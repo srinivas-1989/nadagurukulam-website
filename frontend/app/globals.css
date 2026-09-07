@@ -1,0 +1,35 @@
+:root {
+  --burgundy:#470500; --burgundy-ink:#3a0400; --maroon:#7e2320;
+  --ochre:#c97f1c; --manjal:#e0ac27; --gold:#a27c3f;
+  --silk:#e4d5cb; --silk-deep:#d5bdaf; --cream:#fffde9;
+  --purple:#432250; --forest:#1f4b3f; --waters:#123151;
+
+  --bg:var(--cream); --surface:#fffaf0; --surface-2:var(--silk); --border:#e6d6c4;
+  --text:#2a1712; --text-soft:#6b5548; --text-faint:#93816f;
+  --accent:var(--burgundy); --accent-2:var(--ochre);
+  --shadow: 0 1px 2px rgba(71,5,0,0.06), 0 8px 24px rgba(71,5,0,0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+    --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+    --accent:var(--manjal); --accent-2:var(--ochre);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Jost', sans-serif;
+  font-weight: 600;
+  color: var(--text);
+}

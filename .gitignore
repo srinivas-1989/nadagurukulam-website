@@ -1,2 +1,27 @@
+# OS & Editor files
 .DS_Store
 *.log
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Local Environment Variables (Keep keys out of Git)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env.local
+
+# Next.js Build Outputs
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Render / Build outputs
+dist/
+build/
