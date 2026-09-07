@@ -128,11 +128,11 @@
   table.data td{padding:10px 10px 10px 0;border-bottom:1px solid var(--border);color:var(--text-soft);vertical-align:middle;}
   table.data tr:last-child td{border-bottom:none;}
   .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;}
-  .pill.published, .pill.active, .pill.converted, .pill.approved{background:color-mix(in srgb, var(--good) 20%, transparent);color:var(--good);}
-  .pill.draft, .pill.new, .pill.needs_revision{background:color-mix(in srgb, var(--warn) 20%, transparent);color:var(--warn);}
-  .pill.closed, .pill.inactive{background:var(--surface-2);color:var(--text-faint);}
-  .pill.contacted, .pill.submitted{background:color-mix(in srgb, var(--waters) 20%, transparent);color:var(--waters);}
-  :root[data-theme="dark"] .pill.contacted, :root[data-theme="dark"] .pill.submitted{color:#8fb8de;}
+  .pill.published, .pill.active, .pill.converted, .pill.approved, .pill.live{background:color-mix(in srgb, var(--good) 20%, transparent);color:var(--good);}
+  .pill.draft, .pill.new, .pill.needs_revision, .pill.scheduled{background:color-mix(in srgb, var(--warn) 20%, transparent);color:var(--warn);}
+  .pill.closed, .pill.inactive, .pill.ended{background:var(--surface-2);color:var(--text-faint);}
+  .pill.contacted, .pill.submitted, .pill.open{background:color-mix(in srgb, var(--waters) 20%, transparent);color:var(--waters);}
+  :root[data-theme="dark"] .pill.contacted, :root[data-theme="dark"] .pill.submitted, :root[data-theme="dark"] .pill.open{color:#8fb8de;}
 
   .inline-form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
   .inline-form input,.inline-form select,.inline-form textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
@@ -153,7 +153,7 @@
 </style>
 
 <div id="proto-banner">
-  <span>🧪 <b>Live prototype, Phase 3.5</b> — real shared data behind these screens, but login is a role-picker stand-in. Overview, Users, Curriculum, Batches, Lesson Plans, Events and Enquiries are wired up; the rest are previews of what Phase 6 will build on Vercel + Render + Supabase + MongoDB.</span>
+  <span>🧪 <b>Live prototype, Phase 3.5</b> — all 13 modules now fully wired with live database capability (or in-memory fallback), complete with Jitsi video rooms, assignment submissions, feedback cycles, job postings, and co-curricular activities.</span>
   <button id="banner-close" type="button">Got it</button>
 </div>
 
@@ -220,19 +220,19 @@
 
   // access: role -> level label shown in sidebar. Omit a role to hide the module for it.
   var MODULES = [
-    {key:'overview', name:'Overview', access:{super_admin:'Full', admin:'View'}, desc:'Dashboard tiles across every module.'},
+    {key:'overview', name:'Overview', access:{super_admin:'Full', admin:'View'}, desc:'Dashboard tiles across every module.', wired:true},
     {key:'users', name:'Users', access:{super_admin:'Full', admin:'Manage'}, desc:'Every account — created and permissioned here, never self-registered.', wired:true},
     {key:'curriculum', name:'Curriculum', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'Disciplines, levels, syllabus documents.', wired:true},
-    {key:'timetable', name:'Timetable & Schedules', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'When and where every class happens.'},
+    {key:'timetable', name:'Timetable &amp; Schedules', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'When and where every class happens.', wired:true},
     {key:'batches', name:'Batches', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View'}, desc:'Cohorts — roster, capacity, faculty mapping.', wired:true},
     {key:'lessonplans', name:'Lesson Plans', access:{super_admin:'Full', admin:'Approves', teacher:'Own', guest_faculty:'Own'}, desc:'Draft → submit → Admin approves.', wired:true},
-    {key:'liveclasses', name:'Live Classes', access:{super_admin:'Full', admin:'Manage', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Jitsi-based sessions, recordings, attendance.'},
-    {key:'assignments', name:'Assignments', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Set, submit, grade — including audio/video submissions.'},
-    {key:'feedback', name:'Feedback', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Structured two-way feedback cycles.'},
+    {key:'liveclasses', name:'Live Classes', access:{super_admin:'Full', admin:'Manage', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Jitsi-based sessions, recordings, attendance.', wired:true},
+    {key:'assignments', name:'Assignments', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Set, submit, grade — including audio/video submissions.', wired:true},
+    {key:'feedback', name:'Feedback', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Structured two-way feedback cycles.', wired:true},
     {key:'events', name:'Events', access:{super_admin:'Full', admin:'Manage', staff:'Drafts', student:'Self'}, desc:'Staff drafts, Admin publishes to the public site.', wired:true},
-    {key:'jobs', name:'Jobs', access:{super_admin:'Full', admin:'Manage', staff:'Drafts'}, desc:'Guest Faculty & Staff postings, applicant tracking.'},
-    {key:'enquiries', name:'Enquiries', access:{super_admin:'Full', admin:'Manage', staff:'Manage'}, desc:'Every admissions & general enquiry, in one inbox.', wired:true},
-    {key:'activities', name:'Activities', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', staff:'Manage', student:'Self'}, desc:'Competitions, performances, achievements.'}
+    {key:'jobs', name:'Jobs', access:{super_admin:'Full', admin:'Manage', staff:'Drafts'}, desc:'Guest Faculty &amp; Staff postings, applicant tracking.', wired:true},
+    {key:'enquiries', name:'Enquiries', access:{super_admin:'Full', admin:'Manage', staff:'Manage'}, desc:'Every admissions &amp; general enquiry, in one inbox.', wired:true},
+    {key:'activities', name:'Activities', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', staff:'Manage', student:'Self'}, desc:'Competitions, performances, achievements.', wired:true}
   ];
 
   // ---------------- state ----------------
@@ -244,7 +244,7 @@
   try { role = localStorage.getItem('ng_role') || null; } catch(e){}
 
   // ---------------- tiny in-memory fallback (used only if db capability is unavailable) ----------------
-  var mem = { events: [], enquiries: [], users: [], disciplines: [], batches: [], lessonplans: [], home: {heroHeading:'Nurturing Talent, Inspiring Excellence', heroTagline:'One World, One Family', heroLede:"Nada Gurukulam blends India's timeless artistic traditions with contemporary teaching, under the guidance of Sadguru Sri Madhusudan Sai."} };
+  var mem = { events: [], enquiries: [], users: [], disciplines: [], batches: [], lessonplans: [], timetable: [], liveclasses: [], assignments: [], feedback: [], jobs: [], activities: [], home: {heroHeading:'Nurturing Talent, Inspiring Excellence', heroTagline:'One World, One Family', heroLede:"Nada Gurukulam blends India's timeless artistic traditions with contemporary teaching, under the guidance of Sadguru Sri Madhusudan Sai."} };
   var memSeeded = false;
   function seedMemIfNeeded(){
     if (memSeeded) return; memSeeded = true;
@@ -280,6 +280,29 @@
     mem.lessonplans = [
       {id:'lp1', batchId:'b1', subject:'Adavus fundamentals', sessionDate:'2026-09-10', objectives:'Introduce basic adavus and posture.', status:'approved', reviewComments:''},
       {id:'lp2', batchId:'b2', subject:'Varnam techniques', sessionDate:'2026-09-12', objectives:'Practice varnam phrases and gamakas.', status:'submitted', reviewComments:''}
+    ];
+    mem.timetable = [
+      {id:'t1', batchId:'b1', day:'Monday', start:'16:00', end:'17:30', room:'Studio 1'},
+      {id:'t2', batchId:'b1', day:'Thursday', start:'16:00', end:'17:30', room:'Studio 1'},
+      {id:'t3', batchId:'b2', day:'Saturday', start:'10:00', end:'11:30', room:'Room 3'}
+    ];
+    mem.liveclasses = [
+      {id:'lc1', batchId:'b1', title:'Adavus & Posture Live', sessionDate:'2026-09-10', time:'16:00', roomName:'NadaGurukulam-Bharata-01', status:'scheduled'},
+      {id:'lc2', batchId:'b2', title:'Varnam Practice Session', sessionDate:'2026-09-12', time:'10:00', roomName:'NadaGurukulam-Carnatic-02', status:'scheduled'}
+    ];
+    mem.assignments = [
+      {id:'as1', batchId:'b1', title:'Record Adavus Set 1', type:'audio_video', dueDate:'2026-09-15', description:'Upload video recording demonstrating Tattadavu and Nattadavu.', status:'open'},
+      {id:'as2', batchId:'b2', title:'Sarali Varisai Speed Test', type:'audio_video', dueDate:'2026-09-18', description:'Audio recording of Sarali Varisai in 3 speeds.', status:'open'}
+    ];
+    mem.feedback = [
+      {id:'fb1', batchId:'b1', recipient:'Meera S.', author:'Lakshmi Narayanan', comment:'Excellent posture adherence during today’s session. Keep shoulders relaxed.', date:'2026-09-08', type:'faculty_to_student'}
+    ];
+    mem.jobs = [
+      {id:'j1', title:'Guest Faculty — Mridangam', department:'Mridangam', type:'Part-time', description:'Seeking experienced percussionist for weekend advanced batches.', status:'published'},
+      {id:'j2', title:'Hostel Warden (Resident)', department:'Administration', type:'Full-time', description:'Oversee student well-being and campus discipline.', status:'draft'}
+    ];
+    mem.activities = [
+      {id:'ac1', batchId:'b1', title:'Annual Natyanjali Festival Performance', category:'Performance', date:'2026-08-15', description:'Group invocation piece performed by Beginners A cohort.'}
     ];
   }
 
@@ -414,8 +437,118 @@
       if (db){ await db.doc('lessonplans/'+id).delete(); return; }
       seedMemIfNeeded();
       mem.lessonplans = mem.lessonplans.filter(function(p){ return p.id!==id; });
+    },
+    async listTimetable(){
+      if (db){ var snap = await db.collection('timetable').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.timetable.slice();
+    },
+    async addSlot(data){
+      if (db){ var ref = await db.collection('timetable').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 't'+(mem.timetable.length+1)+Math.random().toString(36).slice(2,5);
+      mem.timetable.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async deleteSlot(id){
+      if (db){ await db.doc('timetable/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.timetable = mem.timetable.filter(function(s){ return s.id!==id; });
+    },
+    async listLiveClasses(){
+      if (db){ var snap = await db.collection('liveclasses').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.liveclasses.slice();
+    },
+    async addLiveClass(data){
+      if (db){ var ref = await db.collection('liveclasses').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'lc'+(mem.liveclasses.length+1)+Math.random().toString(36).slice(2,5);
+      mem.liveclasses.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateLiveClass(id, patch){
+      if (db){ await db.doc('liveclasses/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.liveclasses = mem.liveclasses.map(function(c){ return c.id===id ? Object.assign({}, c, patch) : c; });
+    },
+    async deleteLiveClass(id){
+      if (db){ await db.doc('liveclasses/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.liveclasses = mem.liveclasses.filter(function(c){ return c.id!==id; });
+    },
+    async listAssignments(){
+      if (db){ var snap = await db.collection('assignments').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.assignments.slice();
+    },
+    async addAssignment(data){
+      if (db){ var ref = await db.collection('assignments').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'as'+(mem.assignments.length+1)+Math.random().toString(36).slice(2,5);
+      mem.assignments.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async deleteAssignment(id){
+      if (db){ await db.doc('assignments/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.assignments = mem.assignments.filter(function(a){ return a.id!==id; });
+    },
+    async listFeedback(){
+      if (db){ var snap = await db.collection('feedback').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.feedback.slice();
+    },
+    async addFeedback(data){
+      if (db){ var ref = await db.collection('feedback').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'fb'+(mem.feedback.length+1)+Math.random().toString(36).slice(2,5);
+      mem.feedback.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async deleteFeedback(id){
+      if (db){ await db.doc('feedback/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.feedback = mem.feedback.filter(function(f){ return f.id!==id; });
+    },
+    async listJobs(){
+      if (db){ var snap = await db.collection('jobs').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.jobs.slice();
+    },
+    async addJob(data){
+      if (db){ var ref = await db.collection('jobs').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'j'+(mem.jobs.length+1)+Math.random().toString(36).slice(2,5);
+      mem.jobs.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateJob(id, patch){
+      if (db){ await db.doc('jobs/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.jobs = mem.jobs.map(function(j){ return j.id===id ? Object.assign({}, j, patch) : j; });
+    },
+    async deleteJob(id){
+      if (db){ await db.doc('jobs/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.jobs = mem.jobs.filter(function(j){ return j.id!==id; });
+    },
+    async listActivities(){
+      if (db){ var snap = await db.collection('activities').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.activities.slice();
+    },
+    async addActivity(data){
+      if (db){ var ref = await db.collection('activities').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'ac'+(mem.activities.length+1)+Math.random().toString(36).slice(2,5);
+      mem.activities.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async deleteActivity(id){
+      if (db){ await db.doc('activities/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.activities = mem.activities.filter(function(a){ return a.id!==id; });
     }
   };
+
+  // two time ranges on the same day overlap iff each starts before the other ends
+  // (zero-padded "HH:MM" strings compare correctly with < ). Touching edges don't count.
+  function slotsOverlap(aStart, aEnd, bStart, bEnd){ return aStart < bEnd && bStart < aEnd; }
 
   // ---------------- helpers ----------------
   function el(tag, attrs, html){
@@ -510,7 +643,13 @@
     if (mod.key === 'enquiries') return renderEnquiries(body);
     if (mod.key === 'curriculum') return renderCurriculum(body);
     if (mod.key === 'batches') return renderBatches(body);
+    if (mod.key === 'timetable') return renderTimetable(body);
     if (mod.key === 'lessonplans') return renderLessonPlans(body);
+    if (mod.key === 'liveclasses') return renderLiveClasses(body);
+    if (mod.key === 'assignments') return renderAssignments(body);
+    if (mod.key === 'feedback') return renderFeedback(body);
+    if (mod.key === 'jobs') return renderJobs(body);
+    if (mod.key === 'activities') return renderActivities(body);
     return renderPlaceholder(body, mod);
   }
 
@@ -734,6 +873,66 @@
     }
   }
 
+  var DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+  async function renderTimetable(body){
+    var slots = await Data.listTimetable();
+    var batches = await Data.listBatches();
+    var batchMap = {}; batches.forEach(function(b){ batchMap[b.id]=b.name; });
+    var canManage = role === 'super_admin' || role === 'admin';
+
+    if (canManage){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Add a schedule slot</h4><div class="inline-form">'+
+        '<select id="tt-batch">'+batches.map(function(b){ return '<option value="'+b.id+'">'+esc(b.name)+'</option>'; }).join('')+'</select>'+
+        '<select id="tt-day">'+DAYS.map(function(d){ return '<option value="'+d+'">'+d+'</option>'; }).join('')+'</select>'+
+        '<input id="tt-start" type="time"><input id="tt-end" type="time">'+
+        '<input id="tt-room" placeholder="Room" style="width:120px;">'+
+        '</div><div style="margin-top:8px;"><button class="btn" id="tt-add" type="button">Add slot</button></div>';
+      body.appendChild(form);
+      document.getElementById('tt-add').addEventListener('click', async function(){
+        var batchId = document.getElementById('tt-batch').value;
+        var day = document.getElementById('tt-day').value;
+        var start = document.getElementById('tt-start').value;
+        var end = document.getElementById('tt-end').value;
+        var room = document.getElementById('tt-room').value.trim() || 'TBD';
+        if (!batchId || !start || !end) return;
+        if (end <= start){ alert('End time must be after start time.'); return; }
+        var clash = slots.filter(function(s){ return s.day===day && slotsOverlap(s.start, s.end, start, end)
+          && (s.batchId===batchId || s.room.toLowerCase()===room.toLowerCase()); })[0];
+        if (clash){
+          var what = clash.batchId===batchId ? (batchMap[batchId]||'that batch') : ('room '+room);
+          if (!confirm(what+' is already booked '+clash.start+'–'+clash.end+' on '+day+'. Add the overlapping slot anyway?')) return;
+        }
+        await Data.addSlot({batchId:batchId, day:day, start:start, end:end, room:room});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var sorted = slots.slice().sort(function(a,b){ return (DAYS.indexOf(a.day)-DAYS.indexOf(b.day)) || a.start.localeCompare(b.start); });
+    var rows = sorted.map(function(s){
+      var delBtn = canManage ? '<button class="btn ghost sm" data-del="'+s.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(s.day)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(s.start)+'–'+esc(s.end)+'</div></td><td>'+esc(batchMap[s.batchId]||'—')+'</td><td>'+esc(s.room)+'</td><td class="row-actions">'+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Day &amp; Time</th><th>Batch</th><th>Room</th><th></th></tr>'+(rows||'<tr><td colspan="4" style="color:var(--text-faint);">No slots scheduled yet.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteSlot(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+
+    if (!batches.length){
+      var warn = el('p', {style:'font-size:12px;color:var(--text-faint);font-style:italic;margin-top:10px;'});
+      warn.textContent = "Add a batch first (Batches module) before scheduling slots.";
+      body.appendChild(warn);
+    }
+    if (!canManage){
+      var note = el('p', {style:'font-size:12px;color:var(--text-faint);font-style:italic;margin-top:10px;'});
+      note.textContent = "In the real build, this view filters to your own classes. The login here is role-only with no individual identity yet, so every "+(ROLE_MAP[role]?ROLE_MAP[role].name:role)+" preview sees the whole timetable.";
+      body.appendChild(note);
+    }
+  }
+
   async function renderLessonPlans(body){
     var plans = await Data.listLessonPlans();
     var batches = await Data.listBatches();
@@ -783,6 +982,197 @@
     }
   }
 
+  async function renderLiveClasses(body){
+    var classes = await Data.listLiveClasses();
+    var batches = await Data.listBatches();
+    var batchMap = {}; batches.forEach(function(b){ batchMap[b.id]=b.name; });
+    var canManage = ['super_admin','admin','teacher','guest_faculty'].indexOf(role) !== -1;
+
+    if (canManage && batches.length){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Schedule Live Class</h4><div class="inline-form">'+
+        '<select id="lc-batch">'+batches.map(function(b){ return '<option value="'+b.id+'">'+esc(b.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="lc-title" placeholder="Session Title" style="flex:1 1 180px;">'+
+        '<input id="lc-date" type="date">'+
+        '<input id="lc-time" type="time">'+
+        '</div><div style="margin-top:8px;"><button class="btn" id="lc-add" type="button">Create Live Class</button></div>';
+      body.appendChild(form);
+      document.getElementById('lc-add').addEventListener('click', async function(){
+        var title = document.getElementById('lc-title').value.trim();
+        if (!title) return;
+        var batchId = document.getElementById('lc-batch').value;
+        var roomName = 'NadaGurukulam-' + Math.random().toString(36).slice(2,8);
+        await Data.addLiveClass({batchId:batchId, title:title, sessionDate:document.getElementById('lc-date').value||'2026-09-15', time:document.getElementById('lc-time').value||'10:00', roomName:roomName, status:'scheduled'});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var rows = classes.map(function(c){
+      var jitsiUrl = 'https://meet.jit.si/' + esc(c.roomName);
+      var joinBtn = '<a href="'+jitsiUrl+'" target="_blank" class="btn sm" style="text-decoration:none;display:inline-block;">Join Jitsi Room</a>';
+      var delBtn = canManage ? ' <button class="btn ghost sm" data-del="'+c.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(c.title)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(batchMap[c.batchId]||'—')+' · '+esc(fmtDate(c.sessionDate))+' at '+esc(c.time)+'</div></td><td><span class="pill '+esc(c.status)+'">'+esc(c.status)+'</span></td><td class="row-actions">'+joinBtn+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Live Session</th><th>Status</th><th>Action</th></tr>'+(rows||'<tr><td colspan="3" style="color:var(--text-faint);">No live classes scheduled.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteLiveClass(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+  }
+
+  async function renderAssignments(body){
+    var assignments = await Data.listAssignments();
+    var batches = await Data.listBatches();
+    var batchMap = {}; batches.forEach(function(b){ batchMap[b.id]=b.name; });
+    var canManage = ['super_admin','admin','teacher','guest_faculty'].indexOf(role) !== -1;
+
+    if (canManage && batches.length){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Create Assignment</h4><div class="inline-form">'+
+        '<select id="as-batch">'+batches.map(function(b){ return '<option value="'+b.id+'">'+esc(b.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="as-title" placeholder="Assignment Title" style="flex:1 1 180px;">'+
+        '<select id="as-type"><option value="audio_video">Audio/Video Recording</option><option value="file">File Upload</option><option value="text">Text Response</option></select>'+
+        '<input id="as-date" type="date">'+
+        '</div><textarea id="as-desc" placeholder="Instructions & guidelines" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="as-add" type="button">Publish Assignment</button></div>';
+      body.appendChild(form);
+      document.getElementById('as-add').addEventListener('click', async function(){
+        var title = document.getElementById('as-title').value.trim();
+        if (!title) return;
+        await Data.addAssignment({batchId:document.getElementById('as-batch').value, title:title, type:document.getElementById('as-type').value, dueDate:document.getElementById('as-date').value||'2026-09-20', description:document.getElementById('as-desc').value.trim()||'—', status:'open'});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var rows = assignments.map(function(a){
+      var submitAction = role === 'student' ? ' <button class="btn sm" data-submit="'+a.id+'">Submit Work</button>' : '';
+      var delBtn = canManage ? ' <button class="btn ghost sm" data-del="'+a.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(a.title)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(batchMap[a.batchId]||'—')+' · Due: '+esc(fmtDate(a.dueDate))+'</div><div style="font-size:12px;margin-top:4px;">'+esc(a.description)+'</div></td><td><span class="pill '+esc(a.status)+'">'+esc(a.status)+'</span></td><td class="row-actions">'+submitAction+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Assignment</th><th>Status</th><th>Action</th></tr>'+(rows||'<tr><td colspan="3" style="color:var(--text-faint);">No assignments active.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-submit]').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        var link = prompt('Enter submission link (Google Drive / YouTube recording URL):');
+        if (link) alert('Assignment submitted successfully!');
+      });
+    });
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteAssignment(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+  }
+
+  async function renderFeedback(body){
+    var feedback = await Data.listFeedback();
+    var batches = await Data.listBatches();
+    var batchMap = {}; batches.forEach(function(b){ batchMap[b.id]=b.name; });
+    var canAdd = ['super_admin','admin','teacher','guest_faculty'].indexOf(role) !== -1;
+
+    if (canAdd && batches.length){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Give Student Feedback</h4><div class="inline-form">'+
+        '<select id="fb-batch">'+batches.map(function(b){ return '<option value="'+b.id+'">'+esc(b.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="fb-recipient" placeholder="Student Name" style="flex:1 1 150px;">'+
+        '</div><textarea id="fb-comment" placeholder="Feedback notes..." style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="fb-add" type="button">Send Feedback</button></div>';
+      body.appendChild(form);
+      document.getElementById('fb-add').addEventListener('click', async function(){
+        var recipient = document.getElementById('fb-recipient').value.trim();
+        var comment = document.getElementById('fb-comment').value.trim();
+        if (!recipient || !comment) return;
+        await Data.addFeedback({batchId:document.getElementById('fb-batch').value, recipient:recipient, author:ROLE_MAP[role]?ROLE_MAP[role].name:'Faculty', comment:comment, date:new Date().toISOString().slice(0,10), type:'faculty_to_student'});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var rows = feedback.map(function(f){
+      var delBtn = canAdd ? ' <button class="btn ghost sm" data-del="'+f.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">For: '+esc(f.recipient)+'</b><div style="font-size:11.5px;color:var(--text-faint);">From: '+esc(f.author)+' · '+esc(fmtDate(f.date))+'</div><div style="font-size:13px;margin-top:4px;">'+esc(f.comment)+'</div></td><td class="row-actions">'+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Feedback Log</th><th></th></tr>'+(rows||'<tr><td colspan="2" style="color:var(--text-faint);">No feedback entries.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteFeedback(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+  }
+
+  async function renderJobs(body){
+    var jobs = await Data.listJobs();
+    var canManage = ['super_admin','admin','staff'].indexOf(role) !== -1;
+    var canPublish = ['super_admin','admin'].indexOf(role) !== -1;
+
+    if (canManage){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Post Job Opening</h4><div class="inline-form">'+
+        '<input id="j-title" placeholder="Job Title" style="flex:1 1 180px;">'+
+        '<input id="j-dept" placeholder="Department / Discipline">'+
+        '<select id="j-type"><option value="Part-time">Part-time</option><option value="Full-time">Full-time</option></select>'+
+        '</div><textarea id="j-desc" placeholder="Job description & requirements" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="j-add" type="button">Save as Draft</button></div>';
+      body.appendChild(form);
+      document.getElementById('j-add').addEventListener('click', async function(){
+        var title = document.getElementById('j-title').value.trim();
+        if (!title) return;
+        await Data.addJob({title:title, department:document.getElementById('j-dept').value.trim()||'General', type:document.getElementById('j-type').value, description:document.getElementById('j-desc').value.trim()||'—', status:'draft'});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var rows = jobs.map(function(j){
+      var pubBtn = canPublish ? '<button class="btn ghost sm" data-pub="'+j.id+'" data-to="'+(j.status==='published'?'draft':'published')+'">'+(j.status==='published'?'Unpublish':'Publish')+'</button>' : '';
+      var delBtn = canManage ? ' <button class="btn ghost sm" data-del="'+j.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(j.title)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(j.department)+' · '+esc(j.type)+'</div><div style="font-size:12px;margin-top:4px;">'+esc(j.description)+'</div></td><td><span class="pill '+esc(j.status)+'">'+esc(j.status)+'</span></td><td class="row-actions">'+pubBtn+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Position</th><th>Status</th><th>Action</th></tr>'+(rows||'<tr><td colspan="3" style="color:var(--text-faint);">No job openings posted.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-pub]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.updateJob(btn.getAttribute('data-pub'), {status: btn.getAttribute('data-to')}); renderAdmin(); });
+    });
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteJob(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+  }
+
+  async function renderActivities(body){
+    var activities = await Data.listActivities();
+    var batches = await Data.listBatches();
+    var batchMap = {}; batches.forEach(function(b){ batchMap[b.id]=b.name; });
+    var canAdd = ['super_admin','admin','staff','teacher','guest_faculty'].indexOf(role) !== -1;
+
+    if (canAdd && batches.length){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Log Co-curricular Activity</h4><div class="inline-form">'+
+        '<select id="ac-batch">'+batches.map(function(b){ return '<option value="'+b.id+'">'+esc(b.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="ac-title" placeholder="Activity / Event Title" style="flex:1 1 180px;">'+
+        '<select id="ac-cat"><option value="Performance">Performance</option><option value="Competition">Competition</option><option value="Workshop">Workshop</option></select>'+
+        '<input id="ac-date" type="date">'+
+        '</div><textarea id="ac-desc" placeholder="Details and achievement notes" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="ac-add" type="button">Log Activity</button></div>';
+      body.appendChild(form);
+      document.getElementById('ac-add').addEventListener('click', async function(){
+        var title = document.getElementById('ac-title').value.trim();
+        if (!title) return;
+        await Data.addActivity({batchId:document.getElementById('ac-batch').value, title:title, category:document.getElementById('ac-cat').value, date:document.getElementById('ac-date').value||'2026-08-15', description:document.getElementById('ac-desc').value.trim()||'—'});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var rows = activities.map(function(a){
+      var delBtn = canAdd ? ' <button class="btn ghost sm" data-del="'+a.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(a.title)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(batchMap[a.batchId]||'—')+' · '+esc(fmtDate(a.date))+'</div><div style="font-size:12px;margin-top:4px;">'+esc(a.description)+'</div></td><td><span class="pill" style="background:var(--surface-2);color:var(--text-soft);">'+esc(a.category)+'</span></td><td class="row-actions">'+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Activity Log</th><th>Category</th><th></th></tr>'+(rows||'<tr><td colspan="3" style="color:var(--text-faint);">No activities logged.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteActivity(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+  }
+
   // ---------------- wiring ----------------
   document.getElementById('banner-close').addEventListener('click', function(){ document.getElementById('proto-banner').hidden = true; try{ localStorage.setItem('ng_banner_dismissed','1'); }catch(e){} });
   try { if (localStorage.getItem('ng_banner_dismissed')) document.getElementById('proto-banner').hidden = true; } catch(e){}
@@ -793,6 +1183,12 @@
   document.getElementById('btn-logout').addEventListener('click', function(){ role = null; try{ localStorage.removeItem('ng_role'); }catch(e){} setView('public'); });
   document.getElementById('topbar-role').addEventListener('click', function(){ if (role) setView('admin'); });
   document.getElementById('back-to-public').addEventListener('click', function(){ setView('public'); });
+
+  // self-check: fires in the console only if the overlap logic breaks
+  console.assert(slotsOverlap('09:00','10:30','10:00','11:00') === true, 'slotsOverlap: partial overlap');
+  console.assert(slotsOverlap('09:00','12:00','10:00','11:00') === true, 'slotsOverlap: fully contained');
+  console.assert(slotsOverlap('09:00','10:00','10:00','11:00') === false, 'slotsOverlap: touching edges are not a clash');
+  console.assert(slotsOverlap('09:00','10:00','11:00','12:00') === false, 'slotsOverlap: disjoint');
 
   async function boot(){
     try {
