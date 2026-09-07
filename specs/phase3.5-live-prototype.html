@@ -128,11 +128,11 @@
   table.data td{padding:10px 10px 10px 0;border-bottom:1px solid var(--border);color:var(--text-soft);vertical-align:middle;}
   table.data tr:last-child td{border-bottom:none;}
   .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;}
-  .pill.published, .pill.active, .pill.converted{background:color-mix(in srgb, var(--good) 20%, transparent);color:var(--good);}
-  .pill.draft, .pill.new{background:color-mix(in srgb, var(--warn) 20%, transparent);color:var(--warn);}
+  .pill.published, .pill.active, .pill.converted, .pill.approved{background:color-mix(in srgb, var(--good) 20%, transparent);color:var(--good);}
+  .pill.draft, .pill.new, .pill.needs_revision{background:color-mix(in srgb, var(--warn) 20%, transparent);color:var(--warn);}
   .pill.closed, .pill.inactive{background:var(--surface-2);color:var(--text-faint);}
-  .pill.contacted{background:color-mix(in srgb, var(--waters) 20%, transparent);color:var(--waters);}
-  :root[data-theme="dark"] .pill.contacted{color:#8fb8de;}
+  .pill.contacted, .pill.submitted{background:color-mix(in srgb, var(--waters) 20%, transparent);color:var(--waters);}
+  :root[data-theme="dark"] .pill.contacted, :root[data-theme="dark"] .pill.submitted{color:#8fb8de;}
 
   .inline-form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
   .inline-form input,.inline-form select,.inline-form textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
@@ -153,7 +153,7 @@
 </style>
 
 <div id="proto-banner">
-  <span>🧪 <b>Live prototype, Phase 3.5</b> — real shared data behind these screens, but login is a role-picker stand-in and the events/enquiries/CMS edits here are a preview of the modules Phase 6 will build on Vercel + Render + Supabase + MongoDB.</span>
+  <span>🧪 <b>Live prototype, Phase 3.5</b> — real shared data behind these screens, but login is a role-picker stand-in. Overview, Users, Curriculum, Batches, Lesson Plans, Events and Enquiries are wired up; the rest are previews of what Phase 6 will build on Vercel + Render + Supabase + MongoDB.</span>
   <button id="banner-close" type="button">Got it</button>
 </div>
 
@@ -222,10 +222,10 @@
   var MODULES = [
     {key:'overview', name:'Overview', access:{super_admin:'Full', admin:'View'}, desc:'Dashboard tiles across every module.'},
     {key:'users', name:'Users', access:{super_admin:'Full', admin:'Manage'}, desc:'Every account — created and permissioned here, never self-registered.', wired:true},
-    {key:'curriculum', name:'Curriculum', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'Disciplines, levels, syllabus documents.'},
+    {key:'curriculum', name:'Curriculum', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'Disciplines, levels, syllabus documents.', wired:true},
     {key:'timetable', name:'Timetable & Schedules', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'When and where every class happens.'},
-    {key:'batches', name:'Batches', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View'}, desc:'Cohorts — roster, capacity, faculty mapping.'},
-    {key:'lessonplans', name:'Lesson Plans', access:{super_admin:'Full', admin:'Approves', teacher:'Own', guest_faculty:'Own'}, desc:'Draft → submit → Admin approves.'},
+    {key:'batches', name:'Batches', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View'}, desc:'Cohorts — roster, capacity, faculty mapping.', wired:true},
+    {key:'lessonplans', name:'Lesson Plans', access:{super_admin:'Full', admin:'Approves', teacher:'Own', guest_faculty:'Own'}, desc:'Draft → submit → Admin approves.', wired:true},
     {key:'liveclasses', name:'Live Classes', access:{super_admin:'Full', admin:'Manage', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Jitsi-based sessions, recordings, attendance.'},
     {key:'assignments', name:'Assignments', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Set, submit, grade — including audio/video submissions.'},
     {key:'feedback', name:'Feedback', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Structured two-way feedback cycles.'},
@@ -244,7 +244,7 @@
   try { role = localStorage.getItem('ng_role') || null; } catch(e){}
 
   // ---------------- tiny in-memory fallback (used only if db capability is unavailable) ----------------
-  var mem = { events: [], enquiries: [], users: [], home: {heroHeading:'Nurturing Talent, Inspiring Excellence', heroTagline:'One World, One Family', heroLede:"Nada Gurukulam blends India's timeless artistic traditions with contemporary teaching, under the guidance of Sadguru Sri Madhusudan Sai."} };
+  var mem = { events: [], enquiries: [], users: [], disciplines: [], batches: [], lessonplans: [], home: {heroHeading:'Nurturing Talent, Inspiring Excellence', heroTagline:'One World, One Family', heroLede:"Nada Gurukulam blends India's timeless artistic traditions with contemporary teaching, under the guidance of Sadguru Sri Madhusudan Sai."} };
   var memSeeded = false;
   function seedMemIfNeeded(){
     if (memSeeded) return; memSeeded = true;
@@ -264,6 +264,22 @@
       {id:'u4', name:'Arun Kumar', role:'guest_faculty', email:'arun@nadagurukulam.org', status:'active'},
       {id:'u5', name:'Divya Prasad', role:'staff', email:'divya@nadagurukulam.org', status:'active'},
       {id:'u6', name:'Meera S.', role:'student', email:'meera@nadagurukulam.org', status:'active'}
+    ];
+    mem.disciplines = [
+      {id:'d1', name:'Carnatic Vocal', levels:'Beginner, Intermediate, Advanced', leadFaculty:'Lakshmi Narayanan', description:'South Indian classical vocal tradition — sarali varisai through varnams and kritis.'},
+      {id:'d2', name:'Hindustani Vocal', levels:'Beginner, Intermediate, Advanced', leadFaculty:'Arun Kumar', description:'North Indian classical vocal tradition — raga and taal fundamentals through khayal.'},
+      {id:'d3', name:'Bharatanatyam', levels:'Beginner, Intermediate, Advanced', leadFaculty:'Lakshmi Narayanan', description:'Classical dance — adavus, nritta and abhinaya through the margam repertoire.'},
+      {id:'d4', name:'Mridangam', levels:'Beginner, Intermediate', leadFaculty:'Arun Kumar', description:'South Indian percussion — talam fundamentals through accompaniment practice.'},
+      {id:'d5', name:'Tabla', levels:'Beginner, Intermediate', leadFaculty:'Arun Kumar', description:'North Indian percussion — theka and laya fundamentals through solo compositions.'},
+      {id:'d6', name:'Flute', levels:'Beginner, Intermediate, Advanced', leadFaculty:'Lakshmi Narayanan', description:'Carnatic bamboo flute — breath and fingering technique through raga alapana.'}
+    ];
+    mem.batches = [
+      {id:'b1', name:'Bharatanatyam — Beginners A', disciplineId:'d3', level:'Beginner', facultyId:'u3', capacity:20},
+      {id:'b2', name:'Carnatic Vocal — Intermediate', disciplineId:'d1', level:'Intermediate', facultyId:'u4', capacity:15}
+    ];
+    mem.lessonplans = [
+      {id:'lp1', batchId:'b1', subject:'Adavus fundamentals', sessionDate:'2026-09-10', objectives:'Introduce basic adavus and posture.', status:'approved', reviewComments:''},
+      {id:'lp2', batchId:'b2', subject:'Varnam techniques', sessionDate:'2026-09-12', objectives:'Practice varnam phrases and gamakas.', status:'submitted', reviewComments:''}
     ];
   }
 
@@ -335,6 +351,69 @@
     async setHome(data){
       if (db){ await db.doc('cms/home').set(data); return; }
       seedMemIfNeeded(); mem.home = data;
+    },
+    async listCurriculum(){
+      if (db){ var snap = await db.collection('disciplines').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.disciplines.slice();
+    },
+    async addDiscipline(data){
+      if (db){ var ref = await db.collection('disciplines').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'd'+(mem.disciplines.length+1)+Math.random().toString(36).slice(2,5);
+      mem.disciplines.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateDiscipline(id, patch){
+      if (db){ await db.doc('disciplines/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.disciplines = mem.disciplines.map(function(d){ return d.id===id ? Object.assign({}, d, patch) : d; });
+    },
+    async deleteDiscipline(id){
+      if (db){ await db.doc('disciplines/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.disciplines = mem.disciplines.filter(function(d){ return d.id!==id; });
+    },
+    async listBatches(){
+      if (db){ var snap = await db.collection('batches').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.batches.slice();
+    },
+    async addBatch(data){
+      if (db){ var ref = await db.collection('batches').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'b'+(mem.batches.length+1)+Math.random().toString(36).slice(2,5);
+      mem.batches.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateBatch(id, patch){
+      if (db){ await db.doc('batches/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.batches = mem.batches.map(function(b){ return b.id===id ? Object.assign({}, b, patch) : b; });
+    },
+    async deleteBatch(id){
+      if (db){ await db.doc('batches/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.batches = mem.batches.filter(function(b){ return b.id!==id; });
+    },
+    async listLessonPlans(){
+      if (db){ var snap = await db.collection('lessonplans').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.lessonplans.slice();
+    },
+    async addLessonPlan(data){
+      if (db){ var ref = await db.collection('lessonplans').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'lp'+(mem.lessonplans.length+1)+Math.random().toString(36).slice(2,5);
+      mem.lessonplans.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateLessonPlan(id, patch){
+      if (db){ await db.doc('lessonplans/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.lessonplans = mem.lessonplans.map(function(p){ return p.id===id ? Object.assign({}, p, patch) : p; });
+    },
+    async deleteLessonPlan(id){
+      if (db){ await db.doc('lessonplans/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.lessonplans = mem.lessonplans.filter(function(p){ return p.id!==id; });
     }
   };
 
@@ -429,6 +508,9 @@
     if (mod.key === 'users') return renderUsers(body);
     if (mod.key === 'events') return renderEvents(body);
     if (mod.key === 'enquiries') return renderEnquiries(body);
+    if (mod.key === 'curriculum') return renderCurriculum(body);
+    if (mod.key === 'batches') return renderBatches(body);
+    if (mod.key === 'lessonplans') return renderLessonPlans(body);
     return renderPlaceholder(body, mod);
   }
 
@@ -572,6 +654,133 @@
       await Data.addEnquiry({name:name, contact:document.getElementById('q-contact').value.trim(), type:document.getElementById('q-type').value, message:document.getElementById('q-msg').value.trim()||'—', status:'new'});
       renderAdmin();
     });
+  }
+
+  async function renderCurriculum(body){
+    var items = await Data.listCurriculum();
+    var canManage = role === 'super_admin' || role === 'admin';
+    if (canManage){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Add a discipline</h4><div class="inline-form">'+
+        '<input id="cur-name" placeholder="Discipline name" style="flex:1 1 180px;">'+
+        '<input id="cur-levels" placeholder="Levels (e.g. Beginner, Intermediate)" style="flex:1 1 220px;">'+
+        '<input id="cur-lead" placeholder="Lead faculty">'+
+        '</div><textarea id="cur-desc" placeholder="Description" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="cur-add" type="button">Add discipline</button></div>';
+      body.appendChild(form);
+      document.getElementById('cur-add').addEventListener('click', async function(){
+        var name = document.getElementById('cur-name').value.trim();
+        if (!name) return;
+        await Data.addDiscipline({name:name, levels:document.getElementById('cur-levels').value.trim()||'—', leadFaculty:document.getElementById('cur-lead').value.trim()||'—', description:document.getElementById('cur-desc').value.trim()||'—'});
+        renderAdmin();
+      });
+    }
+    var table = el('div', {class:'card'});
+    var rows = items.map(function(d){
+      var delBtn = canManage ? '<button class="btn ghost sm" data-del="'+d.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(d.name)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(d.description)+'</div></td><td>'+esc(d.levels)+'</td><td>'+esc(d.leadFaculty)+'</td><td class="row-actions">'+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Discipline</th><th>Levels</th><th>Lead Faculty</th><th></th></tr>'+(rows||'<tr><td colspan="4" style="color:var(--text-faint);">No disciplines yet.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteDiscipline(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+    if (!canManage){
+      var note = el('p', {style:'font-size:12px;color:var(--text-faint);font-style:italic;margin-top:10px;'});
+      note.textContent = "In the real build, this view scopes to your own assigned discipline. The login here is role-only with no individual identity yet, so every " + (ROLE_MAP[role]?ROLE_MAP[role].name:role) + " preview sees the full list.";
+      body.appendChild(note);
+    }
+  }
+
+  async function renderBatches(body){
+    var items = await Data.listBatches();
+    var disciplines = await Data.listCurriculum();
+    var users = await Data.listUsers();
+    var faculty = users.filter(function(u){ return u.role==='teacher' || u.role==='guest_faculty'; });
+    var discMap = {}; disciplines.forEach(function(d){ discMap[d.id]=d.name; });
+    var facMap = {}; faculty.forEach(function(f){ facMap[f.id]=f.name; });
+    var canManage = role === 'super_admin' || role === 'admin';
+    if (canManage){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Add a batch</h4><div class="inline-form">'+
+        '<input id="b-name" placeholder="Batch name" style="flex:1 1 200px;">'+
+        '<select id="b-disc">'+disciplines.map(function(d){ return '<option value="'+d.id+'">'+esc(d.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="b-level" placeholder="Level" style="width:120px;">'+
+        '<select id="b-faculty">'+faculty.map(function(f){ return '<option value="'+f.id+'">'+esc(f.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="b-capacity" type="number" placeholder="Capacity" style="width:100px;">'+
+        '</div><div style="margin-top:8px;"><button class="btn" id="b-add" type="button">Add batch</button></div>';
+      body.appendChild(form);
+      document.getElementById('b-add').addEventListener('click', async function(){
+        var name = document.getElementById('b-name').value.trim();
+        if (!name || !disciplines.length || !faculty.length) return;
+        await Data.addBatch({name:name, disciplineId:document.getElementById('b-disc').value, level:document.getElementById('b-level').value.trim()||'—', facultyId:document.getElementById('b-faculty').value, capacity:parseInt(document.getElementById('b-capacity').value,10)||20});
+        renderAdmin();
+      });
+    }
+    var table = el('div', {class:'card'});
+    var rows = items.map(function(b){
+      var delBtn = canManage ? '<button class="btn ghost sm" data-del="'+b.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(b.name)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(b.level)+'</div></td><td>'+esc(discMap[b.disciplineId]||'—')+'</td><td>'+esc(facMap[b.facultyId]||'—')+'</td><td>'+esc(String(b.capacity))+'</td><td class="row-actions">'+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Batch</th><th>Discipline</th><th>Faculty</th><th>Capacity</th><th></th></tr>'+(rows||'<tr><td colspan="5" style="color:var(--text-faint);">No batches yet.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteBatch(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+    if (!canManage){
+      var note = el('p', {style:'font-size:12px;color:var(--text-faint);font-style:italic;margin-top:10px;'});
+      note.textContent = "In the real build, Teacher and Guest Faculty see only the batches they are assigned to. The login here is role-only with no individual identity yet, so every preview sees every batch.";
+      body.appendChild(note);
+    }
+  }
+
+  async function renderLessonPlans(body){
+    var plans = await Data.listLessonPlans();
+    var batches = await Data.listBatches();
+    var batchMap = {}; batches.forEach(function(b){ batchMap[b.id]=b.name; });
+    var canDraft = ['super_admin','teacher','guest_faculty'].indexOf(role) !== -1;
+    var canApprove = ['super_admin','admin'].indexOf(role) !== -1;
+
+    if (canDraft){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Draft a lesson plan</h4><div class="inline-form">'+
+        '<select id="lp-batch">'+batches.map(function(b){ return '<option value="'+b.id+'">'+esc(b.name)+'</option>'; }).join('')+'</select>'+
+        '<input id="lp-subject" placeholder="Subject" style="flex:1 1 180px;">'+
+        '<input id="lp-date" type="date">'+
+        '</div><textarea id="lp-obj" placeholder="Objectives for this session" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="lp-add" type="button">Save as draft</button></div>';
+      body.appendChild(form);
+      document.getElementById('lp-add').addEventListener('click', async function(){
+        var subject = document.getElementById('lp-subject').value.trim();
+        if (!subject || !batches.length) return;
+        await Data.addLessonPlan({batchId:document.getElementById('lp-batch').value, subject:subject, sessionDate:document.getElementById('lp-date').value || '2026-12-01', objectives:document.getElementById('lp-obj').value.trim()||'—', status:'draft', reviewComments:''});
+        renderAdmin();
+      });
+    }
+
+    var table = el('div', {class:'card'});
+    var rows = plans.map(function(p){
+      var actions = '';
+      if (p.status === 'draft' && canDraft) actions += '<button class="btn ghost sm" data-submit="'+p.id+'">Submit for review</button> ';
+      if (p.status === 'submitted' && canApprove) actions += '<button class="btn ghost sm" data-approve="'+p.id+'">Approve</button> <button class="btn ghost sm" data-return="'+p.id+'">Return</button> ';
+      if (p.status === 'needs_revision' && canDraft) actions += '<button class="btn ghost sm" data-resubmit="'+p.id+'">Resubmit</button> ';
+      if (canDraft) actions += '<button class="btn ghost sm" data-del="'+p.id+'">Delete</button>';
+      var comments = p.reviewComments ? '<div style="font-size:11.5px;color:var(--warn);margin-top:4px;">Reviewer note: '+esc(p.reviewComments)+'</div>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(p.subject)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(batchMap[p.batchId]||'—')+' · '+esc(fmtDate(p.sessionDate))+'</div>'+comments+'</td><td><span class="pill '+esc(p.status)+'">'+esc(p.status.replace('_',' '))+'</span></td><td class="row-actions">'+actions+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Lesson Plan</th><th>Status</th><th></th></tr>'+(rows||'<tr><td colspan="3" style="color:var(--text-faint);">No lesson plans yet.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-submit]').forEach(function(btn){ btn.addEventListener('click', async function(){ await Data.updateLessonPlan(btn.getAttribute('data-submit'), {status:'submitted'}); renderAdmin(); }); });
+    table.querySelectorAll('[data-approve]').forEach(function(btn){ btn.addEventListener('click', async function(){ await Data.updateLessonPlan(btn.getAttribute('data-approve'), {status:'approved', reviewComments:''}); renderAdmin(); }); });
+    table.querySelectorAll('[data-return]').forEach(function(btn){ btn.addEventListener('click', async function(){ await Data.updateLessonPlan(btn.getAttribute('data-return'), {status:'needs_revision', reviewComments:'Please revise and resubmit.'}); renderAdmin(); }); });
+    table.querySelectorAll('[data-resubmit]').forEach(function(btn){ btn.addEventListener('click', async function(){ await Data.updateLessonPlan(btn.getAttribute('data-resubmit'), {status:'submitted'}); renderAdmin(); }); });
+    table.querySelectorAll('[data-del]').forEach(function(btn){ btn.addEventListener('click', async function(){ await Data.deleteLessonPlan(btn.getAttribute('data-del')); renderAdmin(); }); });
+
+    if (!batches.length){
+      var warn = el('p', {style:'font-size:12px;color:var(--text-faint);font-style:italic;margin-top:10px;'});
+      warn.textContent = "Add a batch first (Batches module) before drafting a lesson plan.";
+      body.appendChild(warn);
+    }
   }
 
   // ---------------- wiring ----------------
