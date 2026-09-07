@@ -1,8 +1,53 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [role, setRole] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState('teacher');
+  const [loading, setLoading] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+      const res = await fetch(`${apiUrl}/api/users`);
+      const data = await res.json();
+      if (Array.isArray(data)) setUsers(data);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (role) {
+      fetchUsers();
+    }
+  }, [role]);
+
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    if (!newName || !newEmail) return;
+    setLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+      const res = await fetch(`${apiUrl}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, email: newEmail, role_key: newRole })
+      });
+      if (res.ok) {
+        setNewName('');
+        setNewEmail('');
+        fetchUsers();
+      }
+    } catch (err) {
+      console.error('Failed to add user:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -42,17 +87,57 @@ export default function Home() {
       <main style={{ flex: 1, maxWidth: '1080px', margin: '0 auto', padding: '40px 24px', width: '100%' }}>
         {role ? (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow)' }}>
-            <h2>Welcome to the Academic Portal ({role})</h2>
-            <p>Connected live to Supabase &amp; MongoDB storage layers.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '20px' }}>
-              <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <h4>13 Portal Modules</h4>
-                <p style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Active and permission-enforced.</p>
-              </div>
-              <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <h4>Timetable &amp; Live Classes</h4>
-                <p style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Jitsi Meet integrated rooms.</p>
-              </div>
+            <h2>Academic Portal — Users Management ({role})</h2>
+            <p style={{ color: 'var(--text-soft)', marginBottom: '24px' }}>Connected live to Supabase database via Render backend.</p>
+
+            {/* Add User Form */}
+            <form onSubmit={handleAddUser} style={{ background: 'var(--bg)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <input type="text" placeholder="Full name" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
+              <input type="email" placeholder="Email address" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
+              <select value={newRole} onChange={e => setNewRole(e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <option value="admin">Admin</option>
+                <option value="teacher">Teacher</option>
+                <option value="guest_faculty">Guest Faculty</option>
+                <option value="staff">Staff</option>
+                <option value="student">Student</option>
+              </select>
+              <button type="submit" disabled={loading} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
+                {loading ? 'Adding...' : 'Add User'}
+              </button>
+            </form>
+
+            {/* Users Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-faint)' }}>
+                    <th style={{ padding: '10px' }}>Name</th>
+                    <th style={{ padding: '10px' }}>Email</th>
+                    <th style={{ padding: '10px' }}>Role</th>
+                    <th style={{ padding: '10px' }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-faint)' }}>No users found in database yet. Add one above!</td>
+                    </tr>
+                  ) : (
+                    users.map(u => (
+                      <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px', fontWeight: 600 }}>{u.name}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-soft)' }}>{u.email}</td>
+                        <td style={{ padding: '10px', textTransform: 'capitalize' }}>{u.role_key}</td>
+                        <td style={{ padding: '10px' }}>
+                          <span style={{ background: 'rgba(31,75,63,0.15)', color: 'var(--good)', padding: '2px 8px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
+                            {u.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         ) : (

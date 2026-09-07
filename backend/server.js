@@ -1,9 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+// Initialize Supabase (Backend uses Service Role Key for full access)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 app.use(cors());
 app.use(express.json());
@@ -13,15 +20,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', institution: 'Nada Gurukulam', timestamp: new Date().toISOString() });
 });
 
-// API Routes placeholder for the 13 modules
-app.get('/api/modules', (req, res) => {
-  res.json({
-    modules: [
-      'overview', 'users', 'curriculum', 'timetable', 'batches',
-      'lessonplans', 'liveclasses', 'assignments', 'feedback',
-      'events', 'jobs', 'enquiries', 'activities'
-    ]
-  });
+// Users API
+app.get('/api/users', async (req, res) => {
+  const { data, error } = await supabase.from('users').select('*');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/users', async (req, res) => {
+  const { name, email, role_key } = req.body;
+  const { data, error } = await supabase
+    .from('users')
+    .insert([{ name, email, role_key, status: 'active' }])
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data[0]);
 });
 
 app.listen(PORT, () => {
