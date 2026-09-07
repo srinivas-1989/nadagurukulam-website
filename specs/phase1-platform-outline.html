@@ -1,0 +1,725 @@
+<title>Nada Gurukulam Platform Outline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Petit+Formal+Script&display=swap');
+
+  :root{
+    --burgundy:#470500;
+    --burgundy-ink:#3a0400;
+    --maroon:#7e2320;
+    --ochre:#c97f1c;
+    --manjal:#e0ac27;
+    --gold:#a27c3f;
+    --silk:#e4d5cb;
+    --silk-deep:#d5bdaf;
+    --cream:#fffde9;
+
+    --purple:#432250;
+    --forest:#1f4b3f;
+    --waters:#123151;
+
+    --bg:var(--cream);
+    --surface:#fffaf0;
+    --surface-2:var(--silk);
+    --border:#e6d6c4;
+    --text:#2a1712;
+    --text-soft:#6b5548;
+    --text-faint:#93816f;
+    --accent:var(--burgundy);
+    --accent-ink:#ffffff;
+    --accent-2:var(--ochre);
+    --divider-a:var(--burgundy);
+    --divider-b:var(--cream);
+    --code-bg:#f2e8da;
+    --shadow: 0 1px 2px rgba(71,5,0,0.06), 0 8px 24px rgba(71,5,0,0.06);
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c0d09;
+      --surface:#241209;
+      --surface-2:#2e160e;
+      --border:#432217;
+      --text:#f4e9dd;
+      --text-soft:#cbab97;
+      --text-faint:#9c7b68;
+      --accent:var(--manjal);
+      --accent-ink:#2a1500;
+      --accent-2:var(--ochre);
+      --divider-a:#2e160e;
+      --divider-b:#1c0d09;
+      --code-bg:#2a150d;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1c0d09;
+    --surface:#241209;
+    --surface-2:#2e160e;
+    --border:#432217;
+    --text:#f4e9dd;
+    --text-soft:#cbab97;
+    --text-faint:#9c7b68;
+    --accent:var(--manjal);
+    --accent-ink:#2a1500;
+    --accent-2:var(--ochre);
+    --divider-a:#2e160e;
+    --divider-b:#1c0d09;
+    --code-bg:#2a150d;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Jost', ui-sans-serif, system-ui, sans-serif;
+    font-weight:600;
+    letter-spacing:0.01em;
+    text-wrap:balance;
+    color:var(--text);
+    margin:0;
+  }
+  a{color:var(--accent);}
+  .script{
+    font-family:'Petit Formal Script', cursive;
+    font-weight:400;
+  }
+  .serif-em{
+    font-family:'EB Garamond', 'PT Serif', serif;
+    font-style:italic;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    background:linear-gradient(155deg, var(--burgundy) 0%, var(--burgundy-ink) 100%);
+    color:#fbeee6;
+    padding:56px 8vw 76px;
+    position:relative;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);} }
+  :root[data-theme="dark"] .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);}
+  .hero .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--manjal);
+    font-weight:600;
+    margin-bottom:18px;
+  }
+  .hero .eyebrow::before{content:"";width:22px;height:1px;background:var(--manjal);display:inline-block;}
+  .hero h1{
+    font-size:clamp(32px,4.2vw,52px);
+    line-height:1.1;
+    max-width:16ch;
+    color:#fff;
+  }
+  .hero .tagline{
+    font-family:'Petit Formal Script', cursive;
+    font-size:clamp(22px,2.6vw,30px);
+    color:var(--manjal);
+    margin-top:14px;
+  }
+  .hero p.lede{
+    max-width:62ch;
+    font-size:17px;
+    color:#f0ddd2;
+    margin-top:20px;
+  }
+  .hero-meta{
+    display:flex;flex-wrap:wrap;gap:28px;
+    margin-top:34px;
+    padding-top:22px;
+    border-top:1px solid rgba(255,255,255,0.16);
+  }
+  .hero-meta div{font-size:13px;color:#e8c9b9;}
+  .hero-meta strong{display:block;color:#fff;font-size:14.5px;font-weight:600;margin-bottom:2px;}
+
+  .wave{display:block;width:100%;height:52px;margin-top:-2px;}
+
+  /* ---------- Nav rail ---------- */
+  .layout{
+    max-width:1180px;margin:0 auto;
+    display:grid;grid-template-columns:220px 1fr;gap:56px;
+    padding:0 8vw 90px;
+  }
+  @media (max-width:880px){ .layout{grid-template-columns:1fr;} .toc{display:none;} }
+  .toc{position:sticky;top:28px;align-self:start;padding-top:44px;}
+  .toc .toc-label{font-size:11.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:14px;display:block;}
+  .toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;border-left:1px solid var(--border);}
+  .toc li{counter-increment:toc;position:relative;padding:7px 0 7px 20px;}
+  .toc li::before{
+    content:counter(toc,decimal-leading-zero);
+    position:absolute;left:-1px;top:8px;width:16px;transform:translateX(-50%);
+    background:var(--bg);
+    font-size:10.5px;color:var(--text-faint);font-family:'Nunito Sans',sans-serif;
+    padding:2px 0;
+  }
+  .toc a{display:block;font-size:13.5px;color:var(--text-soft);text-decoration:none;font-weight:600;}
+  .toc a:hover{color:var(--accent);}
+
+  main{padding-top:44px;min-width:0;}
+  section.block{margin-bottom:64px;scroll-margin-top:24px;}
+  .kicker{
+    font-size:12px;letter-spacing:0.13em;text-transform:uppercase;color:var(--accent-2);font-weight:700;margin-bottom:8px;
+  }
+  section.block h2{font-size:clamp(24px,2.6vw,30px);margin-bottom:16px;}
+  section.block > p{max-width:70ch;color:var(--text-soft);font-size:15.5px;}
+  section.block > p + p{margin-top:12px;}
+
+  .divider{
+    display:flex;align-items:center;gap:14px;margin:52px 0 40px;color:var(--text-faint);
+  }
+  .divider svg{flex:0 0 auto;width:34px;height:14px;color:var(--gold);}
+  .divider .line{flex:1;height:1px;background:var(--border);}
+  .divider .num{font-family:'Jost',sans-serif;font-size:12px;letter-spacing:0.1em;}
+
+  /* ---------- Layer cards ---------- */
+  .layers{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:26px;}
+  @media (max-width:700px){.layers{grid-template-columns:1fr;}}
+  .layer-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:26px 24px;box-shadow:var(--shadow);
+  }
+  .layer-card .tag{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+    padding:4px 10px;border-radius:99px;margin-bottom:14px;
+  }
+  .layer-card.pub .tag{background:color-mix(in srgb, var(--ochre) 18%, transparent);color:var(--ochre);}
+  .layer-card.portal .tag{background:color-mix(in srgb, var(--burgundy) 14%, transparent);color:var(--accent);}
+  .layer-card h3{font-size:19px;margin-bottom:10px;}
+  .layer-card p{font-size:14.5px;color:var(--text-soft);margin:0 0 12px;}
+  .layer-card ul{margin:0;padding-left:18px;font-size:14px;color:var(--text-soft);}
+  .layer-card li{margin-bottom:5px;}
+
+  /* ---------- Role table ---------- */
+  .role-table{width:100%;border-collapse:collapse;margin-top:22px;font-size:14.5px;}
+  .role-table th{
+    text-align:left;font-family:'Jost',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--text-faint);padding:0 14px 10px 0;border-bottom:1px solid var(--border);
+  }
+  .role-table td{padding:14px 14px 14px 0;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);}
+  .role-table tr:last-child td{border-bottom:none;}
+  .role-chip{
+    display:inline-flex;align-items:center;gap:6px;font-family:'Jost',sans-serif;font-weight:600;font-size:13.5px;color:var(--text);white-space:nowrap;
+  }
+  .role-chip .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+
+  /* ---------- Sitemap tree ---------- */
+  .sitemap{margin-top:24px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px 26px;}
+  @media (max-width:760px){.sitemap{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:520px){.sitemap{grid-template-columns:1fr;}}
+  .sitemap .item{
+    font-size:14.5px;padding:10px 0;border-bottom:1px dashed var(--border);display:flex;justify-content:space-between;gap:10px;align-items:baseline;
+  }
+  .sitemap .item span.note{font-size:12px;color:var(--text-faint);text-align:right;}
+  .sitemap .item strong{font-weight:600;color:var(--text);}
+
+  /* ---------- Module cards ---------- */
+  .modules{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:26px;}
+  @media (max-width:700px){.modules{grid-template-columns:1fr;}}
+  .module{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;box-shadow:var(--shadow);
+  }
+  .module-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .module-head h4{font-size:16.5px;}
+  .module-idx{font-family:'Jost',sans-serif;font-size:12px;color:var(--text-faint);}
+  .module p{font-size:14px;color:var(--text-soft);margin:0 0 12px;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{
+    font-size:11px;font-weight:700;letter-spacing:0.03em;padding:3px 9px;border-radius:99px;
+    background:var(--surface-2);color:var(--text-soft);border:1px solid var(--border);
+  }
+  .chip.super{background:color-mix(in srgb, var(--burgundy) 16%, transparent);color:var(--accent);border-color:transparent;}
+
+  /* ---------- CMS principles ---------- */
+  .principles{margin-top:24px;display:flex;flex-direction:column;gap:0;}
+  .principle{display:grid;grid-template-columns:56px 1fr;gap:18px;padding:18px 0;border-bottom:1px solid var(--border);}
+  .principle:first-child{padding-top:0;}
+  .principle:last-child{border-bottom:none;}
+  .principle .n{font-family:'Jost',sans-serif;font-size:26px;color:var(--silk-deep);font-weight:600;}
+  :root[data-theme="dark"] .principle .n, @media (prefers-color-scheme:dark){.principle .n{color:var(--surface-2);}}
+  .principle h4{font-size:15.5px;margin-bottom:5px;}
+  .principle p{font-size:14px;color:var(--text-soft);margin:0;max-width:60ch;}
+
+  /* ---------- Architecture diagram ---------- */
+  .arch{margin-top:28px;}
+  .arch-row{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;}
+  .arch-box{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;flex:1;min-width:150px;box-shadow:var(--shadow);
+  }
+  .arch-box .k{font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-2);font-weight:700;}
+  .arch-box .v{font-family:'Jost',sans-serif;font-size:15.5px;font-weight:600;margin-top:4px;}
+  .arch-box .d{font-size:12.5px;color:var(--text-faint);margin-top:6px;}
+  .arch-arrow{display:flex;align-items:center;justify-content:center;width:34px;color:var(--text-faint);font-size:18px;flex:0 0 auto;}
+  @media (max-width:760px){.arch-row{flex-direction:column;} .arch-arrow{width:100%;height:24px;transform:rotate(90deg);}}
+  .arch-tier-label{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);margin:22px 0 8px;font-weight:700;}
+  .arch-note{font-size:13px;color:var(--text-faint);margin-top:14px;border-left:2px solid var(--gold);padding-left:12px;}
+
+  /* ---------- Design system swatches ---------- */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:22px;}
+  .swatch{border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+  .swatch .fill{height:60px;}
+  .swatch .label{padding:8px 10px;background:var(--surface);font-size:12px;}
+  .swatch .label b{display:block;font-family:'Jost',sans-serif;font-size:12.5px;color:var(--text);}
+  .swatch .label span{color:var(--text-faint);font-family:'Nunito Sans',monospace;font-size:11px;}
+  .type-specimen{margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media (max-width:700px){.type-specimen{grid-template-columns:1fr;}}
+  .spec-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;}
+  .spec-card .role{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:10px;}
+  .spec-card .sample{font-size:22px;color:var(--text);}
+
+  /* ---------- Roadmap ---------- */
+  .roadmap{margin-top:24px;position:relative;padding-left:26px;border-left:2px solid var(--border);}
+  .phase{position:relative;padding-bottom:26px;}
+  .phase:last-child{padding-bottom:0;}
+  .phase::before{
+    content:"";position:absolute;left:-32px;top:3px;width:11px;height:11px;border-radius:50%;
+    background:var(--surface);border:2px solid var(--accent);
+  }
+  .phase.done::before{background:var(--accent);}
+  .phase h4{font-size:15px;display:flex;align-items:center;gap:9px;}
+  .phase h4 .ph{font-family:'Jost',sans-serif;color:var(--text-faint);font-size:12.5px;font-weight:600;}
+  .phase p{font-size:13.5px;color:var(--text-soft);margin:5px 0 0;max-width:62ch;}
+
+  /* ---------- Decisions ---------- */
+  .decisions{margin-top:24px;display:flex;flex-direction:column;gap:12px;}
+  .decision{
+    display:flex;gap:14px;padding:16px 18px;border-radius:10px;background:var(--surface);border:1px solid var(--border);
+  }
+  .decision .mark{
+    flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;margin-top:1px;
+  }
+  .decision.resolved .mark{background:color-mix(in srgb, var(--forest) 22%, transparent);color:var(--forest);}
+  .decision.open .mark{background:color-mix(in srgb, var(--ochre) 22%, transparent);color:var(--ochre);}
+  .decision .body > b{display:block;font-size:14.5px;margin-bottom:3px;color:var(--text);}
+  .decision .body span{font-size:13.5px;color:var(--text-soft);}
+  .decision .body p{font-size:13.5px;color:var(--text-soft);margin:8px 0 0;max-width:66ch;}
+  .decision .body p b.reco{color:var(--accent);font-weight:700;}
+  .decision.action .mark{background:color-mix(in srgb, var(--waters) 22%, transparent);color:var(--waters);}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .decision.action .mark{color:#8fb8de;}}
+  :root[data-theme="dark"] .decision.action .mark{color:#8fb8de;}
+
+  footer{
+    max-width:1180px;margin:0 auto;padding:0 8vw 60px;
+  }
+  .cta-band{
+    background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:32px 30px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;
+  }
+  .cta-band h3{font-size:19px;margin-bottom:6px;}
+  .cta-band p{font-size:14px;color:var(--text-soft);margin:0;max-width:52ch;}
+  .signature{font-family:'Petit Formal Script', cursive;color:var(--accent);font-size:24px;}
+</style>
+
+<header class="hero">
+  <span class="eyebrow">Nada Gurukulam · Platform Outline · Phase 1</span>
+  <h1>One platform, one login, everything editable.</h1>
+  <div class="tagline">Nurturing Talent, Inspiring Excellence</div>
+  <p class="lede">A structural outline for the Nada Gurukulam website and academic portal — a public, interactive home for the school under Sri Sathya Sai University for Human Excellence, and a role-based back office where you, as Super Admin, control every page, class, and document.</p>
+  <div class="hero-meta">
+    <div><strong>Prepared for</strong>Srinivas · Super Admin</div>
+    <div><strong>Reference brand</strong>Interim Branding Guidelines, One World One Family Mission</div>
+    <div><strong>Reference site</strong>nadagurukulam.org (full rebuild)</div>
+    <div><strong>Status</strong>Outline for sign-off — detailing follows section by section</div>
+  </div>
+</header>
+<svg class="wave" viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C 240,5 480,75 720,40 C 960,5 1200,75 1440,40 L1440,80 L0,80 Z" fill="var(--bg)"></path></svg>
+
+<div class="layout">
+  <nav class="toc">
+    <span class="toc-label">Contents</span>
+    <ol>
+      <li><a href="#vision">Vision & scope</a></li>
+      <li><a href="#layers">The two layers</a></li>
+      <li><a href="#roles">Roles & access</a></li>
+      <li><a href="#sitemap">Public site map</a></li>
+      <li><a href="#portal">Portal modules</a></li>
+      <li><a href="#cms">Dynamic CMS</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#design">Design system</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+      <li><a href="#decisions">Open decisions</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section class="block" id="vision">
+      <div class="kicker">01 — Vision & scope</div>
+      <h2>An informative front door with a working school behind it</h2>
+      <p>Today, nadagurukulam.org introduces the gurukulam — its founder's message, vision, the six disciplines taught (Carnatic vocal, Hindustani vocal, Bharatanatyam, Mridangam, Tabla, Flute), and its faculty. The rebuild keeps that role and adds a second one: everything the school actually runs on — curriculum, timetables, batches, lesson plans, live classes, assignments, feedback and UGC compliance documents — moves onto the same platform, behind a single login, editable by you first.</p>
+      <p>Every visible piece of the public site — text, images, sections, menus, the events calendar, job listings — is a record in the database, not a line of code. Changing it is a Super Admin action, not a developer request. That is the meaning of "completely dynamic" for this build: nothing on the public pages is hardcoded once launched.</p>
+    </section>
+
+    <div class="divider"><span class="num">§01 → §02</span><div class="line"></div></div>
+
+    <section class="block" id="layers">
+      <div class="kicker">02 — The two layers</div>
+      <h2>Public website + Academic portal, one codebase</h2>
+      <p>Both layers share the same design system, the same content database, and the same deployment pipeline — a visitor and a logged-in teacher are looking at two views of one system, not two separate products.</p>
+      <div class="layers">
+        <div class="layer-card pub">
+          <span class="tag">No login required</span>
+          <h3>Public website</h3>
+          <p>The face of Nada Gurukulam — informative, interactive, and built to convert a visitor into an enquiry or an applicant.</p>
+          <ul>
+            <li>Home, About, Founder's message, Vision</li>
+            <li>Courses / disciplines, faculty directory</li>
+            <li>Public events calendar, gallery, news</li>
+            <li>Admissions enquiry form, job listings</li>
+            <li>Public UGC / compliance documents</li>
+          </ul>
+        </div>
+        <div class="layer-card portal">
+          <span class="tag">Role-based login</span>
+          <h3>Academic portal</h3>
+          <p>Where the school is actually run — visible only after sign-in, scoped to what each role is allowed to touch.</p>
+          <ul>
+            <li>Overview, Users, Curriculum</li>
+            <li>Timetable & Schedules, Batches, Lesson Plans</li>
+            <li>Live Classes, Assignments, Feedback</li>
+            <li>Events, Jobs, Enquiries, Activities</li>
+            <li>Restricted UGC documents, by role</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">§02 → §03</span><div class="line"></div></div>
+
+    <section class="block" id="roles">
+      <div class="kicker">03 — Roles & access</div>
+      <h2>Who can see and change what</h2>
+      <p>You create every account as Super Admin — there is no self-registration for staff-side roles. Students register or are enrolled by staff, then use a lighter portal of their own.</p>
+      <table class="role-table">
+        <tr><th>Role</th><th>Created by</th><th>Can generally do</th></tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--burgundy)"></span>Super Admin</span></td>
+          <td>— (you)</td>
+          <td>Everything: edit any page or content block, manage the design system, create and permission every other account, full access to all thirteen portal modules and every document.</td>
+        </tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--waters)"></span>Admin</span></td>
+          <td>Super Admin</td>
+          <td>Day-to-day operations across most modules — Users (non-admin roles), Curriculum, Timetable, Batches, Enquiries, Jobs, Events — without access to site-wide design settings or Super Admin creation.</td>
+        </tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--forest)"></span>Teacher / Faculty</span></td>
+          <td>Super Admin / Admin</td>
+          <td>Own batches and lesson plans, live classes, assignments and feedback for the students they teach; read access to curriculum and timetable.</td>
+        </tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--ochre)"></span>Guest Faculty</span></td>
+          <td>Super Admin / Admin</td>
+          <td>Same shape as Teacher, scoped only to the specific batches or sessions they are assigned — no visibility into other batches, staff records, or enquiries.</td>
+        </tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--purple)"></span>Staff</span></td>
+          <td>Super Admin / Admin</td>
+          <td>Administrative modules — Enquiries, Jobs, Events, Activities — typically without academic modules like Lesson Plans or Feedback, unless granted.</td>
+        </tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--manjal)"></span>Student</span></td>
+          <td>Staff / Admin (enrollment)</td>
+          <td>A separate, lighter portal: own timetable, assignments, live class links, feedback received, and results — no access to the admin sidebar.</td>
+        </tr>
+        <tr>
+          <td><span class="role-chip"><span class="dot" style="background:var(--text-faint)"></span>Public visitor</span></td>
+          <td>— (no account)</td>
+          <td>Browses the public site, submits admissions enquiries, applies to open jobs, views public events and public UGC documents.</td>
+        </tr>
+      </table>
+    </section>
+
+    <div class="divider"><span class="num">§03 → §04</span><div class="line"></div></div>
+
+    <section class="block" id="sitemap">
+      <div class="kicker">04 — Public site map</div>
+      <h2>What a visitor finds, page by page</h2>
+      <p>Every page below is a CMS-managed template — sections can be reordered, added, or hidden by Super Admin without a code change.</p>
+      <div class="sitemap">
+        <div class="item"><strong>Home</strong><span class="note">hero, highlights, feed</span></div>
+        <div class="item"><strong>About & Founder's Message</strong><span class="note">history, vision</span></div>
+        <div class="item"><strong>Courses / Disciplines</strong><span class="note">dynamic list</span></div>
+        <div class="item"><strong>Faculty Directory</strong><span class="note">pulled from Users</span></div>
+        <div class="item"><strong>Admissions</strong><span class="note">→ Enquiries module</span></div>
+        <div class="item"><strong>Events</strong><span class="note">→ Events module</span></div>
+        <div class="item"><strong>Gallery & News</strong><span class="note">photos, updates</span></div>
+        <div class="item"><strong>Campus</strong><span class="note">facilities</span></div>
+        <div class="item"><strong>Careers</strong><span class="note">→ Jobs module</span></div>
+        <div class="item"><strong>UGC / Compliance</strong><span class="note">public subset</span></div>
+        <div class="item"><strong>Contact</strong><span class="note">form → Enquiries</span></div>
+        <div class="item"><strong>Login</strong><span class="note">portal entry</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">§04 → §05</span><div class="line"></div></div>
+
+    <section class="block" id="portal">
+      <div class="kicker">05 — Academic portal · sidebar modules</div>
+      <h2>The thirteen modules behind the login</h2>
+      <p>This is the sidebar as you specified it. Chips mark which roles typically reach each module — the exact permission matrix is where we'll go deep in the detailing pass.</p>
+      <div class="modules">
+
+        <div class="module">
+          <div class="module-head"><h4>Overview</h4><span class="module-idx">01</span></div>
+          <p>Landing dashboard after login: active students and batches, today's classes, pending enquiries, recent activity feed, quick actions.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Users</h4><span class="module-idx">02</span></div>
+          <p>Create, edit and deactivate every account; assign roles and per-module permissions; bulk import staff or students.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin (limited)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Curriculum</h4><span class="module-idx">03</span></div>
+          <p>Course and subject structure, syllabus documents, grade/level definitions, learning outcomes, UGC-mandated curriculum records.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span><span class="chip">Teacher (view)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Timetable & Schedules</h4><span class="module-idx">04</span></div>
+          <p>Class schedules by batch, faculty and room; a recurring-schedule builder with conflict detection; calendar view for everyone affected.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span><span class="chip">Teacher (view)</span><span class="chip">Student (view)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Batches</h4><span class="module-idx">05</span></div>
+          <p>Cohort management — enrollment, batch rosters, capacity, and the mapping of batches to their faculty.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Lesson Plans</h4><span class="module-idx">06</span></div>
+          <p>Faculty-authored plans per batch and subject, with a submit-for-review workflow and reusable templates.</p>
+          <div class="chips"><span class="chip">Teacher</span><span class="chip">Guest Faculty</span><span class="chip">Admin (approve)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Live Classes</h4><span class="module-idx">07</span></div>
+          <p>Schedule and join sessions, keep a recordings archive, and capture attendance automatically at join/leave.</p>
+          <div class="chips"><span class="chip">Teacher</span><span class="chip">Guest Faculty</span><span class="chip">Student (join)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Assignments</h4><span class="module-idx">08</span></div>
+          <p>Create and distribute assignments, track submissions and deadlines, grade, and return feedback to students.</p>
+          <div class="chips"><span class="chip">Teacher</span><span class="chip">Guest Faculty</span><span class="chip">Student (submit)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Feedback</h4><span class="module-idx">09</span></div>
+          <p>Structured cycles — student-to-faculty, faculty-to-student, peer — on a schedule, with simple analytics over time.</p>
+          <div class="chips"><span class="chip">Teacher</span><span class="chip">Student</span><span class="chip">Admin (analytics)</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Events</h4><span class="module-idx">10</span></div>
+          <p>Create internal or public events, manage RSVPs and attendance, and toggle visibility on the public Events page.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span><span class="chip">Staff</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Jobs</h4><span class="module-idx">11</span></div>
+          <p>Post openings for guest faculty or staff, track applicants through stages, and publish to the public Careers page.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span><span class="chip">Staff</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Enquiries</h4><span class="module-idx">12</span></div>
+          <p>Inbox for admissions and general enquiries from the public site — status tracking from new to converted, assigned to staff.</p>
+          <div class="chips"><span class="chip super">Super Admin</span><span class="chip">Admin</span><span class="chip">Staff</span></div>
+        </div>
+
+        <div class="module">
+          <div class="module-head"><h4>Activities</h4><span class="module-idx">13</span></div>
+          <p>Co-curricular logs — competitions, performances, achievements — with an activity calendar feeding student records.</p>
+          <div class="chips"><span class="chip">Staff</span><span class="chip">Teacher</span><span class="chip">Student (view own)</span></div>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">§05 → §06</span><div class="line"></div></div>
+
+    <section class="block" id="cms">
+      <div class="kicker">06 — Dynamic CMS approach</div>
+      <h2>What "editable by Super Admin first" actually means</h2>
+      <p>Four working rules make the public site behave like software the school owns, rather than a template a developer maintains.</p>
+      <div class="principles">
+        <div class="principle">
+          <div class="n">01</div>
+          <div><h4>Content blocks, not fixed pages</h4><p>Every public page is assembled from reusable, editable blocks — hero, text section, image gallery, staff grid, event list. Adding a new About sub-section is a Super Admin action, not a deploy.</p></div>
+        </div>
+        <div class="principle">
+          <div class="n">02</div>
+          <div><h4>Draft, preview, publish</h4><p>Edits save as a draft first. You preview exactly what a visitor will see, then publish — so the live site never shows half-finished work.</p></div>
+        </div>
+        <div class="principle">
+          <div class="n">03</div>
+          <div><h4>One media library</h4><p>Photos, videos and documents are uploaded once and reused across the public site, events, and academic modules — no duplicate uploads per page.</p></div>
+        </div>
+        <div class="principle">
+          <div class="n">04</div>
+          <div><h4>Design tokens, centrally set</h4><p>Colours, type scale and logo live in one settings screen, mapped to the brand system below — so a palette or font change applies sitewide at once.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">§06 → §07</span><div class="line"></div></div>
+
+    <section class="block" id="architecture">
+      <div class="kicker">07 — Technical architecture</div>
+      <h2>Vercel, Render, MongoDB, Supabase, GitHub</h2>
+      <p>Your stack choices map cleanly onto the two kinds of data this system holds: structured, permissioned records (Supabase/Postgres) and flexible, block-shaped content (MongoDB). One change from your original list: <b>Vercel in place of Netlify</b> for the frontend.</p>
+      <p>Both have a free tier and deploy straight from GitHub, but the public site needs pages that stay fresh without a full rebuild — new events, a new enquiry count on Overview, a newly published page. That's server-rendering and incremental regeneration, which Next.js does natively and Vercel (built by the same team) runs on its free Hobby tier without extra configuration: 100GB bandwidth/month, serverless functions included, and an automatic preview link for every change before it goes live. Netlify can run Next.js too, but through an adapter layer, with edge/SSR features gated behind paid tiers sooner. If unlimited bandwidth matters more than SSR convenience, <b>Cloudflare Pages</b> is the other strong free option — it just asks for the <span style="white-space:nowrap;">next-on-pages</span> adapter and is a touch more hands-on to configure. Vercel is the better default for this build; either swaps in without changing anything else below.</p>
+
+      <div class="arch">
+        <div class="arch-tier-label">Delivery</div>
+        <div class="arch-row">
+          <div class="arch-box"><div class="k">Frontend</div><div class="v">Vercel</div><div class="d">Next.js public site + portal UI, deployed from GitHub on every push — free Hobby tier</div></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box"><div class="k">Backend API</div><div class="v">Render.com</div><div class="d">Node.js service — auth, roles, business logic for all 13 modules</div></div>
+        </div>
+        <div class="arch-tier-label">Data</div>
+        <div class="arch-row">
+          <div class="arch-box"><div class="k">Structured & permissioned</div><div class="v">Supabase (Postgres)</div><div class="d">Users & roles, auth, batches, timetable, enrollments, grades, enquiries, jobs, file storage</div></div>
+          <div class="arch-box"><div class="k">Flexible & content-shaped</div><div class="v">MongoDB (Atlas)</div><div class="d">CMS page blocks, lesson plans, feedback forms, activity logs, notifications</div></div>
+        </div>
+        <div class="arch-tier-label">Source control</div>
+        <div class="arch-row">
+          <div class="arch-box"><div class="k">Repository & CI/CD</div><div class="v">GitHub</div><div class="d">Single monorepo or two repos (frontend/backend); pushes trigger Vercel + Render deploys</div></div>
+        </div>
+      </div>
+      <p class="arch-note">To confirm in detailing: Supabase Auth (recommended) vs. a custom JWT layer for login; and whether uploaded documents live in Supabase Storage with MongoDB holding only their metadata, which keeps one system as the actual file store.</p>
+    </section>
+
+    <div class="divider"><span class="num">§07 → §08</span><div class="line"></div></div>
+
+    <section class="block" id="design">
+      <div class="kicker">08 — Design system, from the brand guidelines</div>
+      <h2>Swami's Burgundy, Ganges Gold, Himalayan Silk</h2>
+      <p>Pulled directly from the Interim Branding Guidelines you provided, mapped to how each colour and type role will actually be used on screen.</p>
+      <div class="swatches">
+        <div class="swatch"><div class="fill" style="background:#470500"></div><div class="label"><b>Swami's Burgundy</b><span>#470500 — primary</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#7e2320"></div><div class="label"><b>Maroon</b><span>#7e2320 — hover/active</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#c97f1c"></div><div class="label"><b>Sandalwood</b><span>#c97f1c — accent</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#e0ac27"></div><div class="label"><b>Manjal</b><span>#e0ac27 — highlight</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#a27c3f"></div><div class="label"><b>Ganges Gold</b><span>#a27c3f — dividers</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#d5bdaf"></div><div class="label"><b>Himalayan Silk</b><span>#d5bdaf — surfaces</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#e4d5cb"></div><div class="label"><b>Silk, light</b><span>#e4d5cb — cards</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#fffde9"></div><div class="label"><b>Cream</b><span>#fffde9 — page bg</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#432250"></div><div class="label"><b>Royal Purple</b><span>role: Staff</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#1f4b3f"></div><div class="label"><b>Forest Shade</b><span>role: Teacher</span></div></div>
+        <div class="swatch"><div class="fill" style="background:#123151"></div><div class="label"><b>Deep Waters</b><span>role: Admin</span></div></div>
+      </div>
+
+      <div class="type-specimen">
+        <div class="spec-card">
+          <div class="role">Display — Futura PT (web: Jost)</div>
+          <div class="sample" style="font-family:'Jost',sans-serif;font-weight:600;">Nada Gurukulam</div>
+        </div>
+        <div class="spec-card">
+          <div class="role">Body — Gill Sans Nova (web: Nunito Sans)</div>
+          <div class="sample" style="font-family:'Nunito Sans',sans-serif;">Six disciplines, one gurukulam.</div>
+        </div>
+        <div class="spec-card">
+          <div class="role">Body serif — Garamond Premier (web: EB Garamond)</div>
+          <div class="sample serif-em">for founder's messages & long-form pages</div>
+        </div>
+        <div class="spec-card">
+          <div class="role">Informal script — Ameyallinda (web: Petit Formal Script)</div>
+          <div class="sample script">One World One Family</div>
+        </div>
+      </div>
+      <p style="margin-top:18px;">Two brand elements carry through: the gentle <b>wave divider</b> (used between major sections, as above) and the <b>half-circle accent</b> — the guidelines mark this as secondary and social-first, so it stays out of core portal UI and appears only on public marketing moments, matching how the brand already uses it.</p>
+    </section>
+
+    <div class="divider"><span class="num">§08 → §09</span><div class="line"></div></div>
+
+    <section class="block" id="roadmap">
+      <div class="kicker">09 — Roadmap</div>
+      <h2>From this outline to launch</h2>
+      <div class="roadmap">
+        <div class="phase done"><h4><span class="ph">Phase 1</span>Outline & sign-off</h4><p>This document — structure, roles, modules, stack, and design mapping agreed before any detailing begins.</p></div>
+        <div class="phase done"><h4><span class="ph">Phase 2</span>Public site detail</h4><p>Page-by-page content and section specs for the public site, built on the sitemap above. <a href="https://claude.ai/code/artifact/9a471405-a560-4b8e-b0ad-1e275ec3fb80">Open the spec →</a></p></div>
+        <div class="phase done"><h4><span class="ph">Phase 3</span>Portal module detail</h4><p>Field-by-field spec and full permission matrix for each of the thirteen modules. <a href="https://claude.ai/code/artifact/77883c79-5a98-4142-9264-5d11aaaa51ca">Open the spec →</a></p></div>
+        <div class="phase done"><h4><span class="ph">Phase 3.5</span>Live prototype</h4><p>A clickable, editable preview — role picker, admin sidebar, and working Events/Users/Enquiries/CMS modules against real shared data. <a href="https://claude.ai/code/artifact/c87e2c1b-daee-4369-848f-d8c97da9c9b4">Open the prototype →</a></p></div>
+        <div class="phase done"><h4><span class="ph">Phase 4</span>Data model</h4><p>Supabase table design and MongoDB collection design, matched to Phases 2–3. <a href="https://claude.ai/code/artifact/475fe154-017c-4645-a6cc-70029d5351d9">Open the spec →</a></p></div>
+        <div class="phase"><h4><span class="ph">Phase 5</span>Visual design</h4><p>Applying the design system above to real screens — public pages and the portal dashboard.</p></div>
+        <div class="phase"><h4><span class="ph">Phase 6</span>Build</h4><p>Backend API on Render, frontend on Vercel, auth and role-based access end to end.</p></div>
+        <div class="phase"><h4><span class="ph">Phase 7</span>Content migration & QA</h4><p>Move existing nadagurukulam.org content into the CMS; test every role's access boundaries.</p></div>
+        <div class="phase"><h4><span class="ph">Phase 8</span>Launch & handover</h4><p>Go live, and a working session on running the CMS and portal as Super Admin.</p></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">§09 → §10</span><div class="line"></div></div>
+
+    <section class="block" id="decisions">
+      <div class="kicker">10 — Decisions &amp; follow-ups</div>
+      <h2>Settled so far, and what's next</h2>
+      <p>Six decisions in, all shaped around the same constraint: the institution runs entirely on donations and offers everything free of cost, so every choice below defaults to whatever keeps running cost at or near zero without weakening security.</p>
+      <div class="decisions">
+
+        <div class="decision resolved"><div class="mark">✓</div><div class="body"><b>Students get their own portal login</b><span>Confirmed — a Student role joins the six staff-side roles, scoped to Timetable, Live Classes, Assignments and Feedback.</span></div></div>
+
+        <div class="decision resolved"><div class="mark">✓</div><div class="body"><b>This is a full rebuild, not an add-on</b><span>Confirmed — nadagurukulam.org's current pages become dynamic, CMS-driven pages on the new stack, with the portal built alongside.</span></div></div>
+
+        <div class="decision resolved">
+          <div class="mark">✓</div>
+          <div class="body">
+            <b>Live classes: embed, don't build — Jitsi Meet as the default</b>
+            <p>Building in-house video means running media servers and TURN/STUN infrastructure indefinitely — an ongoing engineering and hosting cost a donation-funded institution shouldn't carry. Embedding is the right call.</p>
+            <p><b class="reco">Recommended default:</b> <b>Jitsi Meet</b> — open-source, free with no time or participant limits, and embeddable directly inside the Live Classes module via its iframe API, so nobody ever leaves the portal. It can be self-hosted later at zero licence cost if you want a fully branded room.</p>
+            <p>For larger one-to-many events (assemblies, guest lectures), apply for <b>Google for Nonprofits</b> — as a registered charitable mission you're very likely eligible, and it unlocks free Google Workspace with Google Meet (higher participant caps, recordings to Drive, calendar sync) at no cost. Meet doesn't embed as cleanly as Jitsi, so treat it as an "open in a new tab" option for big events rather than the everyday classroom tool. Zoom's free tier caps group calls at 40 minutes and its nonprofit rate is discounted, not free — so it's the fallback, not the default.</p>
+          </div>
+        </div>
+
+        <div class="decision resolved">
+          <div class="mark">✓</div>
+          <div class="body">
+            <b>Documents: Supabase + MongoDB now — a cheaper, safer plan for sensitive files as you grow</b>
+            <p>Confirmed for now: Supabase Storage holds the actual files, MongoDB holds their metadata and access rules. Two things to plan ahead for as the library of student, staff and UGC documents grows — storage cost, and how sensitive some of these files are.</p>
+            <p><b class="reco">Cost, once you outgrow Supabase's free storage:</b> <b>Cloudflare R2</b> or <b>Backblaze B2</b> are the cheapest online options — S3-compatible object storage around $0.015/GB-month, and unlike AWS S3 or most providers, neither charges for downloads. That matters here, since students and staff will be pulling documents constantly. The backend keeps issuing short-lived, permission-checked signed URLs, so the access-control model doesn't change — only where the bytes physically live.</p>
+            <p><b class="reco">Safety, for the most sensitive records</b> (ID proof, medical notes, anything involving minors): keep an "online/hot" encrypted copy in object storage for everyday access, plus a periodic <b>encrypted offline backup</b> — an external drive or NAS at the institution, synced on a schedule — so those records survive even if a cloud account is ever compromised or locked out. Alongside that: encryption at rest and in transit, an access log of who viewed or downloaded each document, collecting the minimum personal data needed, and — since some students may be minors — the extra care India's data-protection rules expect around children's information. We'll design this in full in Phase 4; nothing about today's Supabase/MongoDB choice needs to change to get there.</p>
+          </div>
+        </div>
+
+        <div class="decision resolved"><div class="mark">✓</div><div class="body"><b>English at launch, Indian languages ready to add</b><span>Confirmed — English only for launch. The CMS content-block model (Phase 2/4) carries a locale field from day one, so Kannada, Hindi and Sanskrit versions of public-site content can be added per page or section later without restructuring anything. The portal itself (admin/teacher/student side) stays English-only unless you say otherwise.</span></div></div>
+
+        <div class="decision resolved">
+          <div class="mark">✓</div>
+          <div class="body">
+            <b>Domain: test on a free subdomain now, move to nadagurukulam.org once you have access</b>
+            <p>Since neither domain is in your control yet, build and demo on the free subdomains the hosts already give you: Vercel issues something like <code style="background:var(--code-bg);padding:1px 6px;border-radius:4px;">nada-gurukulam.vercel.app</code> for the frontend, and Render gives a matching <code style="background:var(--code-bg);padding:1px 6px;border-radius:4px;">.onrender.com</code> URL for the API — both live immediately, at zero cost, which is exactly what you need to show your admin for approval.</p>
+            <p>Moving to the real domain later is then a one-time DNS change — point nadagurukulam.org at Vercel and Render — with no rebuild required. The site your admin approves on the .vercel.app link is the exact site that goes live on the real domain.</p>
+          </div>
+        </div>
+
+        <div class="decision action">
+          <div class="mark">→</div>
+          <div class="body"><b>Action needed from you: domain access</b><span>The one piece only you can chase down — find out who currently holds the registrar/DNS access for nadagurukulam.org (likely whoever set up srinisir.vikaspatel.in, or the mission's IT contact) and get it restored to you or your team, so the DNS cutover above is ready when you are.</span></div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="cta-band">
+    <div>
+      <h3>Phase 2 is ready</h3>
+      <p>Every public page, broken into sections — what's editable, what's portal-fed, and where each form lands. <a href="https://claude.ai/code/artifact/9a471405-a560-4b8e-b0ad-1e275ec3fb80" style="font-weight:700;">Open the Public Site Spec →</a></p>
+    </div>
+    <div class="signature">One World, One Family</div>
+  </div>
+</footer>

@@ -1,0 +1,426 @@
+<title>Nada Gurukulam Public Site Spec</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Petit+Formal+Script&display=swap');
+
+  :root{
+    --burgundy:#470500;
+    --burgundy-ink:#3a0400;
+    --maroon:#7e2320;
+    --ochre:#c97f1c;
+    --manjal:#e0ac27;
+    --gold:#a27c3f;
+    --silk:#e4d5cb;
+    --silk-deep:#d5bdaf;
+    --cream:#fffde9;
+
+    --purple:#432250;
+    --forest:#1f4b3f;
+    --waters:#123151;
+
+    --bg:var(--cream);
+    --surface:#fffaf0;
+    --surface-2:var(--silk);
+    --border:#e6d6c4;
+    --text:#2a1712;
+    --text-soft:#6b5548;
+    --text-faint:#93816f;
+    --accent:var(--burgundy);
+    --accent-2:var(--ochre);
+    --code-bg:#f2e8da;
+    --shadow: 0 1px 2px rgba(71,5,0,0.06), 0 8px 24px rgba(71,5,0,0.06);
+
+    --chip-cms:var(--gold);
+    --chip-portal:var(--waters);
+    --chip-form:var(--forest);
+    --chip-tbd:var(--maroon);
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+      --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+      --accent:var(--manjal); --accent-2:var(--ochre); --code-bg:#2a150d;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      --chip-cms:#d8b177; --chip-portal:#8fb8de; --chip-form:#8fcdb0; --chip-tbd:#e5a19c;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+    --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+    --accent:var(--manjal); --accent-2:var(--ochre); --code-bg:#2a150d;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    --chip-cms:#d8b177; --chip-portal:#8fb8de; --chip-form:#8fcdb0; --chip-tbd:#e5a19c;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Nunito Sans', ui-sans-serif, system-ui, sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,h4{font-family:'Jost', ui-sans-serif, system-ui, sans-serif;font-weight:600;letter-spacing:0.01em;text-wrap:balance;color:var(--text);margin:0;}
+  a{color:var(--accent);}
+  .script{font-family:'Petit Formal Script', cursive;font-weight:400;}
+
+  .hero{background:linear-gradient(155deg, var(--burgundy) 0%, var(--burgundy-ink) 100%);color:#fbeee6;padding:44px 8vw 70px;position:relative;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);} }
+  :root[data-theme="dark"] .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);}
+  .breadcrumb{font-size:12.5px;color:#e8c9b9;margin-bottom:18px;}
+  .breadcrumb a{color:var(--manjal);text-decoration:none;font-weight:600;}
+  .hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--manjal);font-weight:600;margin-bottom:18px;}
+  .hero .eyebrow::before{content:"";width:22px;height:1px;background:var(--manjal);display:inline-block;}
+  .hero h1{font-size:clamp(30px,3.8vw,46px);line-height:1.12;max-width:20ch;color:#fff;}
+  .hero p.lede{max-width:66ch;font-size:16.5px;color:#f0ddd2;margin-top:18px;}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:28px;margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.16);}
+  .hero-meta div{font-size:13px;color:#e8c9b9;}
+  .hero-meta strong{display:block;color:#fff;font-size:14.5px;font-weight:600;margin-bottom:2px;}
+  .wave{display:block;width:100%;height:52px;margin-top:-2px;}
+
+  .layout{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;gap:56px;padding:0 8vw 90px;}
+  @media (max-width:880px){ .layout{grid-template-columns:1fr;} .toc{display:none;} }
+  .toc{position:sticky;top:28px;align-self:start;padding-top:44px;}
+  .toc .toc-label{font-size:11.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:14px;display:block;}
+  .toc-rules-link{display:block;font-size:13px;color:var(--text-soft);text-decoration:none;font-weight:600;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border);}
+  .toc-rules-link:hover{color:var(--accent);}
+  .toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;border-left:1px solid var(--border);}
+  .toc li{counter-increment:toc;position:relative;padding:6px 0 6px 20px;}
+  .toc li::before{content:counter(toc,decimal-leading-zero);position:absolute;left:-1px;top:7px;width:16px;transform:translateX(-50%);background:var(--bg);font-size:10.5px;color:var(--text-faint);padding:2px 0;}
+  .toc a{display:block;font-size:13px;color:var(--text-soft);text-decoration:none;font-weight:600;}
+  .toc a:hover{color:var(--accent);}
+
+  main{padding-top:44px;min-width:0;}
+  section.block{margin-bottom:56px;scroll-margin-top:24px;}
+  .kicker{font-size:12px;letter-spacing:0.13em;text-transform:uppercase;color:var(--accent-2);font-weight:700;margin-bottom:8px;}
+  section.block h2{font-size:clamp(22px,2.4vw,28px);margin-bottom:14px;}
+  section.block > p{max-width:72ch;color:var(--text-soft);font-size:15.5px;}
+  section.block > p + p{margin-top:10px;}
+
+  .divider{display:flex;align-items:center;gap:14px;margin:48px 0 36px;color:var(--text-faint);}
+  .divider .line{flex:1;height:1px;background:var(--border);}
+  .divider .num{font-family:'Jost',sans-serif;font-size:12px;letter-spacing:0.1em;}
+
+  /* legend + chips */
+  .legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:20px 0 6px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+  .legend-item{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-soft);}
+  .legend-item .dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;}
+  .chip{font-size:10.5px;font-weight:700;letter-spacing:0.03em;padding:2.5px 8px;border-radius:99px;white-space:nowrap;}
+  .chip.cms{background:color-mix(in srgb, var(--chip-cms) 20%, transparent);color:var(--chip-cms);}
+  .chip.portal{background:color-mix(in srgb, var(--chip-portal) 18%, transparent);color:var(--chip-portal);}
+  .chip.form{background:color-mix(in srgb, var(--chip-form) 18%, transparent);color:var(--chip-form);}
+  .chip.tbd{background:color-mix(in srgb, var(--chip-tbd) 18%, transparent);color:var(--chip-tbd);}
+
+  /* rules table */
+  .rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;}
+  @media (max-width:760px){.rules-grid{grid-template-columns:1fr;}}
+  .rule-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
+  .rule-card h4{font-size:14.5px;margin-bottom:7px;}
+  .rule-card p{font-size:13.5px;color:var(--text-soft);margin:0;}
+  .map-table{width:100%;border-collapse:collapse;margin-top:22px;font-size:14px;}
+  .map-table th{text-align:left;font-family:'Jost',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);padding:0 12px 10px 0;border-bottom:1px solid var(--border);}
+  .map-table td{padding:12px 12px 12px 0;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);}
+  .map-table tr:last-child td{border-bottom:none;}
+  .map-table td b{color:var(--text);font-weight:700;}
+
+  /* page cards */
+  .page-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 26px;box-shadow:var(--shadow);margin-bottom:18px;scroll-margin-top:24px;}
+  .page-card-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:4px;}
+  .page-card-head h3{font-size:19px;}
+  .page-route{font-family:'Jost',sans-serif;font-size:12px;color:var(--text-faint);background:var(--surface-2);padding:2px 9px;border-radius:6px;white-space:nowrap;}
+  .page-job{font-size:13.5px;color:var(--text-soft);margin:8px 0 18px;max-width:74ch;font-style:italic;}
+  .section-list{display:flex;flex-direction:column;}
+  .section-row{display:grid;grid-template-columns:26px 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--border);}
+  .section-row:first-child{border-top:none;padding-top:0;}
+  .section-row .idx{font-family:'Jost',sans-serif;font-size:12px;color:var(--text-faint);padding-top:2px;}
+  .section-row .name-row{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:4px;}
+  .section-row .name{font-weight:700;font-size:14.5px;color:var(--text);font-family:'Jost',sans-serif;}
+  .section-row .desc{font-size:13.5px;color:var(--text-soft);max-width:66ch;}
+
+  footer{max-width:1180px;margin:0 auto;padding:0 8vw 60px;}
+  .cta-band{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:32px 30px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;}
+  .cta-band h3{font-size:19px;margin-bottom:6px;}
+  .cta-band p{font-size:14px;color:var(--text-soft);margin:0;max-width:56ch;}
+  .signature{font-family:'Petit Formal Script', cursive;color:var(--accent);font-size:24px;}
+</style>
+
+<header class="hero">
+  <div class="breadcrumb"><a href="https://claude.ai/code/artifact/18b4e5a4-f0a1-4f91-b787-92ac62eb63d8">← Phase 1 · Platform Outline</a></div>
+  <span class="eyebrow">Nada Gurukulam · Public Site Spec · Phase 2 of 8</span>
+  <h1>Every public page, section by section</h1>
+  <p class="lede">The public site map from Phase 1, broken down into the sections each page actually needs — what's Super-Admin-editable, what's pulled live from the academic portal, and which forms feed which module. This is the brief a builder works from next.</p>
+  <div class="hero-meta">
+    <div><strong>Pages specified</strong>12, matching the Phase 1 sitemap</div>
+    <div><strong>Data rule</strong>Nothing is entered twice — the site reads what the portal already holds</div>
+    <div><strong>Status</strong>Draft for review — Phase 3 (portal modules) follows once this is confirmed</div>
+  </div>
+</header>
+<svg class="wave" viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C 240,5 480,75 720,40 C 960,5 1200,75 1440,40 L1440,80 L0,80 Z" fill="var(--bg)"></path></svg>
+
+<div class="layout">
+  <nav class="toc">
+    <span class="toc-label">Contents</span>
+    <a href="#rules" class="toc-rules-link">Cross-cutting rules</a>
+    <ol>
+      <li><a href="#home">Home</a></li>
+      <li><a href="#about">About &amp; Founder's Message</a></li>
+      <li><a href="#courses">Courses / Disciplines</a></li>
+      <li><a href="#faculty">Faculty Directory</a></li>
+      <li><a href="#admissions">Admissions</a></li>
+      <li><a href="#events">Events</a></li>
+      <li><a href="#gallery">Gallery &amp; News</a></li>
+      <li><a href="#campus">Campus</a></li>
+      <li><a href="#careers">Careers</a></li>
+      <li><a href="#compliance">UGC / Compliance</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li><a href="#login">Login</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section class="block" id="rules">
+      <div class="kicker">Before the pages — cross-cutting rules</div>
+      <h2>Four rules that apply to every page below</h2>
+      <p>These hold across all twelve pages, so they're stated once here instead of repeated twelve times.</p>
+
+      <div class="legend">
+        <div class="legend-item"><span class="chip cms">CMS</span>Super Admin edits this directly — text, images, order</div>
+        <div class="legend-item"><span class="chip portal">Portal-fed</span>Reads live from a portal module — never entered twice</div>
+        <div class="legend-item"><span class="chip form">Form → module</span>A visitor submission that lands in a portal module's inbox</div>
+        <div class="legend-item"><span class="chip tbd">TBD</span>Needs a decision or real content from you before build</div>
+      </div>
+
+      <div class="rules-grid">
+        <div class="rule-card"><h4>Shared header &amp; footer</h4><p>Navigation, logo, footer columns, social links and the contact snippet are one CMS record used on all twelve pages — editing it once updates it everywhere, rather than page by page.</p></div>
+        <div class="rule-card"><h4>Every page carries SEO fields</h4><p>Page title, meta description and a social share image are editable per page in the CMS. Home, Courses, Faculty, Events and Gallery &amp; News render server-side (Next.js on Vercel) so they're indexable; the rest can follow the same pattern.</p></div>
+        <div class="rule-card"><h4>"Portal-fed" means read-only on the site</h4><p>Faculty cards, events, job listings and public documents are never typed into the website separately — they're written once in the admin portal (Users, Events, Jobs, Curriculum) and the public page simply displays whatever is marked public/published.</p></div>
+        <div class="rule-card"><h4>Every form has exactly one destination</h4><p>All visitor-facing forms resolve to one of two portal inboxes, so nothing gets lost in email. See the mapping below.</p></div>
+      </div>
+
+      <table class="map-table">
+        <tr><th>Form, where it lives</th><th>Lands in</th><th>As</th></tr>
+        <tr><td><b>Admissions enquiry</b> — Admissions page</td><td>Enquiries module</td><td>Type: Admission</td></tr>
+        <tr><td><b>General contact form</b> — Contact page</td><td>Enquiries module</td><td>Type: General</td></tr>
+        <tr><td><b>Event RSVP</b> — Events page</td><td>Events module</td><td>Attendance record on that event</td></tr>
+        <tr><td><b>Job application</b> — Careers page</td><td>Jobs module</td><td>Applicant, linked to that posting</td></tr>
+        <tr><td><b>Speculative application</b> — Careers page</td><td>Jobs module</td><td>Applicant, unlinked / "general interest"</td></tr>
+      </table>
+    </section>
+
+    <div class="divider"><span class="num">01 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="home">
+      <div class="kicker">01 — Home</div>
+      <h2>/ — first thirty seconds</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: establish the artistic and spiritual identity fast, and hand the visitor a next step — explore a discipline, meet the faculty, or enquire.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Full-bleed performance image or short video, the tagline "Nurturing Talent, Inspiring Excellence," a one-line description, and two calls to action: Explore Disciplines / Enquire Now.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Welcome</span><span class="chip cms">CMS</span></div><div class="desc">Two or three sentences on "the Guru-Shishya system meets modern education," linking through to the full About page.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Founder's message, teaser</span><span class="chip cms">CMS</span></div><div class="desc">A pull-quote from Sadguru Sri Madhusudan Sai (the "Sound is divine" theme) with portrait and a "Read the full message" link into About.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Six disciplines grid</span><span class="chip portal">Portal-fed</span></div><div class="desc">Carnatic Vocal, Hindustani Vocal, Bharatanatyam, Mridangam, Tabla, Flute — pulled from Curriculum, one card each with image and one-liner, linking to Courses.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Why Nada Gurukulam</span><span class="chip cms">CMS</span></div><div class="desc">A short feature strip — master faculty, Sri Sathya Sai University for Human Excellence affiliation, the One World One Family mission, the Guru-Shishya tradition.</div></div></div>
+          <div class="section-row"><div class="idx">06</div><div><div class="name-row"><span class="name">Faculty spotlight</span><span class="chip portal">Portal-fed</span></div><div class="desc">Three or four featured teachers (photo, name, discipline) pulled from Users where the profile is marked public; "Meet all faculty" links to the Faculty Directory.</div></div></div>
+          <div class="section-row"><div class="idx">07</div><div><div class="name-row"><span class="name">Upcoming events strip</span><span class="chip portal">Portal-fed</span></div><div class="desc">Next three events marked public in the Events module, with date and title; "View all events" links to the Events page.</div></div></div>
+          <div class="section-row"><div class="idx">08</div><div><div class="name-row"><span class="name">Latest news</span><span class="chip portal">Portal-fed</span></div><div class="desc">Three most recent posts from the Gallery &amp; News content type.</div></div></div>
+          <div class="section-row"><div class="idx">09</div><div><div class="name-row"><span class="name">Campus preview</span><span class="chip cms">CMS</span></div><div class="desc">A teaser image of the upcoming Bachelor of Fine Arts facility, linking to the Campus page.</div></div></div>
+          <div class="section-row"><div class="idx">10</div><div><div class="name-row"><span class="name">Admissions band</span><span class="chip cms">CMS</span></div><div class="desc">"Begin your journey" — a closing call to action into the Admissions page.</div></div></div>
+          <div class="section-row"><div class="idx">11</div><div><div class="name-row"><span class="name">Footer</span><span class="chip cms">CMS</span></div><div class="desc">Shared across all pages — nav, contact snippet, socials, and a link into UGC/Compliance.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">02 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="about">
+      <div class="kicker">02 — About &amp; Founder's Message</div>
+      <h2>/about — lineage and credibility</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: explain who is teaching, under whose vision, and why — the page a parent reads before they trust the school with their child's training.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Our story</span><span class="chip cms">CMS</span></div><div class="desc">History of the gurukulam and its founding under Sri Sathya Sai University for Human Excellence.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Guru-Shishya meets modern education</span><span class="chip cms">CMS</span></div><div class="desc">The philosophy statement blending India's traditional mentorship model with structured, contemporary teaching.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Founder's message, in full</span><span class="chip cms">CMS</span></div><div class="desc">Sadguru Sri Madhusudan Sai's message in full, with portrait — the "sound is divine" grounding for why music and dance are taught here as a spiritual practice, not only a skill.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Vision statement</span><span class="chip cms">CMS</span></div><div class="desc">The Director's statement on developing culturally-conscious citizens and using the performing arts to build global understanding.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Affiliation &amp; mission</span><span class="chip cms">CMS</span></div><div class="desc">Badges and short notes for Sri Sathya Sai University for Human Excellence and the One World One Family Mission, and — <span class="chip tbd">TBD</span> — a confirmed line on whether tuition here follows the mission's free-of-cost model.</div></div></div>
+          <div class="section-row"><div class="idx">06</div><div><div class="name-row"><span class="name">Closing CTA</span><span class="chip cms">CMS</span></div><div class="desc">Into Courses or Admissions.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">03 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="courses">
+      <div class="kicker">03 — Courses / Disciplines</div>
+      <h2>/courses — choosing a path</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: let a prospective student or parent understand each discipline well enough to pick one, and move straight into Admissions.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Intro banner</span><span class="chip cms">CMS</span></div><div class="desc">Short framing of the six disciplines as one integrated training, not six separate products.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Discipline entries (×6)</span><span class="chip portal">Portal-fed</span></div><div class="desc">Carnatic Vocal, Hindustani Vocal, Bharatanatyam, Mridangam, Tabla, Flute — each synced from Curriculum: description (technical and spiritual dimension), format (individual/group), levels, and the lead faculty pulled from Users.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Discipline detail page</span><span class="chip portal">Portal-fed</span></div><div class="desc">One page per discipline, reached from the grid, with an "Apply for this discipline" button that pre-fills the Admissions form.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">How we teach</span><span class="chip cms">CMS</span></div><div class="desc">A short explainer on the Guru-Shishya learning approach as it applies day to day.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">FAQ</span><span class="chip cms">CMS</span></div><div class="desc">Common questions on age, prior experience, and time commitment.</div></div></div>
+          <div class="section-row"><div class="idx">06</div><div><div class="name-row"><span class="name">CTA</span><span class="chip cms">CMS</span></div><div class="desc">Enquire / Apply, into Admissions.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">04 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="faculty">
+      <div class="kicker">04 — Faculty Directory</div>
+      <h2>/faculty — the people teaching here</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: build trust through the depth of the teaching staff, and open a path to apply for guest-faculty roles.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Intro banner</span><span class="chip cms">CMS</span></div><div class="desc">Short framing of the faculty as master practitioners, not just instructors.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Filter by discipline</span><span class="chip cms">CMS (control)</span></div><div class="desc">A simple filter bar over the grid below — no separate content to manage.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Faculty grid</span><span class="chip portal">Portal-fed</span></div><div class="desc">Every Teacher and Guest Faculty user with their profile marked public: photo, name, discipline(s), short bio, a "Guest Faculty" badge where relevant.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Faculty profile page</span><span class="chip portal">Portal-fed</span></div><div class="desc">Full bio, achievements, and a small performance gallery per teacher, reached from the grid.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Join our faculty</span><span class="chip cms">CMS</span></div><div class="desc">Closing CTA into Careers.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">05 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="admissions">
+      <div class="kicker">05 — Admissions</div>
+      <h2>/admissions — where interest becomes an enquiry</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: answer "can I join, and how," then capture the enquiry — this page's entire purpose is the form at the bottom.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Short, warm framing — this is an invitation, not a gate.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Who can apply</span><span class="chip cms">CMS</span></div><div class="desc">Eligibility by age/discipline — <span class="chip tbd">TBD</span> pending your actual admission criteria.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">How it works</span><span class="chip cms">CMS</span></div><div class="desc">Numbered steps — Enquire → Audition/Interaction → Enrollment → Orientation. A genuine sequence, so it's the one place on the site that earns a numbered list.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Cost</span><span class="chip tbd">TBD</span></div><div class="desc">A confirmed line on fees — free of cost, in line with the wider mission, or otherwise. Needed before this page can go live truthfully.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Enquiry form</span><span class="chip form">Form → module</span></div><div class="desc">Name, contact, discipline of interest, age/prior experience, message — submits into Enquiries as an Admission-type enquiry, picked up by Staff/Admin.</div></div></div>
+          <div class="section-row"><div class="idx">06</div><div><div class="name-row"><span class="name">FAQ</span><span class="chip cms">CMS</span></div><div class="desc">Recurring questions from past applicants.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">06 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="events">
+      <div class="kicker">06 — Events</div>
+      <h2>/events — proof the school is alive</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: show the school in motion and get people to actually turn up.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Short framing; optional highlight of the single next flagship event.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Upcoming / Past toggle</span><span class="chip portal">Portal-fed</span></div><div class="desc">Every event in the Events module marked public, split by date, newest first.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Event detail page</span><span class="chip portal">Portal-fed</span></div><div class="desc">Title, date/time, venue, description, and — for recurring events — a small gallery of past occurrences.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">RSVP</span><span class="chip form">Form → module</span></div><div class="desc">Writes an attendance record on that event inside the Events module — the same record staff see when planning capacity.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Stay in touch</span><span class="chip cms">CMS</span></div><div class="desc">Social links, closing note.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">07 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="gallery">
+      <div class="kicker">07 — Gallery &amp; News</div>
+      <h2>/gallery — see and read what's happening</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: give returning visitors (parents, donors, alumni) a reason to check back, and give the school a place to post updates without touching code.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero + tabs</span><span class="chip cms">CMS</span></div><div class="desc">Photos / Videos / News as three tabs on one page.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Photo grid</span><span class="chip cms">CMS (media library)</span></div><div class="desc">Tagged by event or discipline, drawn from the shared media library so nothing is uploaded twice.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Video embeds</span><span class="chip cms">CMS</span></div><div class="desc">Performances and recitals, pulled in from the mission's YouTube channel (@smsghm) where applicable.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">News list + article page</span><span class="chip cms">CMS</span></div><div class="desc">Dated posts with a cover image, tags and rich text body — the school's own blog, editable like any other content block.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Follow along</span><span class="chip cms">CMS</span></div><div class="desc">Social icons for the mission's channels.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">08 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="campus">
+      <div class="kicker">08 — Campus</div>
+      <h2>/campus — the setting</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: make the physical place feel real to someone who hasn't visited.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Wide shot of the campus or the closest available rendering.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Facilities</span><span class="chip cms">CMS</span></div><div class="desc">Practice halls, auditorium, hostel and similar, as a simple list with photos.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">The Bachelor of Fine Arts facility</span><span class="chip cms">CMS</span></div><div class="desc">Architectural renderings and a short note on what's coming.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Location &amp; map</span><span class="chip cms">CMS</span></div><div class="desc">Address and an embedded map.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">09 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="careers">
+      <div class="kicker">09 — Careers</div>
+      <h2>/careers — for future guest faculty &amp; staff</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: attract the right applicants and get their details straight into the hiring workflow you already have in the portal.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Why teach or work here — the mission framing, briefly.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Open positions</span><span class="chip portal">Portal-fed</span></div><div class="desc">Every posting in the Jobs module marked published — title, type (Guest Faculty / Staff), and date posted.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Job detail page</span><span class="chip portal">Portal-fed</span></div><div class="desc">Full description and requirements per posting.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Apply</span><span class="chip form">Form → module</span></div><div class="desc">Submits into Jobs as an applicant linked to that posting, ready for staff to track through stages.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">General interest</span><span class="chip form">Form → module</span></div><div class="desc">A speculative-application form for when nothing's currently posted, landing in Jobs unlinked to a specific role.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">10 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="compliance">
+      <div class="kicker">10 — UGC / Compliance</div>
+      <h2>/compliance — transparency, and a gateway</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: satisfy regulatory transparency in public, and point enrolled students and staff toward the fuller, restricted document set behind login.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Short framing on the school's affiliations and compliance posture.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Public documents</span><span class="chip portal">Portal-fed</span></div><div class="desc">Everything in Curriculum/UGC records marked public — affiliation certificates, recognitions, mandatory disclosures, policies.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Restricted documents notice</span><span class="chip cms">CMS</span></div><div class="desc">"Additional UGC-mandated documents are available to enrolled students and staff" with a Login button.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Compliance contact</span><span class="chip cms">CMS</span></div><div class="desc">Who to reach for a compliance-specific query.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">11 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="contact">
+      <div class="kicker">11 — Contact</div>
+      <h2>/contact — the catch-all</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: give anyone with a question that isn't Admissions or Careers an easy way to reach a real person.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Hero</span><span class="chip cms">CMS</span></div><div class="desc">Short and direct.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Location &amp; map</span><span class="chip cms">CMS</span></div><div class="desc">Shared with the Campus page's map block.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Contact details</span><span class="chip cms">CMS</span></div><div class="desc">Email (info.nadagurukulam@sssuhe.ac.in) confirmed from the current site; phone number <span class="chip tbd">TBD</span>.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">General contact form</span><span class="chip form">Form → module</span></div><div class="desc">Submits into Enquiries as a General-type enquiry.</div></div></div>
+          <div class="section-row"><div class="idx">05</div><div><div class="name-row"><span class="name">Social links</span><span class="chip cms">CMS</span></div><div class="desc">Shared with the footer block.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">12 / 12</span><div class="line"></div></div>
+
+    <section class="block" id="login">
+      <div class="kicker">12 — Login</div>
+      <h2>/login — one door, role-aware</h2>
+      <p class="page-job" style="margin:0 0 20px;">Job of the page: the single entry point into the academic portal for every staff-side role and for students — nothing else lives here.</p>
+      <div class="page-card">
+        <div class="section-list">
+          <div class="section-row"><div class="idx">01</div><div><div class="name-row"><span class="name">Branded login panel</span><span class="chip cms">CMS (styling only)</span></div><div class="desc">Email/username + password, "forgot password" flow. No self-registration — every staff-side account is created by Super Admin or Admin; students are enrolled by staff.</div></div></div>
+          <div class="section-row"><div class="idx">02</div><div><div class="name-row"><span class="name">Role-aware redirect</span><span class="chip portal">Portal-fed</span></div><div class="desc">Super Admin, Admin, Teacher, Guest Faculty and Staff land in the admin sidebar; Student lands in the separate student dashboard.</div></div></div>
+          <div class="section-row"><div class="idx">03</div><div><div class="name-row"><span class="name">Prospective-student note</span><span class="chip cms">CMS</span></div><div class="desc">A line pointing anyone without an account to Admissions instead of trying to log in.</div></div></div>
+          <div class="section-row"><div class="idx">04</div><div><div class="name-row"><span class="name">Security</span><span class="chip tbd">TBD — Phase 4/6</span></div><div class="desc">Session handling and whether Super Admin/Admin accounts require two-factor authentication — to settle when we design the data model and build auth.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="cta-band">
+    <div>
+      <h3>Phase 3 is ready</h3>
+      <p>All 13 portal modules, field by field, with the full role permission matrix. <a href="https://claude.ai/code/artifact/77883c79-5a98-4142-9264-5d11aaaa51ca" style="font-weight:700;">Open the Portal Modules Spec →</a></p>
+    </div>
+    <div class="signature">One World, One Family</div>
+  </div>
+</footer>

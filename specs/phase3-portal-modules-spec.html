@@ -1,0 +1,464 @@
+<title>Nada Gurukulam Portal Modules Spec</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Petit+Formal+Script&display=swap');
+
+  :root{
+    --burgundy:#470500; --burgundy-ink:#3a0400; --maroon:#7e2320;
+    --ochre:#c97f1c; --manjal:#e0ac27; --gold:#a27c3f;
+    --silk:#e4d5cb; --silk-deep:#d5bdaf; --cream:#fffde9;
+    --purple:#432250; --forest:#1f4b3f; --waters:#123151;
+
+    --bg:var(--cream); --surface:#fffaf0; --surface-2:var(--silk); --border:#e6d6c4;
+    --text:#2a1712; --text-soft:#6b5548; --text-faint:#93816f;
+    --accent:var(--burgundy); --accent-2:var(--ochre); --code-bg:#f2e8da;
+    --shadow: 0 1px 2px rgba(71,5,0,0.06), 0 8px 24px rgba(71,5,0,0.06);
+
+    --role-sa:var(--burgundy); --role-ad:var(--waters); --role-te:var(--forest);
+    --role-gf:var(--ochre); --role-st:var(--purple); --role-su:var(--manjal);
+
+    --perm-full:var(--burgundy); --perm-manage:var(--gold); --perm-view:var(--text-faint); --perm-self:var(--waters);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+      --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+      --accent:var(--manjal); --accent-2:var(--ochre); --code-bg:#2a150d;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      --role-sa:var(--manjal); --role-ad:#8fb8de; --role-te:#8fcdb0; --role-gf:var(--ochre); --role-st:#c9a3e0; --role-su:var(--manjal);
+      --perm-full:var(--manjal); --perm-manage:#d8b177; --perm-view:#9c7b68; --perm-self:#8fb8de;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+    --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+    --accent:var(--manjal); --accent-2:var(--ochre); --code-bg:#2a150d;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    --role-sa:var(--manjal); --role-ad:#8fb8de; --role-te:#8fcdb0; --role-gf:var(--ochre); --role-st:#c9a3e0; --role-su:var(--manjal);
+    --perm-full:var(--manjal); --perm-manage:#d8b177; --perm-view:#9c7b68; --perm-self:#8fb8de;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Nunito Sans', ui-sans-serif, system-ui, sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,h4{font-family:'Jost', ui-sans-serif, system-ui, sans-serif;font-weight:600;letter-spacing:0.01em;text-wrap:balance;color:var(--text);margin:0;}
+  a{color:var(--accent);}
+
+  .hero{background:linear-gradient(155deg, var(--burgundy) 0%, var(--burgundy-ink) 100%);color:#fbeee6;padding:44px 8vw 70px;position:relative;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);} }
+  :root[data-theme="dark"] .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);}
+  .breadcrumb{font-size:12.5px;color:#e8c9b9;margin-bottom:18px;display:flex;gap:16px;flex-wrap:wrap;}
+  .breadcrumb a{color:var(--manjal);text-decoration:none;font-weight:600;}
+  .hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--manjal);font-weight:600;margin-bottom:18px;}
+  .hero .eyebrow::before{content:"";width:22px;height:1px;background:var(--manjal);display:inline-block;}
+  .hero h1{font-size:clamp(30px,3.8vw,46px);line-height:1.12;max-width:20ch;color:#fff;}
+  .hero p.lede{max-width:66ch;font-size:16.5px;color:#f0ddd2;margin-top:18px;}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:28px;margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.16);}
+  .hero-meta div{font-size:13px;color:#e8c9b9;}
+  .hero-meta strong{display:block;color:#fff;font-size:14.5px;font-weight:600;margin-bottom:2px;}
+  .wave{display:block;width:100%;height:52px;margin-top:-2px;}
+
+  .layout{max-width:1220px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;gap:56px;padding:0 8vw 90px;}
+  @media (max-width:880px){ .layout{grid-template-columns:1fr;} .toc{display:none;} }
+  .toc{position:sticky;top:28px;align-self:start;padding-top:44px;max-height:calc(100vh - 56px);overflow-y:auto;}
+  .toc .toc-label{font-size:11.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:14px;display:block;}
+  .toc-rules-link{display:block;font-size:13px;color:var(--text-soft);text-decoration:none;font-weight:600;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border);}
+  .toc-rules-link:hover{color:var(--accent);}
+  .toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;border-left:1px solid var(--border);}
+  .toc li{counter-increment:toc;position:relative;padding:6px 0 6px 20px;}
+  .toc li::before{content:counter(toc,decimal-leading-zero);position:absolute;left:-1px;top:7px;width:16px;transform:translateX(-50%);background:var(--bg);font-size:10.5px;color:var(--text-faint);padding:2px 0;}
+  .toc a{display:block;font-size:12.5px;color:var(--text-soft);text-decoration:none;font-weight:600;}
+  .toc a:hover{color:var(--accent);}
+
+  main{padding-top:44px;min-width:0;}
+  section.block{margin-bottom:52px;scroll-margin-top:24px;}
+  .kicker{font-size:12px;letter-spacing:0.13em;text-transform:uppercase;color:var(--accent-2);font-weight:700;margin-bottom:8px;}
+  section.block h2{font-size:clamp(22px,2.4vw,28px);margin-bottom:14px;}
+  section.block > p{max-width:74ch;color:var(--text-soft);font-size:15.5px;}
+  section.block > p + p{margin-top:10px;}
+  .divider{display:flex;align-items:center;gap:14px;margin:44px 0 34px;color:var(--text-faint);}
+  .divider .line{flex:1;height:1px;background:var(--border);}
+  .divider .num{font-family:'Jost',sans-serif;font-size:12px;letter-spacing:0.1em;}
+
+  /* role legend chips */
+  .role-legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:20px;}
+  .role-legend .r{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-soft);font-weight:600;}
+  .role-legend .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;}
+
+  /* permission pill legend */
+  .perm-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:18px;}
+  .perm-legend .p{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .perm-legend .p b{display:block;font-size:13px;color:var(--text);margin-bottom:2px;}
+  .perm-legend .p span{font-size:12px;color:var(--text-soft);}
+
+  .perm{display:inline-flex;align-items:center;justify-content:center;font-family:'Jost',sans-serif;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap;}
+  .perm.full{background:var(--perm-full);color:#fff;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .perm.full{color:#2a1500;} }
+  :root[data-theme="dark"] .perm.full{color:#2a1500;}
+  .perm.manage{background:color-mix(in srgb, var(--perm-manage) 30%, transparent);color:var(--perm-manage);border:1px solid color-mix(in srgb, var(--perm-manage) 50%, transparent);}
+  .perm.own{background:transparent;color:var(--perm-manage);border:1px solid var(--perm-manage);}
+  .perm.sub{background:transparent;color:var(--ochre);border:1px dashed var(--ochre);}
+  .perm.view{background:transparent;color:var(--text-faint);border:1px solid var(--border);}
+  .perm.self{background:color-mix(in srgb, var(--perm-self) 24%, transparent);color:var(--perm-self);}
+  .perm.none{color:var(--text-faint);font-size:13px;}
+
+  /* matrix */
+  .matrix-scroll{overflow-x:auto;margin-top:22px;border:1px solid var(--border);border-radius:12px;background:var(--surface);}
+  table.matrix{border-collapse:collapse;width:100%;min-width:820px;font-size:13px;}
+  .matrix th,.matrix td{padding:11px 14px;border-bottom:1px solid var(--border);text-align:left;}
+  .matrix thead th{background:var(--surface-2);font-family:'Jost',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;color:var(--text-soft);vertical-align:bottom;}
+  .matrix thead th .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+  .matrix td.rowhead{font-weight:700;color:var(--text);background:var(--surface);white-space:nowrap;font-size:13.5px;}
+  .matrix tbody tr:last-child td{border-bottom:none;}
+  .matrix tbody tr:hover td{background:var(--surface-2);}
+
+  /* module cards */
+  .mod-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 26px;box-shadow:var(--shadow);}
+  .mod-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .mod-head h3{font-size:19px;}
+  .mod-idx{font-family:'Jost',sans-serif;font-size:12px;color:var(--text-faint);}
+  .mod-purpose{font-size:13.5px;color:var(--text-soft);font-style:italic;margin:0 0 16px;max-width:74ch;}
+  .mod-sub{font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--accent-2);font-weight:700;margin:16px 0 8px;}
+  .mod-sub:first-of-type{margin-top:0;}
+  .tag-row{display:flex;flex-wrap:wrap;gap:6px;}
+  .tag{font-size:12px;color:var(--text-soft);background:var(--surface-2);border:1px solid var(--border);padding:3px 10px;border-radius:99px;}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+  .flow .step{font-size:12px;background:var(--surface-2);padding:5px 11px;border-radius:99px;color:var(--text);border:1px solid var(--border);}
+  .flow .arrow{color:var(--text-faint);font-size:13px;}
+  .role-access{display:flex;flex-wrap:wrap;gap:8px 16px;}
+  .role-access .ra{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-soft);}
+  .role-access .ra .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .mod-links{font-size:13px;color:var(--text-soft);}
+  .mod-links b{color:var(--text);font-weight:700;}
+  .mod-note{font-size:12.5px;color:var(--text-faint);margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);}
+
+  footer{max-width:1220px;margin:0 auto;padding:0 8vw 60px;}
+  .cta-band{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:32px 30px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;}
+  .cta-band h3{font-size:19px;margin-bottom:6px;}
+  .cta-band p{font-size:14px;color:var(--text-soft);margin:0;max-width:56ch;}
+  .signature{font-family:'Petit Formal Script', cursive;color:var(--accent);font-size:24px;}
+</style>
+
+<header class="hero">
+  <div class="breadcrumb">
+    <a href="https://claude.ai/code/artifact/18b4e5a4-f0a1-4f91-b787-92ac62eb63d8">← Phase 1 · Platform Outline</a>
+    <a href="https://claude.ai/code/artifact/9a471405-a560-4b8e-b0ad-1e275ec3fb80">← Phase 2 · Public Site Spec</a>
+  </div>
+  <span class="eyebrow">Nada Gurukulam · Portal Modules Spec · Phase 3 of 8</span>
+  <h1>Every module, who can touch what</h1>
+  <p class="lede">The thirteen sidebar modules from Phase 1, now with the fields each one holds, the actions each role can take, and the workflows that move a record from draft to done. The permission matrix below is the single source of truth for what gets built into the access-control layer in Phase 6.</p>
+  <div class="hero-meta">
+    <div><strong>Modules specified</strong>13, plus the shared permission model</div>
+    <div><strong>Roles covered</strong>Super Admin, Admin, Teacher, Guest Faculty, Staff, Student</div>
+    <div><strong>Status</strong>Draft for review — Phase 4 (data model) follows once this is confirmed</div>
+  </div>
+</header>
+<svg class="wave" viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C 240,5 480,75 720,40 C 960,5 1200,75 1440,40 L1440,80 L0,80 Z" fill="var(--bg)"></path></svg>
+
+<div class="layout">
+  <nav class="toc">
+    <span class="toc-label">Contents</span>
+    <a href="#model" class="toc-rules-link">Permission model &amp; matrix</a>
+    <ol>
+      <li><a href="#m-overview">Overview</a></li>
+      <li><a href="#m-users">Users</a></li>
+      <li><a href="#m-curriculum">Curriculum</a></li>
+      <li><a href="#m-timetable">Timetable &amp; Schedules</a></li>
+      <li><a href="#m-batches">Batches</a></li>
+      <li><a href="#m-lessonplans">Lesson Plans</a></li>
+      <li><a href="#m-liveclasses">Live Classes</a></li>
+      <li><a href="#m-assignments">Assignments</a></li>
+      <li><a href="#m-feedback">Feedback</a></li>
+      <li><a href="#m-events">Events</a></li>
+      <li><a href="#m-jobs">Jobs</a></li>
+      <li><a href="#m-enquiries">Enquiries</a></li>
+      <li><a href="#m-activities">Activities</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section class="block" id="model">
+      <div class="kicker">Before the modules — the permission model</div>
+      <h2>Six roles, seven levels of access</h2>
+      <p>Every cell in the matrix below is one of the seven levels defined here. The same seven levels apply uniformly across all thirteen modules — a module's card only needs to say where a role departs from the default.</p>
+
+      <div class="role-legend">
+        <div class="r"><span class="dot" style="background:var(--role-sa)"></span>Super Admin</div>
+        <div class="r"><span class="dot" style="background:var(--role-ad)"></span>Admin</div>
+        <div class="r"><span class="dot" style="background:var(--role-te)"></span>Teacher</div>
+        <div class="r"><span class="dot" style="background:var(--role-gf)"></span>Guest Faculty</div>
+        <div class="r"><span class="dot" style="background:var(--role-st)"></span>Staff</div>
+        <div class="r"><span class="dot" style="background:var(--role-su)"></span>Student</div>
+      </div>
+
+      <div class="perm-legend">
+        <div class="p"><span class="perm full">Full</span><span>Create, edit, delete, and change module-wide settings.</span></div>
+        <div class="p"><span class="perm manage">Manage</span><span>Day-to-day create/edit within the module — not its structural settings.</span></div>
+        <div class="p"><span class="perm own">Own</span><span>Manage rights, but only over records assigned to them (their batch, their session).</span></div>
+        <div class="p"><span class="perm sub">Submits</span><span>Can create and submit, but it needs Admin/Super Admin approval before it counts.</span></div>
+        <div class="p"><span class="perm view">View</span><span>Read-only — sees the record, can't change it.</span></div>
+        <div class="p"><span class="perm self">Self</span><span>Sees and acts only on their own record — a student's own submissions, own timetable.</span></div>
+        <div class="p"><span class="perm none">—</span><span>Module doesn't appear in that role's sidebar at all.</span></div>
+      </div>
+
+      <div class="divider"><span class="num">Full matrix</span><div class="line"></div></div>
+
+      <div class="matrix-scroll">
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th><span class="dot" style="background:var(--role-sa)"></span>Super Admin</th>
+              <th><span class="dot" style="background:var(--role-ad)"></span>Admin</th>
+              <th><span class="dot" style="background:var(--role-te)"></span>Teacher</th>
+              <th><span class="dot" style="background:var(--role-gf)"></span>Guest Faculty</th>
+              <th><span class="dot" style="background:var(--role-st)"></span>Staff</th>
+              <th><span class="dot" style="background:var(--role-su)"></span>Student</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="rowhead">Overview</td><td><span class="perm full">Full</span></td><td><span class="perm view">View</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td></tr>
+            <tr><td class="rowhead">Users</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage*</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td></tr>
+            <tr><td class="rowhead">Curriculum</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm view">View</span></td><td><span class="perm view">View*</span></td><td><span class="perm none">—</span></td><td><span class="perm self">Self*</span></td></tr>
+            <tr><td class="rowhead">Timetable &amp; Schedules</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm view">View*</span></td><td><span class="perm view">View*</span></td><td><span class="perm none">—</span></td><td><span class="perm self">Self</span></td></tr>
+            <tr><td class="rowhead">Batches</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm view">View*</span></td><td><span class="perm view">View*</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td></tr>
+            <tr><td class="rowhead">Lesson Plans</td><td><span class="perm full">Full</span></td><td><span class="perm sub">Approves</span></td><td><span class="perm own">Own*</span></td><td><span class="perm own">Own*</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td></tr>
+            <tr><td class="rowhead">Live Classes</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm own">Own*</span></td><td><span class="perm own">Own*</span></td><td><span class="perm none">—</span></td><td><span class="perm self">Self (join)</span></td></tr>
+            <tr><td class="rowhead">Assignments</td><td><span class="perm full">Full</span></td><td><span class="perm view">View</span></td><td><span class="perm own">Own*</span></td><td><span class="perm own">Own*</span></td><td><span class="perm none">—</span></td><td><span class="perm self">Self (submit)</span></td></tr>
+            <tr><td class="rowhead">Feedback</td><td><span class="perm full">Full</span></td><td><span class="perm view">View</span></td><td><span class="perm own">Own*</span></td><td><span class="perm own">Own*</span></td><td><span class="perm none">—</span></td><td><span class="perm self">Self</span></td></tr>
+            <tr><td class="rowhead">Events</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm sub">Drafts*</span></td><td><span class="perm self">Self (RSVP)</span></td></tr>
+            <tr><td class="rowhead">Jobs</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm sub">Drafts*</span></td><td><span class="perm none">—</span></td></tr>
+            <tr><td class="rowhead">Enquiries</td><td><span class="perm full">Full</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm none">—</span></td><td><span class="perm none">—</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm none">—</span></td></tr>
+            <tr><td class="rowhead">Activities</td><td><span class="perm full">Full</span></td><td><span class="perm view">View</span></td><td><span class="perm own">Own*</span></td><td><span class="perm own">Own*</span></td><td><span class="perm manage">Manage</span></td><td><span class="perm self">Self (view)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-faint);margin-top:10px;">* starred cells are explained under that module's card below — they carry a scope limit the single-word label can't fully capture.</p>
+    </section>
+
+    <div class="divider"><span class="num">01 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-overview">
+      <div class="kicker">01 — Overview</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Overview</h3><span class="mod-idx">Super Admin · Admin</span></div>
+        <p class="mod-purpose">The landing dashboard after login — a snapshot of the school right now, not a module you configure.</p>
+        <div class="mod-sub">Key tiles</div>
+        <div class="tag-row"><span class="tag">Active students</span><span class="tag">Active batches</span><span class="tag">Today's classes</span><span class="tag">Pending enquiries</span><span class="tag">Lesson plans awaiting review</span><span class="tag">Recent activity feed</span><span class="tag">Quick actions</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;">Admin sees the same dashboard minus the tiles tied to Super-Admin-only settings (design tokens, role creation). Teacher, Guest Faculty, Staff and Student don't get this module at all — each lands on a role-appropriate home screen instead (a teacher's own batch list, a student's own dashboard), which isn't part of the 13-module count.</p>
+        <div class="mod-note"><span class="mod-links"><b>Reads from:</b> Users, Batches, Timetable, Enquiries, Lesson Plans — this module has no data of its own.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">02 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-users">
+      <div class="kicker">02 — Users</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Users</h3><span class="mod-idx">Super Admin · Admin (limited)</span></div>
+        <p class="mod-purpose">The single source of truth for every account — nobody self-registers on the staff side.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Name &amp; contact</span><span class="tag">Role</span><span class="tag">Assigned batches/disciplines</span><span class="tag">Status (active/inactive)</span><span class="tag">Public-profile toggle</span><span class="tag">Permission overrides</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Invite created</span><span class="arrow">→</span><span class="step">Account set up (temp password / invite link)</span><span class="arrow">→</span><span class="step">Profile completed</span><span class="arrow">→</span><span class="step">Public profile toggled if faculty</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Admin (Manage*)</b> can create and edit Teacher, Guest Faculty, Staff and Student accounts, but cannot create or edit an Admin or Super Admin account — that boundary is what stops privilege escalation. Only Super Admin can create another Admin.</p>
+        <div class="mod-note"><span class="mod-links"><b>Feeds:</b> the public Faculty Directory (Phase 2), and the assignment fields inside every other module.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">03 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-curriculum">
+      <div class="kicker">03 — Curriculum</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Curriculum</h3><span class="mod-idx">Super Admin · Admin · view for others</span></div>
+        <p class="mod-purpose">The structure of what's taught — disciplines, levels and the syllabus documents behind them.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Discipline name</span><span class="tag">Description</span><span class="tag">Levels / grades</span><span class="tag">Syllabus documents</span><span class="tag">Learning outcomes</span><span class="tag">UGC curriculum references</span><span class="tag">Lead faculty</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Guest Faculty (View*)</b> sees only the discipline(s) they teach, not the full curriculum. <b>Student (Self*)</b> sees only the syllabus for the discipline they're enrolled in — this is their read of Curriculum, not a separate record.</p>
+        <div class="mod-note"><span class="mod-links"><b>Feeds:</b> the public Courses page (Phase 2). <b>Referenced by:</b> Batches (a batch belongs to a discipline+level), Timetable.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">04 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-timetable">
+      <div class="kicker">04 — Timetable &amp; Schedules</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Timetable &amp; Schedules</h3><span class="mod-idx">Super Admin · Admin</span></div>
+        <p class="mod-purpose">When and where every class happens, with conflicts caught before they become a problem.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Batch</span><span class="tag">Faculty</span><span class="tag">Discipline/subject</span><span class="tag">Day &amp; time</span><span class="tag">Room / online link</span><span class="tag">Recurrence rule</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Admin builds recurring schedule per batch</span><span class="arrow">→</span><span class="step">Conflicts flagged automatically</span><span class="arrow">→</span><span class="step">Published to affected faculty &amp; students</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Teacher / Guest Faculty (View*)</b> see only their own schedule, not the full school timetable. <b>Student (Self)</b> sees only their own batch's timetable.</p>
+        <div class="mod-note"><span class="mod-links"><b>Reads from:</b> Batches, Users. <b>Feeds:</b> Live Classes (a session's join link is generated from its timetable entry).</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">05 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-batches">
+      <div class="kicker">05 — Batches</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Batches</h3><span class="mod-idx">Super Admin · Admin</span></div>
+        <p class="mod-purpose">The cohort — who's enrolled, with whom, taught by whom.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Batch name</span><span class="tag">Discipline &amp; level</span><span class="tag">Assigned faculty</span><span class="tag">Student roster</span><span class="tag">Capacity</span><span class="tag">Start date</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Teacher / Guest Faculty (View*)</b> see the roster only for the batch(es) they're assigned to.</p>
+        <div class="mod-note"><span class="mod-links"><b>Referenced by:</b> Timetable, Lesson Plans, Live Classes, Assignments, Feedback and Activities — every one of those scopes to a batch.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">06 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-lessonplans">
+      <div class="kicker">06 — Lesson Plans</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Lesson Plans</h3><span class="mod-idx">Teacher · Guest Faculty · approved by Admin</span></div>
+        <p class="mod-purpose">What will actually be taught, session by session — drafted by the person teaching it, checked by Admin before it's final.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Batch</span><span class="tag">Subject</span><span class="tag">Session date</span><span class="tag">Objectives</span><span class="tag">Content / method</span><span class="tag">Materials</span><span class="tag">Status: draft → submitted → approved / needs revision</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Teacher/Guest Faculty drafts</span><span class="arrow">→</span><span class="step">Submits for review</span><span class="arrow">→</span><span class="step">Admin approves</span><span class="arrow">or</span><span class="step">sends back with comments</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Teacher / Guest Faculty (Own*)</b> can create, edit and submit only for their own batches — this is a Submits-level right in practice, since nothing is final until Admin approves it. Templates from a previous term can be duplicated to save re-writing routine plans.</p>
+        <div class="mod-note"><span class="mod-links"><b>Scoped by:</b> Batches, Curriculum. <b>Can attach to:</b> a Live Classes session as its agenda.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">07 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-liveclasses">
+      <div class="kicker">07 — Live Classes</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Live Classes</h3><span class="mod-idx">Teacher · Guest Faculty · Student joins</span></div>
+        <p class="mod-purpose">Where class actually happens online — built around the free, embedded Jitsi Meet decision from Phase 1.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Linked timetable session</span><span class="tag">Room link</span><span class="tag">Start / end time</span><span class="tag">Recording URL</span><span class="tag">Attendance list</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Session scheduled in Timetable</span><span class="arrow">→</span><span class="step">Room link auto-generated</span><span class="arrow">→</span><span class="step">Teacher starts, students join</span><span class="arrow">→</span><span class="step">Attendance logged automatically</span><span class="arrow">→</span><span class="step">Recording archived</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Teacher / Guest Faculty (Own*)</b> can only start or manage sessions for their own assigned batches. <b>Student (Self, join)</b> sees join links and recordings only for batches they're enrolled in.</p>
+        <div class="mod-note"><span class="mod-links"><b>Reads from:</b> Timetable, Batches. <b>Can spawn:</b> an Assignment straight out of a session.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">08 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-assignments">
+      <div class="kicker">08 — Assignments</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Assignments</h3><span class="mod-idx">Teacher · Guest Faculty · Student submits</span></div>
+        <p class="mod-purpose">Practice and evaluation between classes — including performance submissions, not just written work.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Batch</span><span class="tag">Title &amp; instructions</span><span class="tag">Attachment</span><span class="tag">Due date</span><span class="tag">Submission type: file / text / audio-video</span><span class="tag">Grade / score</span><span class="tag">Feedback text</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Teacher creates &amp; assigns to batch</span><span class="arrow">→</span><span class="step">Students submit by due date</span><span class="arrow">→</span><span class="step">Teacher grades &amp; returns feedback</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;">Audio/video submission matters here specifically — a Bharatanatyam or Mridangam assignment is often "record yourself and upload," not text. <b>Teacher / Guest Faculty (Own*)</b> only for their own batches. <b>Student (Self, submit)</b> sees and submits only their own.</p>
+        <div class="mod-note"><span class="mod-links"><b>Scoped by:</b> Batches. <b>Feeds:</b> Feedback, and the Student's own dashboard.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">09 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-feedback">
+      <div class="kicker">09 — Feedback</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Feedback</h3><span class="mod-idx">Teacher · Student · Admin analytics</span></div>
+        <p class="mod-purpose">A structured, two-way loop — not just a suggestion box.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Type: student→faculty / faculty→student / peer</span><span class="tag">Cycle / period</span><span class="tag">Form questions</span><span class="tag">Responses</span><span class="tag">Aggregate rating</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Admin or Teacher opens a cycle for a batch</span><span class="arrow">→</span><span class="step">Students respond (can be anonymous)</span><span class="arrow">→</span><span class="step">Results aggregate for Admin's analytics view</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Teacher / Guest Faculty (Own*)</b> give and receive feedback only within their own batches. <b>Student (Self)</b> submits feedback and sees feedback given to them, not classmates' records.</p>
+        <div class="mod-note"><span class="mod-links"><b>Scoped by:</b> Batches, Assignments (per-assignment feedback threads).</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">10 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-events">
+      <div class="kicker">10 — Events</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Events</h3><span class="mod-idx">Staff drafts · Admin publishes</span></div>
+        <p class="mod-purpose">Everything happening beyond regular classes, with a publish gate so nothing reaches the public site unreviewed.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Title &amp; description</span><span class="tag">Date / time / venue</span><span class="tag">Type: internal / public</span><span class="tag">RSVP list</span><span class="tag">Cover image</span><span class="tag">Public-visibility toggle</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Staff drafts the event</span><span class="arrow">→</span><span class="step">Admin/Super Admin reviews &amp; publishes</span><span class="arrow">→</span><span class="step">RSVPs collected</span><span class="arrow">→</span><span class="step">Attendance marked on the day</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Staff (Drafts*)</b> can create and edit events and manage RSVPs, but the toggle that puts an event on the public Events page is reserved for Admin/Super Admin — the same draft-preview-publish discipline the CMS uses in Phase 1.</p>
+        <div class="mod-note"><span class="mod-links"><b>Feeds:</b> the public Events page (Phase 2). <b>Can feed:</b> Activities, for performance events.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">11 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-jobs">
+      <div class="kicker">11 — Jobs</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Jobs</h3><span class="mod-idx">Staff drafts · Admin publishes</span></div>
+        <p class="mod-purpose">Recruiting guest faculty and staff, with applicants tracked in one place instead of an inbox.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Title &amp; type</span><span class="tag">Description &amp; requirements</span><span class="tag">Status: draft / published / closed</span><span class="tag">Applicant stage: new → shortlisted → interview → offer → rejected</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Staff drafts posting</span><span class="arrow">→</span><span class="step">Admin/Super Admin publishes to Careers</span><span class="arrow">→</span><span class="step">Applications arrive</span><span class="arrow">→</span><span class="step">Staff/Admin move applicants through stages</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;">Same publish gate as Events: <b>Staff (Drafts*)</b> prepares the posting, Admin/Super Admin puts it live.</p>
+        <div class="mod-note"><span class="mod-links"><b>Feeds:</b> the public Careers page (Phase 2). <b>On hire:</b> creates the new Guest Faculty/Staff account in Users.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">12 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-enquiries">
+      <div class="kicker">12 — Enquiries</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Enquiries</h3><span class="mod-idx">Staff · Admin</span></div>
+        <p class="mod-purpose">Every admissions or general enquiry from the public site, caught in one inbox instead of scattered across email.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Name &amp; contact</span><span class="tag">Type: Admission / General</span><span class="tag">Message</span><span class="tag">Discipline of interest</span><span class="tag">Status: new → contacted → converted / closed</span><span class="tag">Assigned staff</span><span class="tag">Notes / history</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Enquiry submitted on public site</span><span class="arrow">→</span><span class="step">Lands as "new"</span><span class="arrow">→</span><span class="step">Staff/Admin assigns &amp; contacts</span><span class="arrow">→</span><span class="step">Status updates through to converted or closed</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;">"Converted" is the one status with a side effect worth designing for now: it can auto-create the Student record in Users, so admissions staff aren't re-typing what the enquiry already captured.</p>
+        <div class="mod-note"><span class="mod-links"><b>Fed by:</b> the Admissions and Contact forms (Phase 2). <b>Creates:</b> Student accounts in Users, on conversion.</span></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">13 / 13</span><div class="line"></div></div>
+
+    <section class="block" id="m-activities">
+      <div class="kicker">13 — Activities</div>
+      <div class="mod-card">
+        <div class="mod-head"><h3>Activities</h3><span class="mod-idx">Staff · Teacher · Student views own</span></div>
+        <p class="mod-purpose">The co-curricular record — competitions, performances, achievements — that a certificate or portfolio can eventually draw on.</p>
+        <div class="mod-sub">Key fields</div>
+        <div class="tag-row"><span class="tag">Student(s) / batch</span><span class="tag">Activity type</span><span class="tag">Date</span><span class="tag">Description</span><span class="tag">Result / achievement</span><span class="tag">Evidence: photo / certificate</span></div>
+        <div class="mod-sub">Workflow</div>
+        <div class="flow"><span class="step">Staff/Teacher logs the activity</span><span class="arrow">→</span><span class="step">Participating students tagged</span><span class="arrow">→</span><span class="step">Appears on each student's own record</span></div>
+        <div class="mod-sub">Role notes</div>
+        <p style="font-size:13.5px;color:var(--text-soft);margin:0;"><b>Teacher / Guest Faculty (Own*)</b> log activities only for their own batch. <b>Student (Self, view)</b> sees only their own activity history.</p>
+        <div class="mod-note"><span class="mod-links"><b>Scoped by:</b> Batches, Users. <b>Can feed:</b> the public Gallery &amp; News page (Phase 2), when a photo from a logged activity is reused there.</span></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="cta-band">
+    <div>
+      <h3>Phase 3.5 and Phase 4 are ready</h3>
+      <p>Try this permission matrix as a live, clickable prototype — role picker, admin sidebar, working Events/Users/Enquiries/CMS against real shared data. <a href="https://claude.ai/code/artifact/c87e2c1b-daee-4369-848f-d8c97da9c9b4" style="font-weight:700;">Open the Live Prototype →</a> Then the actual data model: Supabase tables for the structured modules, MongoDB collections for the flexible ones, and the sensitive-document security plan from Phase 1. <a href="https://claude.ai/code/artifact/475fe154-017c-4645-a6cc-70029d5351d9" style="font-weight:700;">Open the Data Model Spec →</a></p>
+    </div>
+    <div class="signature">One World, One Family</div>
+  </div>
+</footer>

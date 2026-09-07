@@ -1,0 +1,419 @@
+<title>Nada Gurukulam Data Model Spec</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Petit+Formal+Script&family=JetBrains+Mono:wght@500;600&display=swap');
+
+  :root{
+    --burgundy:#470500; --burgundy-ink:#3a0400; --maroon:#7e2320;
+    --ochre:#c97f1c; --manjal:#e0ac27; --gold:#a27c3f;
+    --silk:#e4d5cb; --silk-deep:#d5bdaf; --cream:#fffde9;
+    --purple:#432250; --forest:#1f4b3f; --waters:#123151;
+
+    --bg:var(--cream); --surface:#fffaf0; --surface-2:var(--silk); --border:#e6d6c4;
+    --text:#2a1712; --text-soft:#6b5548; --text-faint:#93816f;
+    --accent:var(--burgundy); --accent-2:var(--ochre); --code-bg:#f2e8da;
+    --shadow: 0 1px 2px rgba(71,5,0,0.06), 0 8px 24px rgba(71,5,0,0.06);
+    --pg:var(--waters); --mongo:var(--forest);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+      --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+      --accent:var(--manjal); --accent-2:var(--ochre); --code-bg:#2a150d;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      --pg:#8fb8de; --mongo:#8fcdb0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+    --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+    --accent:var(--manjal); --accent-2:var(--ochre); --code-bg:#2a150d;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    --pg:#8fb8de; --mongo:#8fcdb0;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Nunito Sans', ui-sans-serif, system-ui, sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,h4{font-family:'Jost', ui-sans-serif, system-ui, sans-serif;font-weight:600;letter-spacing:0.01em;text-wrap:balance;color:var(--text);margin:0;}
+  a{color:var(--accent);}
+  code, .mono{font-family:'JetBrains Mono', ui-monospace, monospace;}
+
+  .hero{background:linear-gradient(155deg, var(--burgundy) 0%, var(--burgundy-ink) 100%);color:#fbeee6;padding:44px 8vw 70px;position:relative;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);} }
+  :root[data-theme="dark"] .hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);}
+  .breadcrumb{font-size:12.5px;color:#e8c9b9;margin-bottom:18px;display:flex;gap:16px;flex-wrap:wrap;}
+  .breadcrumb a{color:var(--manjal);text-decoration:none;font-weight:600;}
+  .hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--manjal);font-weight:600;margin-bottom:18px;}
+  .hero .eyebrow::before{content:"";width:22px;height:1px;background:var(--manjal);display:inline-block;}
+  .hero h1{font-size:clamp(30px,3.8vw,46px);line-height:1.12;max-width:22ch;color:#fff;}
+  .hero p.lede{max-width:66ch;font-size:16.5px;color:#f0ddd2;margin-top:18px;}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:28px;margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.16);}
+  .hero-meta div{font-size:13px;color:#e8c9b9;}
+  .hero-meta strong{display:block;color:#fff;font-size:14.5px;font-weight:600;margin-bottom:2px;}
+  .wave{display:block;width:100%;height:52px;margin-top:-2px;}
+
+  .layout{max-width:1220px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;gap:56px;padding:0 8vw 90px;}
+  @media (max-width:880px){ .layout{grid-template-columns:1fr;} .toc{display:none;} }
+  .toc{position:sticky;top:28px;align-self:start;padding-top:44px;}
+  .toc .toc-label{font-size:11.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:14px;display:block;}
+  .toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;border-left:1px solid var(--border);}
+  .toc li{counter-increment:toc;position:relative;padding:6px 0 6px 20px;}
+  .toc li::before{content:counter(toc,decimal-leading-zero);position:absolute;left:-1px;top:7px;width:16px;transform:translateX(-50%);background:var(--bg);font-size:10.5px;color:var(--text-faint);padding:2px 0;}
+  .toc a{display:block;font-size:12.5px;color:var(--text-soft);text-decoration:none;font-weight:600;}
+  .toc a:hover{color:var(--accent);}
+
+  main{padding-top:44px;min-width:0;}
+  section.block{margin-bottom:52px;scroll-margin-top:24px;}
+  .kicker{font-size:12px;letter-spacing:0.13em;text-transform:uppercase;color:var(--accent-2);font-weight:700;margin-bottom:8px;}
+  section.block h2{font-size:clamp(22px,2.4vw,28px);margin-bottom:14px;}
+  section.block > p{max-width:74ch;color:var(--text-soft);font-size:15.5px;}
+  section.block > p + p{margin-top:10px;}
+  .divider{display:flex;align-items:center;gap:14px;margin:44px 0 34px;color:var(--text-faint);}
+  .divider .line{flex:1;height:1px;background:var(--border);}
+  .divider .num{font-family:'Jost',sans-serif;font-size:12px;letter-spacing:0.1em;}
+
+  /* db split overview */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;}
+  @media (max-width:720px){.split{grid-template-columns:1fr;}}
+  .split-col{border-radius:14px;padding:20px 22px;border:1px solid var(--border);background:var(--surface);}
+  .split-col.pg{border-top:3px solid var(--pg);}
+  .split-col.mongo{border-top:3px solid var(--mongo);}
+  .split-col h4{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .split-col h4 .dot{width:9px;height:9px;border-radius:50%;}
+  .split-col p{font-size:13px;color:var(--text-soft);margin:0 0 12px;}
+  .split-col .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .split-col .chip{font-size:11.5px;font-family:'JetBrains Mono',monospace;background:var(--surface-2);border:1px solid var(--border);padding:3px 9px;border-radius:6px;color:var(--text);}
+
+  /* hybrid rule callout */
+  .rule-box{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent-2);border-radius:10px;padding:16px 20px;}
+  .rule-box b{color:var(--text);}
+  .rule-box p{font-size:13.5px;color:var(--text-soft);margin:6px 0 0;}
+
+  /* schema group */
+  .group-label{font-family:'Jost',sans-serif;font-size:13px;font-weight:600;color:var(--text);margin:28px 0 12px;display:flex;align-items:center;gap:8px;}
+  .group-label:first-of-type{margin-top:22px;}
+  .group-label .dot{width:8px;height:8px;border-radius:50%;}
+  .schema-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:760px){.schema-grid{grid-template-columns:1fr;}}
+  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);}
+  .table-card .tname{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;color:var(--text);}
+  .table-card .tpurpose{font-size:12.5px;color:var(--text-soft);margin:4px 0 10px;}
+  .table-card .cols{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+  .table-card .col{font-size:11px;font-family:'JetBrains Mono',monospace;background:var(--surface-2);border:1px solid var(--border);padding:2px 7px;border-radius:5px;color:var(--text-soft);}
+  .table-card .col.key{color:var(--accent);border-color:transparent;background:color-mix(in srgb, var(--accent) 14%, transparent);}
+  .table-card .refs{font-size:11.5px;color:var(--text-faint);}
+  .table-card .refs b{color:var(--text-soft);font-weight:600;}
+
+  /* mongo cards, single column, slightly richer */
+  .mongo-grid{display:flex;flex-direction:column;gap:12px;}
+  .mongo-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
+  .mongo-card .tname{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14.5px;color:var(--text);}
+  .mongo-card .tpurpose{font-size:13px;color:var(--text-soft);margin:4px 0 10px;font-style:italic;}
+  .mongo-card .shape{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text-soft);white-space:pre-wrap;overflow-x:auto;}
+  .mongo-card .refs{font-size:11.5px;color:var(--text-faint);margin-top:8px;}
+  .mongo-card .refs b{color:var(--text-soft);font-weight:600;}
+
+  /* security steps */
+  .sec-steps{display:flex;flex-direction:column;margin-top:20px;}
+  .sec-step{display:grid;grid-template-columns:26px 1fr;gap:14px;padding:14px 0;border-top:1px solid var(--border);}
+  .sec-step:first-child{border-top:none;padding-top:0;}
+  .sec-step .n{font-family:'Jost',sans-serif;color:var(--silk-deep);font-weight:700;font-size:15px;}
+  :root[data-theme="dark"] .sec-step .n{color:var(--surface-2);}
+  .sec-step h4{font-size:14.5px;margin-bottom:4px;}
+  .sec-step p{font-size:13.5px;color:var(--text-soft);margin:0;max-width:66ch;}
+
+  .rls-note{margin-top:18px;padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13.5px;color:var(--text-soft);}
+  .rls-note b{color:var(--text);}
+
+  footer{max-width:1220px;margin:0 auto;padding:0 8vw 60px;}
+  .cta-band{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:32px 30px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;}
+  .cta-band h3{font-size:19px;margin-bottom:6px;}
+  .cta-band p{font-size:14px;color:var(--text-soft);margin:0;max-width:56ch;}
+  .signature{font-family:'Petit Formal Script', cursive;color:var(--accent);font-size:24px;}
+</style>
+
+<header class="hero">
+  <div class="breadcrumb">
+    <a href="https://claude.ai/code/artifact/18b4e5a4-f0a1-4f91-b787-92ac62eb63d8">← Phase 1 · Platform Outline</a>
+    <a href="https://claude.ai/code/artifact/9a471405-a560-4b8e-b0ad-1e275ec3fb80">← Phase 2 · Public Site Spec</a>
+    <a href="https://claude.ai/code/artifact/77883c79-5a98-4142-9264-5d11aaaa51ca">← Phase 3 · Portal Modules Spec</a>
+    <a href="https://claude.ai/code/artifact/c87e2c1b-daee-4369-848f-d8c97da9c9b4">← Phase 3.5 · Live Prototype</a>
+  </div>
+  <span class="eyebrow">Nada Gurukulam · Data Model Spec · Phase 4 of 8</span>
+  <h1>Where every record actually lives</h1>
+  <p class="lede">Phase 3's thirteen modules, turned into real tables and collections — which ones sit in Supabase, which sit in MongoDB, how they reference each other across that split, and the storage plan for sensitive documents. This is what Phase 6 gets built against.</p>
+  <div class="hero-meta">
+    <div><strong>Postgres tables</strong>16, in Supabase</div>
+    <div><strong>MongoDB collections</strong>7, in Atlas</div>
+    <div><strong>Status</strong>Draft for review — Phase 5 (visual design) follows once this is confirmed</div>
+  </div>
+</header>
+<svg class="wave" viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C 240,5 480,75 720,40 C 960,5 1200,75 1440,40 L1440,80 L0,80 Z" fill="var(--bg)"></path></svg>
+
+<div class="layout">
+  <nav class="toc">
+    <span class="toc-label">Contents</span>
+    <ol>
+      <li><a href="#split">The two-database split</a></li>
+      <li><a href="#pattern">The hybrid-record rule</a></li>
+      <li><a href="#postgres">Postgres tables</a></li>
+      <li><a href="#mongo">MongoDB collections</a></li>
+      <li><a href="#documents">Documents &amp; sensitive data</a></li>
+      <li><a href="#rls">Enforcing the permission matrix</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section class="block" id="split">
+      <div class="kicker">01 — The two-database split</div>
+      <h2>Structured and permissioned vs. flexible and content-shaped</h2>
+      <p>This is the Phase 1 architecture decision, made concrete: anything relational — it has a fixed shape, gets queried by joins, and carries row-level permissions — goes in Supabase. Anything whose shape varies record to record, or that's closer to a document than a row, goes in MongoDB.</p>
+      <div class="split">
+        <div class="split-col pg">
+          <h4><span class="dot" style="background:var(--pg)"></span>Supabase (Postgres)</h4>
+          <p>Identity, scheduling, enrollment, documents, and anything with a public-site pipeline behind it.</p>
+          <div class="chips">
+            <span class="chip">roles</span><span class="chip">users</span><span class="chip">disciplines</span><span class="chip">batches</span><span class="chip">batch_faculty</span><span class="chip">enrollments</span><span class="chip">timetable_slots</span><span class="chip">live_sessions</span><span class="chip">session_attendance</span><span class="chip">documents</span><span class="chip">document_access_log</span><span class="chip">events</span><span class="chip">event_rsvps</span><span class="chip">jobs</span><span class="chip">job_applicants</span><span class="chip">enquiries</span>
+          </div>
+        </div>
+        <div class="split-col mongo">
+          <h4><span class="dot" style="background:var(--mongo)"></span>MongoDB (Atlas)</h4>
+          <p>Whatever varies in shape from record to record, or reads more like a document than a row.</p>
+          <div class="chips">
+            <span class="chip">cms_blocks</span><span class="chip">curriculum_content</span><span class="chip">lesson_plans</span><span class="chip">feedback_forms</span><span class="chip">feedback_responses</span><span class="chip">activities</span><span class="chip">notifications</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">02</span><div class="line"></div></div>
+
+    <section class="block" id="pattern">
+      <div class="kicker">02 — The hybrid-record rule</div>
+      <h2>One recurring pattern, so the split doesn't fight itself</h2>
+      <p>A few things in Phase 3 (Curriculum, most visibly) don't cleanly belong to one database — a discipline has structured fields you'd want to query and permission (name, level, lead faculty) and a long, richly-formatted body (the actual syllabus) that behaves like content. Rather than force one or the other, one rule applies everywhere this comes up:</p>
+      <div class="rule-box">
+        <b>The hybrid-record rule:</b>
+        <p>The structured, queryable, permissioned part of a record always lives in Postgres as its own row. If that record also has a flexible, richly-formatted body, that body lives in MongoDB as its own document, and the Postgres row holds a single reference column pointing to it (e.g. <code>disciplines.syllabus_content_id</code>). The app reads both and joins them at the API layer — Postgres is never queried for the body text, and Mongo never has to enforce a permission it doesn't understand.</p>
+      </div>
+      <p style="margin-top:14px;">This is why <span class="mono" style="font-size:13.5px;">disciplines</span> appears in Postgres below with a <span class="mono" style="font-size:13.5px;">syllabus_content_id</span> column, while the syllabus text itself is a <span class="mono" style="font-size:13.5px;">curriculum_content</span> document in Mongo.</p>
+    </section>
+
+    <div class="divider"><span class="num">03</span><div class="line"></div></div>
+
+    <section class="block" id="postgres">
+      <div class="kicker">03 — Postgres tables (Supabase)</div>
+      <h2>Sixteen tables, grouped by what they answer</h2>
+
+      <div class="group-label"><span class="dot" style="background:var(--role-sa, var(--accent))"></span>Identity &amp; access</div>
+      <div class="schema-grid">
+        <div class="table-card">
+          <div class="tname">roles</div>
+          <div class="tpurpose">The six roles from Phase 3, plus any future one — never hard-coded in application logic.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">name</span><span class="col">description</span><span class="col">is_system</span></div>
+        </div>
+        <div class="table-card">
+          <div class="tname">users</div>
+          <div class="tpurpose">Every account — Super Admin down to Student — one table, distinguished by role.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">name</span><span class="col">email</span><span class="col">phone</span><span class="col">role_id</span><span class="col">status</span><span class="col">public_profile</span><span class="col">avatar_doc_id</span></div>
+          <div class="refs"><b>References:</b> roles.id · documents.id (avatar)</div>
+        </div>
+      </div>
+
+      <div class="group-label"><span class="dot" style="background:var(--pg)"></span>Academic structure</div>
+      <div class="schema-grid">
+        <div class="table-card">
+          <div class="tname">disciplines</div>
+          <div class="tpurpose">Carnatic Vocal, Bharatanatyam, and the rest — the structured half of Curriculum.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">name</span><span class="col">slug</span><span class="col">level_structure</span><span class="col">lead_faculty_id</span><span class="col">syllabus_content_id</span><span class="col">is_public</span></div>
+          <div class="refs"><b>References:</b> users.id (lead faculty) · curriculum_content (Mongo)</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">batches</div>
+          <div class="tpurpose">A cohort — one discipline, one level, a roster.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">discipline_id</span><span class="col">name</span><span class="col">level</span><span class="col">capacity</span><span class="col">start_date</span><span class="col">status</span></div>
+          <div class="refs"><b>References:</b> disciplines.id</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">batch_faculty</div>
+          <div class="tpurpose">Join table — which Teacher(s)/Guest Faculty teach which batch.</div>
+          <div class="cols"><span class="col key">batch_id</span><span class="col key">user_id</span><span class="col">role_in_batch</span></div>
+          <div class="refs"><b>References:</b> batches.id · users.id</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">enrollments</div>
+          <div class="tpurpose">Join table — which students belong to which batch.</div>
+          <div class="cols"><span class="col key">batch_id</span><span class="col key">student_id</span><span class="col">enrolled_at</span><span class="col">status</span></div>
+          <div class="refs"><b>References:</b> batches.id · users.id</div>
+        </div>
+      </div>
+
+      <div class="group-label"><span class="dot" style="background:var(--pg)"></span>Scheduling &amp; live classes</div>
+      <div class="schema-grid">
+        <div class="table-card">
+          <div class="tname">timetable_slots</div>
+          <div class="tpurpose">The recurring shape of the week — one row per regular class slot.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">batch_id</span><span class="col">faculty_id</span><span class="col">day_or_date</span><span class="col">start_time</span><span class="col">end_time</span><span class="col">location_or_link</span><span class="col">recurrence_rule</span></div>
+          <div class="refs"><b>References:</b> batches.id · users.id</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">live_sessions</div>
+          <div class="tpurpose">One real occurrence of a timetable slot — today's actual Jitsi room.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">timetable_slot_id</span><span class="col">session_date</span><span class="col">room_link</span><span class="col">recording_url</span><span class="col">started_at</span><span class="col">ended_at</span></div>
+          <div class="refs"><b>References:</b> timetable_slots.id</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">session_attendance</div>
+          <div class="tpurpose">Who actually joined — captured automatically on join/leave.</div>
+          <div class="cols"><span class="col key">session_id</span><span class="col key">user_id</span><span class="col">joined_at</span><span class="col">left_at</span></div>
+          <div class="refs"><b>References:</b> live_sessions.id · users.id</div>
+        </div>
+      </div>
+
+      <div class="group-label"><span class="dot" style="background:var(--pg)"></span>Documents</div>
+      <div class="schema-grid">
+        <div class="table-card">
+          <div class="tname">documents</div>
+          <div class="tpurpose">Metadata + access rule for every uploaded file. The file itself sits in Supabase Storage (or R2/B2 later) — never in this table.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">title</span><span class="col">storage_path</span><span class="col">storage_provider</span><span class="col">owner_user_id</span><span class="col">module_scope</span><span class="col">visibility</span><span class="col">is_sensitive</span><span class="col">uploaded_at</span></div>
+          <div class="refs"><b>References:</b> users.id (owner)</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">document_access_log</div>
+          <div class="tpurpose">Who viewed or downloaded what, and when — the audit trail from Phase 1's document-security plan.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">document_id</span><span class="col">user_id</span><span class="col">action</span><span class="col">at</span></div>
+          <div class="refs"><b>References:</b> documents.id · users.id</div>
+        </div>
+      </div>
+
+      <div class="group-label"><span class="dot" style="background:var(--pg)"></span>Public engagement</div>
+      <div class="schema-grid">
+        <div class="table-card">
+          <div class="tname">events</div>
+          <div class="tpurpose">Everything on the Events module and, once published, the public Events page.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">title</span><span class="col">description</span><span class="col">start_at</span><span class="col">venue</span><span class="col">type</span><span class="col">status</span><span class="col">cover_image_id</span></div>
+          <div class="refs"><b>References:</b> documents.id (cover image)</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">event_rsvps</div>
+          <div class="tpurpose">Join table — who's coming, from the public RSVP form or a logged-in Student.</div>
+          <div class="cols"><span class="col key">event_id</span><span class="col">user_id / guest_contact</span><span class="col">status</span><span class="col">rsvp_at</span></div>
+          <div class="refs"><b>References:</b> events.id · users.id (nullable, for public RSVPs)</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">jobs</div>
+          <div class="tpurpose">Postings for Guest Faculty and Staff roles.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">title</span><span class="col">type</span><span class="col">description</span><span class="col">requirements</span><span class="col">status</span></div>
+        </div>
+        <div class="table-card">
+          <div class="tname">job_applicants</div>
+          <div class="tpurpose">Everyone who applied, and where they are in the pipeline.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">job_id</span><span class="col">name</span><span class="col">contact</span><span class="col">resume_document_id</span><span class="col">stage</span><span class="col">applied_at</span></div>
+          <div class="refs"><b>References:</b> jobs.id · documents.id (resume)</div>
+        </div>
+        <div class="table-card">
+          <div class="tname">enquiries</div>
+          <div class="tpurpose">Every admissions or general enquiry, from the public site's two forms.</div>
+          <div class="cols"><span class="col key">id</span><span class="col">name</span><span class="col">contact</span><span class="col">type</span><span class="col">message</span><span class="col">discipline_interest_id</span><span class="col">status</span><span class="col">assigned_to</span></div>
+          <div class="refs"><b>References:</b> disciplines.id · users.id (assigned staff)</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">04</span><div class="line"></div></div>
+
+    <section class="block" id="mongo">
+      <div class="kicker">04 — MongoDB collections (Atlas)</div>
+      <h2>Seven collections, shaped like what they hold</h2>
+      <p>Shown as an example document shape rather than a column list — that's the point of putting these here instead of in Postgres.</p>
+
+      <div class="mongo-grid">
+        <div class="mongo-card">
+          <div class="tname">cms_blocks</div>
+          <div class="tpurpose">Every editable section of the public site from Phase 2 — one document per block.</div>
+          <div class="shape">{ page: "home", section_key: "hero", order: 1,
+  block_type: "hero", locale: "en",
+  content: { heading, tagline, image_url, cta_label, cta_href },
+  status: "published", updated_by, updated_at }</div>
+        </div>
+        <div class="mongo-card">
+          <div class="tname">curriculum_content</div>
+          <div class="tpurpose">The flexible half of Curriculum — the syllabus body a <span class="mono">disciplines</span> row points to.</div>
+          <div class="shape">{ discipline_id, locale: "en",
+  syllabus_body: [ richTextBlocks... ],
+  learning_outcomes: ["...", "..."] }</div>
+        </div>
+        <div class="mongo-card">
+          <div class="tname">lesson_plans</div>
+          <div class="tpurpose">Draft → submitted → approved, exactly as specced in Phase 3.</div>
+          <div class="shape">{ batch_id, subject, session_date, objectives,
+  content_method, materials: ["..."],
+  status: "submitted", submitted_by, reviewed_by, review_comments }</div>
+        </div>
+        <div class="mongo-card">
+          <div class="tname">feedback_forms + feedback_responses</div>
+          <div class="tpurpose">Two collections, kept separate so a form's questions and its many responses don't bloat one document.</div>
+          <div class="shape">// feedback_forms
+{ type: "student_to_faculty", batch_id, cycle_period,
+  questions: [{ id, text, kind }] }
+
+// feedback_responses
+{ form_id, respondent_id: null, // null = anonymous
+  answers: { q1: "...", q2: 4 }, submitted_at }</div>
+        </div>
+        <div class="mongo-card">
+          <div class="tname">activities</div>
+          <div class="tpurpose">The co-curricular log — evidence files are Postgres <span class="mono">documents</span> rows, referenced by id.</div>
+          <div class="shape">{ batch_id, participant_ids: ["u_123","u_456"],
+  type: "competition", date, description, result,
+  evidence_document_ids: ["doc_789"] }</div>
+        </div>
+        <div class="mongo-card">
+          <div class="tname">notifications</div>
+          <div class="tpurpose">In-app and email notification queue — new assignment, feedback cycle open, enquiry assigned.</div>
+          <div class="shape">{ user_id, type: "assignment_graded", payload: {...},
+  read_at: null, created_at }</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">05</span><div class="line"></div></div>
+
+    <section class="block" id="documents">
+      <div class="kicker">05 — Documents &amp; sensitive data</div>
+      <h2>From "Supabase now, cheaper later" to an actual schema</h2>
+      <p>Phase 1 resolved the direction: Supabase Storage holds files today, with Cloudflare R2 or Backblaze B2 as the cost-efficient move once the library grows, plus an encrypted offline backup for the most sensitive records. The <span class="mono">documents</span> and <span class="mono">document_access_log</span> tables above are what make that real.</p>
+      <div class="sec-steps">
+        <div class="sec-step"><div class="n">1</div><div><h4>Every file is a row, not a loose object</h4><p>Nothing is ever linked to directly by URL. A visitor or teacher hits the API, which checks <span class="mono">documents.visibility</span> against their role, then issues a short-lived signed URL — so moving the actual bytes from Supabase Storage to R2/B2 later never breaks a link anyone has bookmarked.</p></div></div>
+        <div class="sec-step"><div class="n">2</div><div><h4>Visibility is a value, not a folder</h4><p><span class="mono">documents.visibility</span> holds one of: <span class="mono">public</span> (UGC/Compliance page), <span class="mono">students</span>, <span class="mono">staff</span>, or a specific role list — checked on every read, so a document's audience can change without moving the file.</p></div></div>
+        <div class="sec-step"><div class="n">3</div><div><h4>is_sensitive triggers the extra handling</h4><p>ID proof, medical notes, anything involving minors gets <span class="mono">is_sensitive = true</span>: encrypted at rest, included in the periodic encrypted offline backup, and every view/download is written to <span class="mono">document_access_log</span> — not just permitted, but recorded.</p></div></div>
+        <div class="sec-step"><div class="n">4</div><div><h4>The access log is append-only</h4><p><span class="mono">document_access_log</span> is written to, never edited or deleted by the application — it's the record you'd need if you ever had to answer "who saw this."</p></div></div>
+      </div>
+    </section>
+
+    <div class="divider"><span class="num">06</span><div class="line"></div></div>
+
+    <section class="block" id="rls">
+      <div class="kicker">06 — Enforcing the Phase 3 permission matrix</div>
+      <h2>Where the matrix actually lives in code</h2>
+      <p>The matrix from Phase 3 isn't just documentation — each cell becomes an enforced rule at exactly one of two layers, depending on which database the data sits in.</p>
+      <div class="rls-note">
+        <b>Postgres tables → Row-Level Security policies.</b> Supabase's RLS runs the check inside the database itself: a policy on <span class="mono">batches</span> literally says "a Teacher may select this row only if their <span class="mono">user_id</span> appears in <span class="mono">batch_faculty</span> for this <span class="mono">batch_id</span>" — which is the database-level version of Phase 3's "Own*" cells. Even a bug in application code can't leak another teacher's batch, because the database refuses the query itself.
+      </div>
+      <div class="rls-note" style="margin-top:10px;">
+        <b>MongoDB collections → checked in the API layer.</b> Mongo has no equivalent to RLS, so every read/write to <span class="mono">lesson_plans</span>, <span class="mono">feedback_responses</span>, <span class="mono">activities</span> and the rest passes through the Render backend, which re-derives the same "Own scope" and "Self" rules from the requester's role and their rows in Postgres (their <span class="mono">batch_faculty</span> or <span class="mono">enrollments</span> entries) before it will return a document.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="cta-band">
+    <div>
+      <h3>Ready for Phase 5</h3>
+      <p>Next: apply the Phase 1 design system to real screens — the public homepage, the login, and the admin dashboard shell — so there's something on screen before the build begins.</p>
+    </div>
+    <div class="signature">One World, One Family</div>
+  </div>
+</footer>

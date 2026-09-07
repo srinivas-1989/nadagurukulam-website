@@ -1,0 +1,596 @@
+<title>Nada Gurukulam Live Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&family=Petit+Formal+Script&display=swap');
+
+  :root{
+    --burgundy:#470500; --burgundy-ink:#3a0400; --maroon:#7e2320;
+    --ochre:#c97f1c; --manjal:#e0ac27; --gold:#a27c3f;
+    --silk:#e4d5cb; --silk-deep:#d5bdaf; --cream:#fffde9;
+    --purple:#432250; --forest:#1f4b3f; --waters:#123151;
+
+    --bg:var(--cream); --surface:#fffaf0; --surface-2:var(--silk); --border:#e6d6c4;
+    --text:#2a1712; --text-soft:#6b5548; --text-faint:#93816f;
+    --accent:var(--burgundy); --accent-2:var(--ochre);
+    --shadow: 0 1px 2px rgba(71,5,0,0.06), 0 8px 24px rgba(71,5,0,0.08);
+    --good:#1f4b3f; --warn:#a2621a;
+
+    --role-super_admin:var(--burgundy); --role-admin:var(--waters); --role-teacher:var(--forest);
+    --role-guest_faculty:var(--ochre); --role-staff:var(--purple); --role-student:var(--manjal);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+      --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+      --accent:var(--manjal); --accent-2:var(--ochre);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      --good:#8fcdb0; --warn:#e0ac27;
+      --role-super_admin:var(--manjal); --role-admin:#8fb8de; --role-teacher:#8fcdb0; --role-guest_faculty:var(--ochre); --role-staff:#c9a3e0; --role-student:var(--manjal);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1c0d09; --surface:#241209; --surface-2:#2e160e; --border:#432217;
+    --text:#f4e9dd; --text-soft:#cbab97; --text-faint:#9c7b68;
+    --accent:var(--manjal); --accent-2:var(--ochre);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    --good:#8fcdb0; --warn:#e0ac27;
+    --role-super_admin:var(--manjal); --role-admin:#8fb8de; --role-teacher:#8fcdb0; --role-guest_faculty:var(--ochre); --role-staff:#c9a3e0; --role-student:var(--manjal);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Nunito Sans', ui-sans-serif, system-ui, sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,h4{font-family:'Jost', ui-sans-serif, system-ui, sans-serif;font-weight:600;letter-spacing:0.01em;text-wrap:balance;color:var(--text);margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  input,textarea,select{font-family:inherit;font-size:14px;}
+  a{color:inherit;}
+
+  /* ---- notice banner ---- */
+  #proto-banner{background:color-mix(in srgb, var(--ochre) 16%, var(--surface));border-bottom:1px solid var(--border);padding:9px 20px;font-size:12.5px;color:var(--text-soft);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  #proto-banner b{color:var(--text);}
+  #proto-banner button{background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;font-size:11.5px;color:var(--text-soft);}
+
+  /* ---- topbar ---- */
+  #topbar{background:linear-gradient(155deg, var(--burgundy) 0%, var(--burgundy-ink) 100%);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #topbar{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);} }
+  :root[data-theme="dark"] #topbar{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);}
+  #topbar .brand{display:flex;align-items:center;gap:10px;font-family:'Jost',sans-serif;font-weight:600;font-size:16px;}
+  #topbar .brand .mark{width:26px;height:26px;border-radius:50%;background:var(--manjal);display:flex;align-items:center;justify-content:center;color:#3a2500;font-size:13px;font-weight:700;}
+  #topbar .right{display:flex;align-items:center;gap:12px;font-size:13px;}
+  #topbar .rolebadge{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.1);padding:5px 12px;border-radius:99px;}
+  #topbar .rolebadge .dot{width:8px;height:8px;border-radius:50%;}
+  #topbar button.link{background:none;border:1px solid rgba(255,255,255,0.35);color:#fff;padding:6px 14px;border-radius:99px;font-size:12.5px;font-weight:600;}
+  #topbar button.link:hover{background:rgba(255,255,255,0.12);}
+
+  /* ---- generic screen ---- */
+  .screen{min-height:60vh;}
+
+  /* ===== PUBLIC HOME ===== */
+  #public-hero{background:linear-gradient(155deg, var(--burgundy) 0%, var(--burgundy-ink) 100%);color:#fbeee6;padding:50px 8vw 64px;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #public-hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);} }
+  :root[data-theme="dark"] #public-hero{ background:linear-gradient(155deg,#2e160e 0%, #1c0d09 100%);}
+  #public-hero h1{font-size:clamp(28px,4vw,44px);color:#fff;max-width:18ch;line-height:1.15;}
+  #public-hero .tagline{font-family:'Petit Formal Script',cursive;color:var(--manjal);font-size:24px;margin-top:10px;}
+  #public-hero p{max-width:60ch;color:#f0ddd2;margin-top:16px;font-size:15.5px;}
+  .wave{display:block;width:100%;height:44px;margin-top:-2px;}
+  #public-body{max-width:1080px;margin:0 auto;padding:44px 8vw 70px;}
+  .section-title{font-size:20px;margin-bottom:6px;}
+  .section-sub{font-size:13.5px;color:var(--text-soft);margin-bottom:20px;}
+  .event-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+  .event-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
+  .event-card .date{font-size:11.5px;color:var(--accent-2);font-weight:700;letter-spacing:0.04em;text-transform:uppercase;}
+  .event-card h4{font-size:15.5px;margin:6px 0 6px;}
+  .event-card p{font-size:13px;color:var(--text-soft);margin:0;}
+  .event-card .venue{font-size:12px;color:var(--text-faint);margin-top:8px;}
+  .empty-note{font-size:13.5px;color:var(--text-faint);font-style:italic;}
+  #public-footer{background:var(--surface-2);padding:28px 8vw;text-align:center;font-size:13px;color:var(--text-soft);}
+  #public-footer button{margin-top:10px;background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:99px;font-weight:600;font-size:13px;}
+
+  /* ===== LOGIN ===== */
+  #login-screen{max-width:760px;margin:0 auto;padding:60px 24px;}
+  #login-screen h2{font-size:24px;margin-bottom:8px;text-align:center;}
+  #login-screen .note{font-size:13px;color:var(--text-soft);text-align:center;max-width:52ch;margin:0 auto 30px;}
+  .role-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
+  .role-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:left;box-shadow:var(--shadow);}
+  .role-card:hover{border-color:var(--accent);}
+  .role-card .dot{width:11px;height:11px;border-radius:50%;margin-bottom:10px;}
+  .role-card b{display:block;font-family:'Jost',sans-serif;font-size:14.5px;margin-bottom:4px;}
+  .role-card span{font-size:12px;color:var(--text-soft);}
+  #back-to-public{display:block;margin:26px auto 0;background:none;border:none;color:var(--text-faint);font-size:12.5px;text-decoration:underline;}
+
+  /* ===== ADMIN SHELL ===== */
+  #admin-shell{display:grid;grid-template-columns:230px 1fr;min-height:70vh;}
+  @media (max-width:760px){#admin-shell{grid-template-columns:1fr;}}
+  #admin-sidebar{background:var(--surface);border-right:1px solid var(--border);padding:18px 12px;}
+  @media (max-width:760px){#admin-sidebar{border-right:none;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;}}
+  .side-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--text-soft);font-weight:600;margin-bottom:2px;background:none;border:none;width:100%;text-align:left;}
+  @media (max-width:760px){.side-item{width:auto;}}
+  .side-item:hover{background:var(--surface-2);}
+  .side-item.active{background:var(--accent);color:#fff;}
+  :root[data-theme="dark"] .side-item.active, @media (prefers-color-scheme:dark){.side-item.active{color:#2a1500;}}
+  .side-item .lvl{margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--surface-2);color:var(--text-faint);}
+  .side-item.active .lvl{background:rgba(255,255,255,0.25);color:#fff;}
+  #admin-main{padding:24px 28px;max-width:920px;}
+  .admin-h{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+  .admin-h h2{font-size:21px;}
+  .admin-h .lvltag{font-size:11.5px;color:var(--text-faint);}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);}
+  .tile .num{font-family:'Jost',sans-serif;font-size:26px;font-weight:700;color:var(--accent);}
+  .tile .lbl{font-size:12px;color:var(--text-soft);margin-top:2px;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .card h4{font-size:14.5px;margin-bottom:10px;}
+  .placeholder-card{border-style:dashed;color:var(--text-soft);}
+  .placeholder-card .lvl-line{font-size:12px;color:var(--text-faint);margin-top:8px;}
+
+  table.data{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.data th{text-align:left;font-family:'Jost',sans-serif;font-size:11px;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-faint);padding:0 10px 8px 0;border-bottom:1px solid var(--border);}
+  table.data td{padding:10px 10px 10px 0;border-bottom:1px solid var(--border);color:var(--text-soft);vertical-align:middle;}
+  table.data tr:last-child td{border-bottom:none;}
+  .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;}
+  .pill.published, .pill.active, .pill.converted{background:color-mix(in srgb, var(--good) 20%, transparent);color:var(--good);}
+  .pill.draft, .pill.new{background:color-mix(in srgb, var(--warn) 20%, transparent);color:var(--warn);}
+  .pill.closed, .pill.inactive{background:var(--surface-2);color:var(--text-faint);}
+  .pill.contacted{background:color-mix(in srgb, var(--waters) 20%, transparent);color:var(--waters);}
+  :root[data-theme="dark"] .pill.contacted{color:#8fb8de;}
+
+  .inline-form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .inline-form input,.inline-form select,.inline-form textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
+  .inline-form textarea{width:100%;min-height:60px;}
+  .btn{background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;}
+  .btn.ghost{background:none;border:1px solid var(--border);color:var(--text-soft);}
+  .btn.sm{padding:4px 10px;font-size:12px;}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  select.status-select{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;}
+
+  .cms-edit{margin-top:8px;}
+  .cms-edit label{display:block;font-size:11.5px;color:var(--text-faint);margin:10px 0 4px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;}
+  .cms-edit input,.cms-edit textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
+  .cms-edit textarea{min-height:70px;}
+  .save-note{font-size:12px;color:var(--good);margin-left:10px;}
+
+  [hidden]{display:none!important;}
+</style>
+
+<div id="proto-banner">
+  <span>🧪 <b>Live prototype, Phase 3.5</b> — real shared data behind these screens, but login is a role-picker stand-in and the events/enquiries/CMS edits here are a preview of the modules Phase 6 will build on Vercel + Render + Supabase + MongoDB.</span>
+  <button id="banner-close" type="button">Got it</button>
+</div>
+
+<div id="topbar">
+  <div class="brand"><span class="mark">నా</span> Nada Gurukulam <span style="opacity:.6;font-weight:400;font-size:12px;">/ prototype</span></div>
+  <div class="right">
+    <span id="topbar-role" class="rolebadge" hidden><span class="dot"></span><span id="topbar-role-name"></span></span>
+    <button class="link" id="btn-public" type="button">Public Site</button>
+    <button class="link" id="btn-login" type="button">Login</button>
+    <button class="link" id="btn-logout" type="button" hidden>Log out</button>
+  </div>
+</div>
+
+<!-- ===================== PUBLIC SCREEN ===================== -->
+<section class="screen" id="screen-public">
+  <div id="public-hero">
+    <h1 id="pub-heading">Nurturing Talent, Inspiring Excellence</h1>
+    <div class="tagline" id="pub-tagline">One World, One Family</div>
+    <p id="pub-lede">Nada Gurukulam blends India's timeless artistic traditions with contemporary teaching, under the guidance of Sadguru Sri Madhusudan Sai.</p>
+  </div>
+  <svg class="wave" viewBox="0 0 1440 60" preserveAspectRatio="none"><path d="M0,30 C 240,4 480,56 720,30 C 960,4 1200,56 1440,30 L1440,60 L0,60 Z" fill="var(--bg)"></path></svg>
+  <div id="public-body">
+    <div class="section-title">Upcoming &amp; Recent Events</div>
+    <div class="section-sub">Published live from the Events module — try publishing a draft as Admin and watch it appear here.</div>
+    <div class="event-grid" id="public-events"><p class="empty-note">Loading events…</p></div>
+  </div>
+  <div id="public-footer">
+    Staff, faculty and students sign in for timetables, assignments, and live classes.
+    <br><button id="btn-public-login" type="button">Staff &amp; Student Login</button>
+  </div>
+</section>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<section class="screen" id="screen-login" hidden>
+  <div id="login-screen">
+    <h2>Preview a role</h2>
+    <p class="note">Real authentication (passwords, invites, session security) is built in Phase 6. For this prototype, pick the role you want to see the portal as — the sidebar and permissions below match the Phase 3 matrix exactly.</p>
+    <div class="role-grid" id="role-grid"></div>
+    <button id="back-to-public" type="button">← Back to public site</button>
+  </div>
+</section>
+
+<!-- ===================== ADMIN SCREEN ===================== -->
+<section class="screen" id="screen-admin" hidden>
+  <div id="admin-shell">
+    <nav id="admin-sidebar"></nav>
+    <div id="admin-main"></div>
+  </div>
+</section>
+
+<script>
+(function(){
+
+  // ---------------- role & module config (mirrors Phase 3) ----------------
+  var ROLES = [
+    {key:'super_admin', name:'Super Admin', blurb:'Everything — every module, full control.'},
+    {key:'admin', name:'Admin', blurb:'Day-to-day operations across most modules.'},
+    {key:'teacher', name:'Teacher', blurb:'Own batches — lesson plans, live classes, assignments.'},
+    {key:'guest_faculty', name:'Guest Faculty', blurb:'Same as Teacher, scoped to assigned sessions only.'},
+    {key:'staff', name:'Staff', blurb:'Enquiries, Jobs, Events, Activities.'},
+    {key:'student', name:'Student', blurb:'Own timetable, assignments, live classes, feedback.'}
+  ];
+  var ROLE_MAP = {}; ROLES.forEach(function(r){ ROLE_MAP[r.key]=r; });
+
+  // access: role -> level label shown in sidebar. Omit a role to hide the module for it.
+  var MODULES = [
+    {key:'overview', name:'Overview', access:{super_admin:'Full', admin:'View'}, desc:'Dashboard tiles across every module.'},
+    {key:'users', name:'Users', access:{super_admin:'Full', admin:'Manage'}, desc:'Every account — created and permissioned here, never self-registered.', wired:true},
+    {key:'curriculum', name:'Curriculum', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'Disciplines, levels, syllabus documents.'},
+    {key:'timetable', name:'Timetable & Schedules', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View', student:'Self'}, desc:'When and where every class happens.'},
+    {key:'batches', name:'Batches', access:{super_admin:'Full', admin:'Manage', teacher:'View', guest_faculty:'View'}, desc:'Cohorts — roster, capacity, faculty mapping.'},
+    {key:'lessonplans', name:'Lesson Plans', access:{super_admin:'Full', admin:'Approves', teacher:'Own', guest_faculty:'Own'}, desc:'Draft → submit → Admin approves.'},
+    {key:'liveclasses', name:'Live Classes', access:{super_admin:'Full', admin:'Manage', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Jitsi-based sessions, recordings, attendance.'},
+    {key:'assignments', name:'Assignments', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Set, submit, grade — including audio/video submissions.'},
+    {key:'feedback', name:'Feedback', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', student:'Self'}, desc:'Structured two-way feedback cycles.'},
+    {key:'events', name:'Events', access:{super_admin:'Full', admin:'Manage', staff:'Drafts', student:'Self'}, desc:'Staff drafts, Admin publishes to the public site.', wired:true},
+    {key:'jobs', name:'Jobs', access:{super_admin:'Full', admin:'Manage', staff:'Drafts'}, desc:'Guest Faculty & Staff postings, applicant tracking.'},
+    {key:'enquiries', name:'Enquiries', access:{super_admin:'Full', admin:'Manage', staff:'Manage'}, desc:'Every admissions & general enquiry, in one inbox.', wired:true},
+    {key:'activities', name:'Activities', access:{super_admin:'Full', admin:'View', teacher:'Own', guest_faculty:'Own', staff:'Manage', student:'Self'}, desc:'Competitions, performances, achievements.'}
+  ];
+
+  // ---------------- state ----------------
+  var db = null;
+  var view = 'public'; // public | login | admin
+  var role = null;
+  var activeModule = 'overview';
+
+  try { role = localStorage.getItem('ng_role') || null; } catch(e){}
+
+  // ---------------- tiny in-memory fallback (used only if db capability is unavailable) ----------------
+  var mem = { events: [], enquiries: [], users: [], home: {heroHeading:'Nurturing Talent, Inspiring Excellence', heroTagline:'One World, One Family', heroLede:"Nada Gurukulam blends India's timeless artistic traditions with contemporary teaching, under the guidance of Sadguru Sri Madhusudan Sai."} };
+  var memSeeded = false;
+  function seedMemIfNeeded(){
+    if (memSeeded) return; memSeeded = true;
+    mem.events = [
+      {id:'e1', title:'Guru Purnima Celebration', description:'An evening of Carnatic vocal and Bharatanatyam performances offered in gratitude to our Gurus.', date:'2026-07-29', venue:'Nada Gurukulam Auditorium', status:'published'},
+      {id:'e2', title:'Autumn Recital Evening', description:'Termly showcase across all six disciplines.', date:'2026-10-18', venue:'Main Campus Hall', status:'published'},
+      {id:'e3', title:"Founders' Day Rehearsal", description:'Internal rehearsal — faculty and senior batches only.', date:'2026-11-02', venue:'Practice Hall 2', status:'draft'}
+    ];
+    mem.enquiries = [
+      {id:'q1', name:'Ananya Rao', contact:'ananya.rao@example.com', type:'admission', message:'Interested in enrolling my 9-year-old for Bharatanatyam.', status:'new'},
+      {id:'q2', name:'Karthik Iyer', contact:'karthik.i@example.com', type:'general', message:'Do you offer weekend flute batches for working professionals?', status:'contacted'}
+    ];
+    mem.users = [
+      {id:'u1', name:'Srinivas', role:'super_admin', email:'srinivas@nadagurukulam.org', status:'active'},
+      {id:'u2', name:'Revathi Ramachandran', role:'admin', email:'revathi@nadagurukulam.org', status:'active'},
+      {id:'u3', name:'Lakshmi Narayanan', role:'teacher', email:'lakshmi@nadagurukulam.org', status:'active'},
+      {id:'u4', name:'Arun Kumar', role:'guest_faculty', email:'arun@nadagurukulam.org', status:'active'},
+      {id:'u5', name:'Divya Prasad', role:'staff', email:'divya@nadagurukulam.org', status:'active'},
+      {id:'u6', name:'Meera S.', role:'student', email:'meera@nadagurukulam.org', status:'active'}
+    ];
+  }
+
+  // ---------------- data access layer (routes to db or memory fallback) ----------------
+  var Data = {
+    async listEvents(publishedOnly){
+      if (db){
+        var q = db.collection('events');
+        if (publishedOnly) q = q.where('status','==','published');
+        var snap = await q.get();
+        return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      }
+      seedMemIfNeeded();
+      return mem.events.filter(function(e){ return !publishedOnly || e.status==='published'; });
+    },
+    async addEvent(data){
+      if (db){ var ref = await db.collection('events').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'e'+(mem.events.length+1)+Math.random().toString(36).slice(2,5);
+      mem.events.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateEvent(id, patch){
+      if (db){ await db.doc('events/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.events = mem.events.map(function(e){ return e.id===id ? Object.assign({}, e, patch) : e; });
+    },
+    async deleteEvent(id){
+      if (db){ await db.doc('events/'+id).delete(); return; }
+      seedMemIfNeeded();
+      mem.events = mem.events.filter(function(e){ return e.id!==id; });
+    },
+    async listEnquiries(){
+      if (db){ var snap = await db.collection('enquiries').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.enquiries.slice();
+    },
+    async addEnquiry(data){
+      if (db){ var ref = await db.collection('enquiries').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'q'+(mem.enquiries.length+1)+Math.random().toString(36).slice(2,5);
+      mem.enquiries.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateEnquiry(id, patch){
+      if (db){ await db.doc('enquiries/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.enquiries = mem.enquiries.map(function(e){ return e.id===id ? Object.assign({}, e, patch) : e; });
+    },
+    async listUsers(){
+      if (db){ var snap = await db.collection('users').get(); return snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); }
+      seedMemIfNeeded(); return mem.users.slice();
+    },
+    async addUser(data){
+      if (db){ var ref = await db.collection('users').add(data); return ref.id; }
+      seedMemIfNeeded();
+      var id = 'u'+(mem.users.length+1)+Math.random().toString(36).slice(2,5);
+      mem.users.push(Object.assign({id:id}, data));
+      return id;
+    },
+    async updateUser(id, patch){
+      if (db){ await db.doc('users/'+id).update(patch); return; }
+      seedMemIfNeeded();
+      mem.users = mem.users.map(function(u){ return u.id===id ? Object.assign({}, u, patch) : u; });
+    },
+    async getHome(){
+      if (db){ var snap = await db.doc('cms/home').get(); return snap.exists ? snap.data() : mem.home; }
+      seedMemIfNeeded(); return mem.home;
+    },
+    async setHome(data){
+      if (db){ await db.doc('cms/home').set(data); return; }
+      seedMemIfNeeded(); mem.home = data;
+    }
+  };
+
+  // ---------------- helpers ----------------
+  function el(tag, attrs, html){
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmtDate(d){ try { return new Date(d+'T00:00:00').toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'}); } catch(e){ return d; } }
+
+  function setView(v){
+    view = v;
+    document.getElementById('screen-public').hidden = v!=='public';
+    document.getElementById('screen-login').hidden = v!=='login';
+    document.getElementById('screen-admin').hidden = v!=='admin';
+    document.getElementById('btn-public').hidden = v==='public';
+    document.getElementById('btn-login').hidden = !!role;
+    document.getElementById('btn-logout').hidden = !role;
+    var rb = document.getElementById('topbar-role');
+    if (role){ rb.hidden = false; rb.querySelector('.dot').style.background = 'var(--role-'+role+')'; document.getElementById('topbar-role-name').textContent = ROLE_MAP[role].name; }
+    else { rb.hidden = true; }
+    if (v==='public') renderPublic();
+    if (v==='login') renderLogin();
+    if (v==='admin') renderAdmin();
+  }
+
+  // ---------------- PUBLIC ----------------
+  async function renderPublic(){
+    var home = await Data.getHome();
+    document.getElementById('pub-heading').textContent = home.heroHeading;
+    document.getElementById('pub-tagline').textContent = home.heroTagline;
+    document.getElementById('pub-lede').textContent = home.heroLede;
+    var events = await Data.listEvents(true);
+    var wrap = document.getElementById('public-events');
+    wrap.innerHTML = '';
+    if (!events.length){ wrap.innerHTML = '<p class="empty-note">Nothing published yet — publish an event as Admin to see it appear here.</p>'; return; }
+    events.forEach(function(ev){
+      var c = el('div', {class:'event-card'});
+      c.innerHTML = '<div class="date">'+esc(fmtDate(ev.date))+'</div><h4>'+esc(ev.title)+'</h4><p>'+esc(ev.description)+'</p><div class="venue">📍 '+esc(ev.venue)+'</div>';
+      wrap.appendChild(c);
+    });
+  }
+
+  // ---------------- LOGIN ----------------
+  function renderLogin(){
+    var grid = document.getElementById('role-grid');
+    grid.innerHTML = '';
+    ROLES.forEach(function(r){
+      var c = el('button', {class:'role-card', type:'button'});
+      c.innerHTML = '<span class="dot" style="background:var(--role-'+r.key+')"></span><b>'+esc(r.name)+'</b><span>'+esc(r.blurb)+'</span>';
+      c.addEventListener('click', function(){
+        role = r.key;
+        try { localStorage.setItem('ng_role', role); } catch(e){}
+        activeModule = MODULES.some(function(m){ return m.access[role]; }) ? (MODULES.find(function(m){ return m.access[role]; }).key) : 'overview';
+        setView('admin');
+      });
+      grid.appendChild(c);
+    });
+  }
+
+  // ---------------- ADMIN ----------------
+  function moduleAccessFor(role){
+    return MODULES.filter(function(m){ return m.access[role]; });
+  }
+
+  function renderSidebar(){
+    var side = document.getElementById('admin-sidebar');
+    side.innerHTML = '';
+    var mine = moduleAccessFor(role);
+    mine.forEach(function(m){
+      var b = el('button', {class:'side-item'+(m.key===activeModule?' active':''), type:'button'});
+      b.innerHTML = '<span>'+esc(m.name)+'</span><span class="lvl">'+esc(m.access[role])+'</span>';
+      b.addEventListener('click', function(){ activeModule = m.key; renderAdmin(); });
+      side.appendChild(b);
+    });
+  }
+
+  async function renderAdmin(){
+    renderSidebar();
+    var main = document.getElementById('admin-main');
+    var mod = MODULES.find(function(m){ return m.key===activeModule; }) || MODULES[0];
+    if (!mod.access[role]){ activeModule='overview'; mod = MODULES[0]; renderSidebar(); }
+
+    var h = '<div class="admin-h"><h2>'+esc(mod.name)+'</h2><span class="lvltag">Your access: '+esc(mod.access[role]||'—')+'</span></div>';
+    main.innerHTML = h + '<div id="module-body"></div>';
+    var body = document.getElementById('module-body');
+
+    if (mod.key === 'overview') return renderOverview(body);
+    if (mod.key === 'users') return renderUsers(body);
+    if (mod.key === 'events') return renderEvents(body);
+    if (mod.key === 'enquiries') return renderEnquiries(body);
+    return renderPlaceholder(body, mod);
+  }
+
+  function renderPlaceholder(body, mod){
+    var c = el('div', {class:'card placeholder-card'});
+    c.innerHTML = '<h4>'+esc(mod.name)+' — speced, not wired up yet</h4><p style="font-size:13px;">'+esc(mod.desc)+'</p><div class="lvl-line">Full field list, workflow and permissions: see the Phase 3 Portal Modules Spec.</div>';
+    body.appendChild(c);
+  }
+
+  async function renderOverview(body){
+    var events = await Data.listEvents(false);
+    var enquiries = await Data.listEnquiries();
+    var users = await Data.listUsers();
+    var published = events.filter(function(e){ return e.status==='published'; }).length;
+    var openEnq = enquiries.filter(function(e){ return e.status==='new'; }).length;
+
+    var tiles = el('div', {class:'tiles'});
+    tiles.innerHTML =
+      '<div class="tile"><div class="num">'+users.length+'</div><div class="lbl">Active accounts</div></div>'+
+      '<div class="tile"><div class="num">'+events.length+'</div><div class="lbl">Events ('+published+' published)</div></div>'+
+      '<div class="tile"><div class="num">'+openEnq+'</div><div class="lbl">New enquiries</div></div>'+
+      '<div class="tile"><div class="num">13</div><div class="lbl">Portal modules (Phase 3)</div></div>';
+    body.appendChild(tiles);
+
+    if (role === 'super_admin'){
+      var home = await Data.getHome();
+      var c = el('div', {class:'card'});
+      c.innerHTML = '<h4>Edit the public Home page</h4><p style="font-size:12.5px;color:var(--text-soft);margin:0 0 4px;">This is the CMS block behind the public homepage hero — change it here, then check the Public Site tab.</p>'+
+        '<div class="cms-edit">'+
+        '<label>Heading</label><input id="cms-heading" value="'+esc(home.heroHeading)+'">'+
+        '<label>Tagline</label><input id="cms-tagline" value="'+esc(home.heroTagline)+'">'+
+        '<label>Description</label><textarea id="cms-lede">'+esc(home.heroLede)+'</textarea>'+
+        '<div style="margin-top:12px;"><button class="btn" id="cms-save" type="button">Save &amp; publish</button><span class="save-note" id="cms-saved" hidden>Saved — check the public site.</span></div>'+
+        '</div>';
+      body.appendChild(c);
+      document.getElementById('cms-save').addEventListener('click', async function(){
+        await Data.setHome({
+          heroHeading: document.getElementById('cms-heading').value,
+          heroTagline: document.getElementById('cms-tagline').value,
+          heroLede: document.getElementById('cms-lede').value
+        });
+        var n = document.getElementById('cms-saved'); n.hidden = false; setTimeout(function(){ n.hidden = true; }, 2500);
+      });
+    }
+  }
+
+  async function renderUsers(body){
+    var users = await Data.listUsers();
+    var canManage = role === 'super_admin' || role === 'admin';
+    if (canManage){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Add an account</h4><div class="inline-form">'+
+        '<input id="u-name" placeholder="Full name">'+
+        '<select id="u-role">'+ROLES.filter(function(r){ return role==='super_admin' || (r.key!=='super_admin' && r.key!=='admin'); }).map(function(r){ return '<option value="'+r.key+'">'+r.name+'</option>'; }).join('')+'</select>'+
+        '<input id="u-email" placeholder="Email">'+
+        '<button class="btn" id="u-add" type="button">Add</button></div>';
+      body.appendChild(form);
+      document.getElementById('u-add').addEventListener('click', async function(){
+        var name = document.getElementById('u-name').value.trim();
+        if (!name) return;
+        await Data.addUser({name:name, role:document.getElementById('u-role').value, email:document.getElementById('u-email').value.trim(), status:'active'});
+        renderAdmin();
+      });
+    }
+    var table = el('div', {class:'card'});
+    var rows = users.map(function(u){
+      return '<tr><td><b style="color:var(--text)">'+esc(u.name)+'</b></td><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--role-'+u.role+');display:inline-block;"></span>'+esc(ROLE_MAP[u.role]?ROLE_MAP[u.role].name:u.role)+'</span></td><td>'+esc(u.email||'—')+'</td><td><span class="pill '+esc(u.status)+'">'+esc(u.status)+'</span></td>'+
+        (canManage ? '<td class="row-actions"><button class="btn ghost sm" data-toggle="'+u.id+'" data-status="'+(u.status==='active'?'inactive':'active')+'">'+(u.status==='active'?'Deactivate':'Activate')+'</button></td>' : '<td></td>')+
+        '</tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Name</th><th>Role</th><th>Email</th><th>Status</th><th></th></tr>'+rows+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-toggle]').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        await Data.updateUser(btn.getAttribute('data-toggle'), {status: btn.getAttribute('data-status')});
+        renderAdmin();
+      });
+    });
+  }
+
+  async function renderEvents(body){
+    var events = await Data.listEvents(false);
+    var canDraft = ['super_admin','admin','staff'].indexOf(role) !== -1;
+    var canPublish = ['super_admin','admin'].indexOf(role) !== -1;
+    if (canDraft){
+      var form = el('div', {class:'card'});
+      form.innerHTML = '<h4>Draft a new event</h4><div class="inline-form">'+
+        '<input id="ev-title" placeholder="Title" style="flex:1 1 200px;">'+
+        '<input id="ev-date" type="date">'+
+        '<input id="ev-venue" placeholder="Venue">'+
+        '</div><textarea id="ev-desc" placeholder="Description" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+        '<div style="margin-top:8px;"><button class="btn" id="ev-add" type="button">Save as draft</button></div>';
+      body.appendChild(form);
+      document.getElementById('ev-add').addEventListener('click', async function(){
+        var title = document.getElementById('ev-title').value.trim();
+        if (!title) return;
+        await Data.addEvent({title:title, date:document.getElementById('ev-date').value || '2026-12-01', venue:document.getElementById('ev-venue').value.trim()||'TBD', description:document.getElementById('ev-desc').value.trim()||'—', status:'draft'});
+        renderAdmin();
+      });
+    }
+    var table = el('div', {class:'card'});
+    var rows = events.map(function(ev){
+      var publishBtn = canPublish ? '<button class="btn ghost sm" data-pub="'+ev.id+'" data-to="'+(ev.status==='published'?'draft':'published')+'">'+(ev.status==='published'?'Unpublish':'Publish')+'</button>' : (canDraft ? '<span style="font-size:11.5px;color:var(--text-faint);">awaiting Admin</span>' : '');
+      var delBtn = canDraft ? ' <button class="btn ghost sm" data-del="'+ev.id+'">Delete</button>' : '';
+      return '<tr><td><b style="color:var(--text)">'+esc(ev.title)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(fmtDate(ev.date))+' · '+esc(ev.venue)+'</div></td><td><span class="pill '+esc(ev.status)+'">'+esc(ev.status)+'</span></td><td class="row-actions">'+publishBtn+delBtn+'</td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>Event</th><th>Status</th><th></th></tr>'+(rows||'<tr><td colspan="3" style="color:var(--text-faint);">No events yet.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-pub]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.updateEvent(btn.getAttribute('data-pub'), {status: btn.getAttribute('data-to')}); renderAdmin(); });
+    });
+    table.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', async function(){ await Data.deleteEvent(btn.getAttribute('data-del')); renderAdmin(); });
+    });
+  }
+
+  async function renderEnquiries(body){
+    var enquiries = await Data.listEnquiries();
+    var statuses = ['new','contacted','converted','closed'];
+    var table = el('div', {class:'card'});
+    var rows = enquiries.map(function(q){
+      var opts = statuses.map(function(s){ return '<option value="'+s+'"'+(s===q.status?' selected':'')+'>'+s+'</option>'; }).join('');
+      return '<tr><td><b style="color:var(--text)">'+esc(q.name)+'</b><div style="font-size:11.5px;color:var(--text-faint);">'+esc(q.contact)+'</div></td><td style="max-width:260px;">'+esc(q.message)+'</td><td><span class="pill" style="text-transform:capitalize;background:var(--surface-2);color:var(--text-soft);">'+esc(q.type)+'</span></td><td><select class="status-select" data-q="'+q.id+'">'+opts+'</select></td></tr>';
+    }).join('');
+    table.innerHTML = '<table class="data"><tr><th>From</th><th>Message</th><th>Type</th><th>Status</th></tr>'+(rows||'<tr><td colspan="4" style="color:var(--text-faint);">No enquiries yet.</td></tr>')+'</table>';
+    body.appendChild(table);
+    table.querySelectorAll('[data-q]').forEach(function(sel){
+      sel.addEventListener('change', async function(){ await Data.updateEnquiry(sel.getAttribute('data-q'), {status: sel.value}); });
+    });
+
+    var form = el('div', {class:'card'});
+    form.innerHTML = '<h4>Simulate a public submission</h4><div class="inline-form">'+
+      '<input id="q-name" placeholder="Name"><input id="q-contact" placeholder="Email or phone">'+
+      '<select id="q-type"><option value="admission">Admission</option><option value="general">General</option></select></div>'+
+      '<textarea id="q-msg" placeholder="Message" style="width:100%;min-height:50px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"></textarea>'+
+      '<div style="margin-top:8px;"><button class="btn" id="q-add" type="button">Submit</button></div>';
+    body.appendChild(form);
+    document.getElementById('q-add').addEventListener('click', async function(){
+      var name = document.getElementById('q-name').value.trim();
+      if (!name) return;
+      await Data.addEnquiry({name:name, contact:document.getElementById('q-contact').value.trim(), type:document.getElementById('q-type').value, message:document.getElementById('q-msg').value.trim()||'—', status:'new'});
+      renderAdmin();
+    });
+  }
+
+  // ---------------- wiring ----------------
+  document.getElementById('banner-close').addEventListener('click', function(){ document.getElementById('proto-banner').hidden = true; try{ localStorage.setItem('ng_banner_dismissed','1'); }catch(e){} });
+  try { if (localStorage.getItem('ng_banner_dismissed')) document.getElementById('proto-banner').hidden = true; } catch(e){}
+
+  document.getElementById('btn-public').addEventListener('click', function(){ setView('public'); });
+  document.getElementById('btn-public-login').addEventListener('click', function(){ setView(role ? 'admin' : 'login'); });
+  document.getElementById('btn-login').addEventListener('click', function(){ setView('login'); });
+  document.getElementById('btn-logout').addEventListener('click', function(){ role = null; try{ localStorage.removeItem('ng_role'); }catch(e){} setView('public'); });
+  document.getElementById('topbar-role').addEventListener('click', function(){ if (role) setView('admin'); });
+  document.getElementById('back-to-public').addEventListener('click', function(){ setView('public'); });
+
+  async function boot(){
+    try {
+      db = await claude.use('db');
+    } catch(e){ db = null; }
+    setView(role ? 'admin' : 'public');
+  }
+  boot();
+})();
+</script>
