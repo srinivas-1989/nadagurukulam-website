@@ -1,36 +1,92 @@
 :root {
-  /* Maroon Primary */
+  /* Maroon Primary (NDG Guidelines) */
   --primary: #81171a;
+  --primary-rgb: 129, 23, 26;
   --primary-deep: #591b17;
+  --primary-light: #a62a2d;
 
   /* Saffron Accent */
   --accent: #dd9f3c;
   --accent-deep: #c58539;
+  --accent-light: #f4b860;
 
   /* Background/Surface */
-  --bg: #fdf3e0;
-  --bg-saffron: #fdf3e0; /* Cream + 25% Saffron */
+  --bg: #fdf3e0; /* Cream */
   --surface: #ffffff;
+  --surface-muted: #f9f6f1;
   --border: #e6d6c4;
+  --divider: #d9c5b2;
 
   /* Text Greys */
-  --text: #3c3c3b;
+  --text: #1a1a1a;
   --text-soft: #4a4949;
-  --text-faint: #575756;
+  --text-faint: #757575;
+
+  /* Utility */
+  --success: #1f4b3f;
+  --error: #b00020;
+  --warning: #f57c00;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 24px rgba(89, 27, 23, 0.1);
+  --radius: 8px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121212;
+    --surface: #1e1e1e;
+    --surface-muted: #252525;
+    --border: #333333;
+    --divider: #444444;
+    --text: #f5f5f5;
+    --text-soft: #bdbdbd;
+    --text-faint: #757575;
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif; /* Gill Sans fallback */
+  font-family: 'Gill Sans', 'Gill Sans MT', 'Nunito Sans', sans-serif;
   font-size: 16px;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4 {
-  font-family: 'Futura', 'Futura-Medium', 'Trebuchet MS', sans-serif;
+h1, h2, h3, h4, .font-display {
+  font-family: 'Futura', 'Futura-Medium', 'Jost', sans-serif;
   color: var(--primary-deep);
-  font-weight: 500;
+  font-weight: 600;
   margin: 0;
+  letter-spacing: -0.01em;
 }
+
+button {
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+input, select, textarea {
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+/* Scrollbar Polish */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+/* Animation Classes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in { animation: fadeIn 0.4s ease forwards; }
