@@ -21,6 +21,7 @@ frontend/.env.local
 frontend/.next/
 frontend/out/
 frontend/build/
+.next/
 
 # Render / Build outputs
 dist/

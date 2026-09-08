@@ -28,31 +28,67 @@ export default function Home() {
     { key: 'activities', name: 'Activities', access: { super_admin: 'Full', admin: 'View', teacher: 'Own', guest_faculty: 'Own', staff: 'Manage', student: 'Self' }, desc: 'Competitions, performances, achievements.' }
   ];
 
-  const [view, setView] = useState('public'); // public | login | admin
+  const [view, setView] = useState('public');
   const [role, setRole] = useState(null);
   const [activeModule, setActiveModule] = useState('overview');
 
-  // Real data state
+  // Data state
   const [users, setUsers] = useState([]);
+  const [curriculum, setCurriculum] = useState([]);
+  const [batches, setBatches] = useState([]);
+
+  // Form state
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState('teacher');
+  const [newUserRole, setNewUserRole] = useState('teacher');
   const [loading, setLoading] = useState(false);
+
+  // Curriculum form
+  const [newDiscName, setNewDiscName] = useState('');
+  const [newDiscLevels, setNewDiscLevels] = useState('');
+  const [newDiscDesc, setNewDiscDesc] = useState('');
+
+  // Batch form
+  const [newBatchName, setNewBatchName] = useState('');
+  const [newBatchLevel, setNewBatchLevel] = useState('');
+  const [newBatchDisc, setNewBatchDisc] = useState('');
+  const [newBatchFaculty, setNewBatchFaculty] = useState('');
+  const [newBatchCapacity, setNewBatchCapacity] = useState(20);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 
   const fetchUsers = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
       const res = await fetch(`${apiUrl}/api/users`);
       const data = await res.json();
       if (Array.isArray(data)) setUsers(data);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    }
+    } catch (err) { console.error('Failed to fetch users:', err); }
+  };
+
+  const fetchCurriculum = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/curriculum`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setCurriculum(data);
+        if (!newBatchDisc && data.length > 0) setNewBatchDisc(data[0].id);
+      }
+    } catch (err) { console.error('Failed to fetch curriculum:', err); }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/batches`);
+      const data = await res.json();
+      if (Array.isArray(data)) setBatches(data);
+    } catch (err) { console.error('Failed to fetch batches:', err); }
   };
 
   useEffect(() => {
-    if (view === 'admin' && activeModule === 'users') {
-      fetchUsers();
+    if (view === 'admin') {
+      if (activeModule === 'users') fetchUsers();
+      if (activeModule === 'curriculum') fetchCurriculum();
+      if (activeModule === 'batches') { fetchCurriculum(); fetchBatches(); fetchUsers(); }
     }
   }, [view, activeModule]);
 
@@ -61,25 +97,54 @@ export default function Home() {
     if (!newName || !newEmail) return;
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
       const res = await fetch(`${apiUrl}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName, email: newEmail, role_key: newRole })
+        body: JSON.stringify({ name: newName, email: newEmail, role_key: newUserRole })
       });
-      if (res.ok) {
-        setNewName('');
-        setNewEmail('');
-        fetchUsers();
-      }
-    } catch (err) {
-      console.error('Failed to add user:', err);
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { setNewName(''); setNewEmail(''); fetchUsers(); }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
+  const handleAddDiscipline = async (e) => {
+    e.preventDefault();
+    if (!newDiscName) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/curriculum`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newDiscName, levels: newDiscLevels, description: newDiscDesc })
+      });
+      if (res.ok) { setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); fetchCurriculum(); }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
+  const handleAddBatch = async (e) => {
+    e.preventDefault();
+    if (!newBatchName || !newBatchDisc) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/batches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newBatchName,
+          level: newBatchLevel,
+          discipline_id: newBatchDisc,
+          faculty_id: newBatchFaculty || null,
+          capacity: parseInt(newBatchCapacity, 10) || 20
+        })
+      });
+      if (res.ok) { setNewBatchName(''); setNewBatchLevel(''); setNewBatchCapacity(20); fetchBatches(); }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   const currentModules = role ? MODULES.filter(m => m.access[role]) : [];
+  const facultyList = users.filter(u => u.role_key === 'teacher' || u.role_key === 'guest_faculty');
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
@@ -154,7 +219,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* LOGIN / ROLE SELECTOR */}
+      {/* LOGIN */}
       {view === 'login' && (
         <div style={{ maxWidth: '720px', margin: '60px auto', padding: '0 24px', flex: 1 }}>
           <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>Select Portal Role</h2>
@@ -175,7 +240,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ADMIN / PORTAL SHELL */}
+      {/* ADMIN */}
       {view === 'admin' && role && (
         <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', flex: 1, minHeight: '75vh' }}>
           {/* Sidebar */}
@@ -193,7 +258,7 @@ export default function Home() {
             ))}
           </nav>
 
-          {/* Main Content Area */}
+          {/* Main */}
           <main style={{ padding: '32px', maxWidth: '900px', width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
               <h2 style={{ fontSize: '24px', color: 'var(--primary-deep)' }}>
@@ -204,17 +269,17 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Users Module View */}
+            {/* USERS */}
             {activeModule === 'users' && (
               <div>
                 <p style={{ color: 'var(--text-soft)', marginBottom: '20px' }}>
-                  Manage accounts created in the system. Connected live to Supabase via Render backend.
+                  Manage accounts. Connected live to Supabase via Render backend.
                 </p>
                 {(role === 'super_admin' || role === 'admin') && (
                   <form onSubmit={handleAddUser} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <input type="text" placeholder="Full name" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
-                    <input type="email" placeholder="Email address" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
-                    <select value={newRole} onChange={e => setNewRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                    <input type="email" placeholder="Email" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
+                    <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
                       <option value="admin">Admin</option>
                       <option value="teacher">Teacher</option>
                       <option value="guest_faculty">Guest Faculty</option>
@@ -239,31 +304,121 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {users.length === 0 ? (
-                        <tr>
-                          <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>Loading users or none found in database…</td>
+                        <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>Loading users…</td></tr>
+                      ) : users.map(u => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '12px', fontWeight: 600 }}>{u.name}</td>
+                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{u.email}</td>
+                          <td style={{ padding: '12px', textTransform: 'capitalize' }}>{u.role_key}</td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{ background: 'rgba(129,23,26,0.1)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
+                              {u.status}
+                            </span>
+                          </td>
                         </tr>
-                      ) : (
-                        users.map(u => (
-                          <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '12px', fontWeight: 600 }}>{u.name}</td>
-                            <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{u.email}</td>
-                            <td style={{ padding: '12px', textTransform: 'capitalize' }}>{u.role_key}</td>
-                            <td style={{ padding: '12px' }}>
-                              <span style={{ background: 'rgba(129,23,26,0.1)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
-                                {u.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
             )}
 
-            {/* Other Modules Placeholder */}
-            {activeModule !== 'users' && (
+            {/* CURRICULUM */}
+            {activeModule === 'curriculum' && (
+              <div>
+                <p style={{ color: 'var(--text-soft)', marginBottom: '20px' }}>
+                  Disciplines offered by the institution. Six core arts defined in Phase 1.
+                </p>
+                {(role === 'super_admin' || role === 'admin') && (
+                  <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <input type="text" placeholder="Discipline name" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} required />
+                    <input type="text" placeholder="Levels (e.g. Beginner, Intermediate)" value={newDiscLevels} onChange={e => setNewDiscLevels(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 220px' }} />
+                    <input type="text" placeholder="Description" value={newDiscDesc} onChange={e => setNewDiscDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 220px' }} />
+                    <button type="submit" disabled={loading} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer' }}>
+                      {loading ? 'Adding...' : 'Add Discipline'}
+                    </button>
+                  </form>
+                )}
+
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-faint)' }}>
+                        <th style={{ padding: '12px' }}>Discipline</th>
+                        <th style={{ padding: '12px' }}>Levels</th>
+                        <th style={{ padding: '12px' }}>Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {curriculum.length === 0 ? (
+                        <tr><td colSpan="3" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No disciplines yet</td></tr>
+                      ) : curriculum.map(d => (
+                        <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '12px', fontWeight: 600, color: 'var(--primary)' }}>{d.name}</td>
+                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{d.levels || '—'}</td>
+                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{d.description || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* BATCHES */}
+            {activeModule === 'batches' && (
+              <div>
+                <p style={{ color: 'var(--text-soft)', marginBottom: '20px' }}>
+                  Cohorts linked to disciplines with assigned faculty.
+                </p>
+                {(role === 'super_admin' || role === 'admin') && (
+                  <form onSubmit={handleAddBatch} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <input type="text" placeholder="Batch name" value={newBatchName} onChange={e => setNewBatchName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
+                    <input type="text" placeholder="Level" value={newBatchLevel} onChange={e => setNewBatchLevel(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '110px' }} />
+                    <select value={newBatchDisc} onChange={e => setNewBatchDisc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="">Select Discipline</option>
+                      {curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    <select value={newBatchFaculty} onChange={e => setNewBatchFaculty(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="">Select Faculty</option>
+                      {facultyList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                    <input type="number" placeholder="Capacity" value={newBatchCapacity} onChange={e => setNewBatchCapacity(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '90px' }} />
+                    <button type="submit" disabled={loading} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer' }}>
+                      {loading ? 'Adding...' : 'Add Batch'}
+                    </button>
+                  </form>
+                )}
+
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-faint)' }}>
+                        <th style={{ padding: '12px' }}>Batch</th>
+                        <th style={{ padding: '12px' }}>Discipline</th>
+                        <th style={{ padding: '12px' }}>Faculty</th>
+                        <th style={{ padding: '12px' }}>Capacity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batches.length === 0 ? (
+                        <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No batches yet</td></tr>
+                      ) : batches.map(b => (
+                        <tr key={b.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '12px', fontWeight: 600 }}>{b.name}</td>
+                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{curriculum.find(d => d.id === b.discipline_id)?.name || '—'}</td>
+                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{users.find(u => u.id === b.faculty_id)?.name || '—'}</td>
+                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{b.capacity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Placeholder */}
+            {!['users', 'curriculum', 'batches'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
@@ -272,7 +427,7 @@ export default function Home() {
                   {MODULES.find(m => m.key === activeModule)?.desc}
                 </p>
                 <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text-faint)', fontStyle: 'italic' }}>
-                  Full data model and permissions mapped per Phase 3 specifications. Ready for backend wiring.
+                  Ready for backend wiring (Phase 6 build sequence).
                 </div>
               </div>
             )}
