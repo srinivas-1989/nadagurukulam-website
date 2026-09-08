@@ -36,7 +36,7 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [],
-    live_sessions: []
+    live_sessions: [], assignments: []
   });
 
   const [editing, setEditing] = useState(null);
@@ -44,7 +44,7 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const endpoints = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'courses', 'course_modules', 'live_sessions'];
+      const endpoints = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'courses', 'course_modules', 'live_sessions', 'assignments'];
       const results = await Promise.all(endpoints.map(ep => fetch(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])));
       const mapped = {};
       endpoints.forEach((ep, idx) => { mapped[ep] = Array.isArray(results[idx]) ? results[idx] : []; });
@@ -110,6 +110,33 @@ export default function Home() {
 
   const handleJoinSession = (roomLink) => {
     window.open(roomLink, '_blank');
+  };
+
+  // Assignment form state
+  const [newAssignBatch, setNewAssignBatch] = useState('');
+  const [newAssignTitle, setNewAssignTitle] = useState('');
+  const [newAssignType, setNewAssignType] = useState('audio_video');
+  const [newAssignDue, setNewAssignDue] = useState('');
+  const [newAssignDesc, setNewAssignDesc] = useState('');
+
+  const handleAddAssignment = async (e) => {
+    e.preventDefault();
+    if (!newAssignBatch || !newAssignTitle || !newAssignDue) return;
+    await fetch(`${apiUrl}/api/assignments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batch_id: newAssignBatch, title: newAssignTitle, type: newAssignType, due_date: newAssignDue, description: newAssignDesc, status: 'open' })
+    });
+    setNewAssignBatch(''); setNewAssignTitle(''); setNewAssignType('audio_video'); setNewAssignDue(''); setNewAssignDesc(''); fetchData();
+  };
+
+  const handleUpdateAssignmentStatus = async (id, status) => {
+    await fetch(`${apiUrl}/api/assignments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    fetchData();
   };
 
   const handleAddUser = async (e) => {
@@ -436,8 +463,67 @@ export default function Home() {
               </div>
             )}
 
+            {/* ASSIGNMENTS MODULE */}
+            {activeModule === 'assignments' && (
+              <div>
+                {(role === 'super_admin' || role === 'admin') && (
+                  <form onSubmit={handleAddAssignment} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <select value={newAssignBatch} onChange={e => setNewAssignBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
+                      <option value="">Select Batch...</option>
+                      {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <input placeholder="Assignment Title (e.g. Week 3 Kritis)" value={newAssignTitle} onChange={e => setNewAssignTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <select value={newAssignType} onChange={e => setNewAssignType(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="audio_video">Audio/Video</option>
+                      <option value="file">File Upload</option>
+                      <option value="text">Text</option>
+                    </select>
+                    <input type="date" value={newAssignDue} onChange={e => setNewAssignDue(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                    <textarea placeholder="Description / Instructions" value={newAssignDesc} onChange={e => setNewAssignDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Create Assignment</button>
+                  </form>
+                )}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  {dbData.assignments.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No assignments created yet.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                          <th style={{ padding: '12px' }}>Title</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Type</th><th style={{ padding: '12px' }}>Due Date</th><th style={{ padding: '12px' }}>Status</th><th style={{ padding: '12px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dbData.assignments.map(a => {
+                          const batch = dbData.batches.find(b => b.id === a.batch_id);
+                          return (
+                            <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '12px' }}>{a.title}</td>
+                              <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
+                              <td style={{ padding: '12px' }}>{a.type?.replace('_', ' ') || '—'}</td>
+                              <td style={{ padding: '12px' }}>{a.due_date}</td>
+                              <td style={{ padding: '12px' }}>
+                                <select value={a.status || 'open'} onChange={e => handleUpdateAssignmentStatus(a.id, e.target.value)} style={{ padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }}>
+                                  <option value="open">Open</option>
+                                  <option value="closed">Closed</option>
+                                  <option value="graded">Graded</option>
+                                </select>
+                              </td>
+                              <td style={{ padding: '12px' }}>
+                                {(role === 'super_admin' || role === 'admin') && <button onClick={() => handleDelete('assignments', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {!['overview', 'users', 'curriculum', 'liveclasses'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'liveclasses', 'assignments'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
