@@ -37,6 +37,12 @@ app.post('/api/users', async (req, res) => {
   res.status(201).json(data[0]);
 });
 
+app.delete('/api/users/:id', async (req, res) => {
+  const { error } = await supabase.from('users').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(204).send();
+});
+
 // --- Curriculum API ---
 app.get('/api/curriculum', async (req, res) => {
   const { data, error } = await supabase.from('disciplines').select('*');
@@ -54,6 +60,12 @@ app.post('/api/curriculum', async (req, res) => {
   res.status(201).json(data[0]);
 });
 
+app.delete('/api/curriculum/:id', async (req, res) => {
+  const { error } = await supabase.from('disciplines').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(204).send();
+});
+
 // --- Batches API ---
 app.get('/api/batches', async (req, res) => {
   const { data, error } = await supabase.from('batches').select('*');
@@ -69,6 +81,12 @@ app.post('/api/batches', async (req, res) => {
     .select();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data[0]);
+});
+
+app.delete('/api/batches/:id', async (req, res) => {
+  const { error } = await supabase.from('batches').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(204).send();
 });
 
 // --- Timetable API ---
