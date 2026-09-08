@@ -1,60 +1,45 @@
 :root {
-  /* Maroon Primary (NDG Guidelines) */
+  /* Maroon Primary (NDG Official Guidelines) */
   --primary: #81171a;
-  --primary-rgb: 129, 23, 26;
   --primary-deep: #591b17;
-  --primary-light: #a62a2d;
+  --primary-light: #9c2428;
 
   /* Saffron Accent */
   --accent: #dd9f3c;
   --accent-deep: #c58539;
-  --accent-light: #f4b860;
+  --accent-light: #f5b759;
 
-  /* Background/Surface */
-  --bg: #fdf3e0; /* Cream */
+  /* Authentic Backgrounds (Strictly Cream, Never Pitch Black) */
+  --bg: #fdf3e0;
+  --bg-saffron: #fbf0d7;
   --surface: #ffffff;
-  --surface-muted: #f9f6f1;
+  --surface-muted: #f8eee0;
   --border: #e6d6c4;
   --divider: #d9c5b2;
 
-  /* Text Greys */
-  --text: #1a1a1a;
+  /* Bodycopy Grey */
+  --text: #3c3c3b;
   --text-soft: #4a4949;
-  --text-faint: #757575;
+  --text-faint: #575756;
 
-  /* Utility */
-  --success: #1f4b3f;
-  --error: #b00020;
-  --warning: #f57c00;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 24px rgba(89, 27, 23, 0.1);
+  /* Shadows & Layout */
+  --shadow-sm: 0 1px 3px rgba(89, 27, 23, 0.06);
+  --shadow-md: 0 4px 14px rgba(89, 27, 23, 0.08);
+  --shadow-lg: 0 12px 28px rgba(89, 27, 23, 0.12);
   --radius: 8px;
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --radius-lg: 12px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121212;
-    --surface: #1e1e1e;
-    --surface-muted: #252525;
-    --border: #333333;
-    --divider: #444444;
-    --text: #f5f5f5;
-    --text-soft: #bdbdbd;
-    --text-faint: #757575;
-    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
-  }
+* {
+  box-sizing: border-box;
 }
-
-* { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: 'Gill Sans', 'Gill Sans MT', 'Nunito Sans', sans-serif;
-  font-size: 16px;
+  font-size: 15.5px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -64,29 +49,15 @@ h1, h2, h3, h4, .font-display {
   color: var(--primary-deep);
   font-weight: 600;
   margin: 0;
-  letter-spacing: -0.01em;
 }
 
 button {
-  transition: var(--transition);
   font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 input, select, textarea {
-  transition: var(--transition);
   font-family: inherit;
+  font-size: 14.5px;
 }
-
-/* Scrollbar Polish */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
-
-/* Animation Classes */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.fade-in { animation: fadeIn 0.4s ease forwards; }
