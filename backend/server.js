@@ -14,10 +14,17 @@ const supabase = createClient(
 app.use(cors());
 app.use(express.json());
 
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', institution: 'Nada Gurukulam', timestamp: new Date().toISOString() });
+});
+
 // Helper for generic CRUD
-const crud = (table) => ({
+const crud = (table, orderCol = 'created_at') => ({
   list: async (req, res) => {
-    const { data, error } = await supabase.from(table).select('*');
+    let query = supabase.from(table).select('*');
+    if (orderCol) query = query.order(orderCol, { ascending: false });
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
   },
@@ -38,14 +45,14 @@ const crud = (table) => ({
   }
 });
 
-// Routes
+// --- Core Academic Modules ---
 const users = crud('users');
 app.get('/api/users', users.list);
 app.post('/api/users', users.create);
 app.put('/api/users/:id', users.update);
 app.delete('/api/users/:id', users.delete);
 
-const curriculum = crud('disciplines');
+const curriculum = crud('disciplines', 'name');
 app.get('/api/curriculum', curriculum.list);
 app.post('/api/curriculum', curriculum.create);
 app.put('/api/curriculum/:id', curriculum.update);
@@ -57,10 +64,29 @@ app.post('/api/batches', batches.create);
 app.put('/api/batches/:id', batches.update);
 app.delete('/api/batches/:id', batches.delete);
 
-const timetable = crud('timetable_slots');
+const timetable = crud('timetable_slots', null);
 app.get('/api/timetable', timetable.list);
 app.post('/api/timetable', timetable.create);
 app.put('/api/timetable/:id', timetable.update);
 app.delete('/api/timetable/:id', timetable.delete);
 
-app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+// --- Public Engagement Modules ---
+const events = crud('events', 'date');
+app.get('/api/events', events.list);
+app.post('/api/events', events.create);
+app.put('/api/events/:id', events.update);
+app.delete('/api/events/:id', events.delete);
+
+const enquiries = crud('enquiries');
+app.get('/api/enquiries', enquiries.list);
+app.post('/api/enquiries', enquiries.create);
+app.put('/api/enquiries/:id', enquiries.update);
+app.delete('/api/enquiries/:id', enquiries.delete);
+
+const jobs = crud('jobs');
+app.get('/api/jobs', jobs.list);
+app.post('/api/jobs', jobs.create);
+app.put('/api/jobs/:id', jobs.update);
+app.delete('/api/jobs/:id', jobs.delete);
+
+app.listen(PORT, () => console.log(`Nada Gurukulam API server running on port ${PORT}`));
