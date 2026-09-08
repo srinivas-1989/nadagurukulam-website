@@ -1,5 +1,5 @@
 -- ============================================================================
--- NADA GURUKULAM — SUPABASE POSTGRESQL DATABASE SCHEMA (PHASE 4)
+-- NADA GURUKULAM — SUPABASE POSTGRESQL DATABASE SCHEMA (PHASE 4 + ALL MODULES)
 -- Run this complete script in the Supabase SQL Editor.
 -- ============================================================================
 
@@ -21,6 +21,7 @@ create table if not exists public.users (
   role_key text references public.roles(key) not null,
   status text default 'active' check (status in ('active', 'inactive')),
   phone text,
+  custom_permissions jsonb default '{}'::jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -43,7 +44,7 @@ create table if not exists public.disciplines (
   description text,
   levels text,
   lead_faculty_id uuid references public.users(id),
-  syllabus_content_id text -- maps to MongoDB curriculum_content document ID
+  syllabus_content_id text
 );
 
 create table if not exists public.batches (
@@ -74,7 +75,7 @@ create table if not exists public.enrollments (
 );
 
 
--- 3. SCHEDULING & LIVE CLASSES
+-- 3. SCHEDULING, LIVE CLASSES & ACADEMIC WORKFLOW
 create table if not exists public.timetable_slots (
   id uuid default uuid_generate_v4() primary key,
   batch_id uuid references public.batches(id) on delete cascade not null,
@@ -103,6 +104,50 @@ create table if not exists public.session_attendance (
   status text default 'present' check (status in ('present', 'absent', 'late')),
   joined_at timestamp with time zone default timezone('utc'::text, now()) not null,
   left_at timestamp with time zone
+);
+
+create table if not exists public.lesson_plans (
+  id uuid default uuid_generate_v4() primary key,
+  batch_id uuid references public.batches(id) on delete cascade not null,
+  subject text not null,
+  session_date date not null,
+  objectives text,
+  status text default 'draft' check (status in ('draft', 'submitted', 'approved', 'needs_revision')),
+  review_comments text,
+  author_id uuid references public.users(id),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.assignments (
+  id uuid default uuid_generate_v4() primary key,
+  batch_id uuid references public.batches(id) on delete cascade not null,
+  title text not null,
+  type text default 'audio_video' check (type in ('audio_video', 'file', 'text')),
+  due_date date not null,
+  description text,
+  status text default 'open' check (status in ('open', 'closed', 'graded')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.feedback (
+  id uuid default uuid_generate_v4() primary key,
+  batch_id uuid references public.batches(id) on delete cascade not null,
+  recipient text not null,
+  author text not null,
+  comment text not null,
+  date date default CURRENT_DATE,
+  type text default 'faculty_to_student',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.activities (
+  id uuid default uuid_generate_v4() primary key,
+  batch_id uuid references public.batches(id) on delete cascade not null,
+  title text not null,
+  category text default 'Performance',
+  date date not null,
+  description text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 
@@ -198,6 +243,10 @@ alter table public.enrollments enable row level security;
 alter table public.timetable_slots enable row level security;
 alter table public.live_sessions enable row level security;
 alter table public.session_attendance enable row level security;
+alter table public.lesson_plans enable row level security;
+alter table public.assignments enable row level security;
+alter table public.feedback enable row level security;
+alter table public.activities enable row level security;
 alter table public.documents enable row level security;
 alter table public.document_access_log enable row level security;
 alter table public.events enable row level security;

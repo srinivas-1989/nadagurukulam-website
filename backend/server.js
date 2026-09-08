@@ -22,26 +22,42 @@ app.get('/health', (req, res) => {
 // Helper for generic CRUD
 const crud = (table, orderCol = 'created_at') => ({
   list: async (req, res) => {
-    let query = supabase.from(table).select('*');
-    if (orderCol) query = query.order(orderCol, { ascending: false });
-    const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
+    try {
+      let query = supabase.from(table).select('*');
+      if (orderCol) query = query.order(orderCol, { ascending: false });
+      const { data, error } = await query;
+      if (error) return res.status(500).json({ error: error.message });
+      res.json(data || []);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   },
   create: async (req, res) => {
-    const { data, error } = await supabase.from(table).insert([req.body]).select();
-    if (error) return res.status(500).json({ error: error.message });
-    res.status(201).json(data[0]);
+    try {
+      const { data, error } = await supabase.from(table).insert([req.body]).select();
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(201).json(data[0]);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   },
   update: async (req, res) => {
-    const { data, error } = await supabase.from(table).update(req.body).eq('id', req.params.id).select();
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data[0]);
+    try {
+      const { data, error } = await supabase.from(table).update(req.body).eq('id', req.params.id).select();
+      if (error) return res.status(500).json({ error: error.message });
+      res.json(data[0]);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   },
   delete: async (req, res) => {
-    const { error } = await supabase.from(table).delete().eq('id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
-    res.status(204).send();
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', req.params.id);
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 
@@ -88,5 +104,36 @@ app.get('/api/jobs', jobs.list);
 app.post('/api/jobs', jobs.create);
 app.put('/api/jobs/:id', jobs.update);
 app.delete('/api/jobs/:id', jobs.delete);
+
+// --- Advanced Academic & Student Workflow Modules ---
+const liveclasses = crud('live_sessions', 'session_date');
+app.get('/api/liveclasses', liveclasses.list);
+app.post('/api/liveclasses', liveclasses.create);
+app.put('/api/liveclasses/:id', liveclasses.update);
+app.delete('/api/liveclasses/:id', liveclasses.delete);
+
+const lessonplans = crud('lesson_plans', 'session_date');
+app.get('/api/lessonplans', lessonplans.list);
+app.post('/api/lessonplans', lessonplans.create);
+app.put('/api/lessonplans/:id', lessonplans.update);
+app.delete('/api/lessonplans/:id', lessonplans.delete);
+
+const assignments = crud('assignments', 'due_date');
+app.get('/api/assignments', assignments.list);
+app.post('/api/assignments', assignments.create);
+app.put('/api/assignments/:id', assignments.update);
+app.delete('/api/assignments/:id', assignments.delete);
+
+const feedback = crud('feedback', 'created_at');
+app.get('/api/feedback', feedback.list);
+app.post('/api/feedback', feedback.create);
+app.put('/api/feedback/:id', feedback.update);
+app.delete('/api/feedback/:id', feedback.delete);
+
+const activities = crud('activities', 'date');
+app.get('/api/activities', activities.list);
+app.post('/api/activities', activities.create);
+app.put('/api/activities/:id', activities.update);
+app.delete('/api/activities/:id', activities.delete);
 
 app.listen(PORT, () => console.log(`Nada Gurukulam API server running on port ${PORT}`));
