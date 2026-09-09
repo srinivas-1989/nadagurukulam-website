@@ -83,11 +83,16 @@ export default function Home() {
 
   // Course form (MPA Syllabus format)
   const [courseDisc, setCourseDisc] = useState('');
+  const [courseType, setCourseType] = useState('Masters');
   const [courseSem, setCourseSem] = useState('Semester I');
   const [courseCode, setCourseCode] = useState('');
   const [courseName, setCourseName] = useState('');
   const [courseCredits, setCourseCredits] = useState(6);
   const [courseHours, setCourseHours] = useState(90);
+
+  const courseSemesters = courseType === 'Masters'
+    ? ['Semester I', 'Semester II', 'Semester III', 'Semester IV']
+    : ['Semester I', 'Semester II', 'Semester III', 'Semester IV', 'Semester V', 'Semester VI'];
 
   // Live session form state
   const [newSessionBatch, setNewSessionBatch] = useState('');
@@ -211,7 +216,7 @@ export default function Home() {
     await fetch(`${apiUrl}/api/courses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ discipline_id: courseDisc || dbData.curriculum[0]?.id, semester: courseSem, code: courseCode, name: courseName, credits: courseCredits, teaching_hours: courseHours })
+      body: JSON.stringify({ discipline_id: courseDisc || dbData.curriculum[0]?.id, course_type: courseType, semester: courseSem, code: courseCode, name: courseName, credits: courseCredits, teaching_hours: courseHours })
     });
     setCourseCode(''); setCourseName(''); fetchData();
   };
@@ -418,11 +423,12 @@ export default function Home() {
                       <select value={courseDisc} onChange={e => setCourseDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
                         {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
+                      <select value={courseType} onChange={e => setCourseType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
+                        <option value="Masters">Masters (MPA)</option>
+                        <option value="Undergraduate">Undergraduate</option>
+                      </select>
                       <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                        <option value="Semester I">Semester I</option>
-                        <option value="Semester II">Semester II</option>
-                        <option value="Semester III">Semester III</option>
-                        <option value="Semester IV">Semester IV</option>
+                        {courseSemesters.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                       <input placeholder="Course Code (e.g. MBNP110)" value={courseCode} onChange={e => setCourseCode(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '130px' }} required />
                       <input placeholder="Course Name (e.g. Nritya Marga Purvanga-1)" value={courseName} onChange={e => setCourseName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
