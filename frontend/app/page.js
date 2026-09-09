@@ -36,7 +36,7 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [],
-    live_sessions: [], assignments: [], feedback: []
+    live_sessions: [], assignments: [], feedback: [], jobs: []
   });
 
   const [editing, setEditing] = useState(null);
@@ -154,6 +154,33 @@ export default function Home() {
       body: JSON.stringify({ batch_id: newFeedbackBatch, recipient: newFeedbackAuthor, author: 'current_user', comment: newFeedbackComment, type: newFeedbackType })
     });
     setNewFeedbackBatch(''); setNewFeedbackAuthor(''); setNewFeedbackType('faculty_to_student'); setNewFeedbackComment(''); fetchData();
+  };
+
+  // Jobs form state (Staff draft → Admin/Super Admin publishes)
+  const [newJobTitle, setNewJobTitle] = useState('');
+  const [newJobDept, setNewJobDept] = useState('');
+  const [newJobType, setNewJobType] = useState('Full-time');
+  const [newJobDesc, setNewJobDesc] = useState('');
+  const [newJobStatus, setNewJobStatus] = useState('draft');
+
+  const handleAddJob = async (e) => {
+    e.preventDefault();
+    if (!newJobTitle || !newJobDept) return;
+    await fetch(`${apiUrl}/api/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newJobTitle, department: newJobDept, type: newJobType, description: newJobDesc, status: newJobStatus, author_id: 'current_user' })
+    });
+    setNewJobTitle(''); setNewJobDept(''); setNewJobType('Full-time'); setNewJobDesc(''); setNewJobStatus('draft'); fetchData();
+  };
+
+  const handleUpdateJobStatus = async (id, status) => {
+    await fetch(`${apiUrl}/api/jobs/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    fetchData();
   };
 
   const handleAddUser = async (e) => {
@@ -589,8 +616,66 @@ export default function Home() {
               </div>
             )}
 
+            {/* JOBS MODULE (Staff draft → Admin/Super Admin publishes) */}
+            {activeModule === 'jobs' && (
+              <div>
+                {(role === 'super_admin' || role === 'admin' || role === 'staff') && (
+                  <form onSubmit={handleAddJob} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <input placeholder="Job Title (e.g. Bharatanatyam Instructor)" value={newJobTitle} onChange={e => setNewJobTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 250px' }} />
+                    <input placeholder="Department (e.g. Performing Arts)" value={newJobDept} onChange={e => setNewJobDept(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <select value={newJobType} onChange={e => setNewJobType(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="Full-time">Full-time</option>
+                      <option value="Part-time">Part-time</option>
+                      <option value="Contract">Contract</option>
+                      <option value="Volunteer">Volunteer</option>
+                    </select>
+                    <textarea placeholder="Job Description" value={newJobDesc} onChange={e => setNewJobDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
+                    <select value={newJobStatus} onChange={e => setNewJobStatus(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                    </select>
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>{role === 'staff' ? 'Submit Draft' : 'Post Job'}</button>
+                  </form>
+                )}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  {dbData.jobs.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No job postings yet.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                          <th style={{ padding: '12px' }}>Title</th><th style={{ padding: '12px' }}>Department</th><th style={{ padding: '12px' }}>Type</th><th style={{ padding: '12px' }}>Status</th><th style={{ padding: '12px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dbData.jobs.map(j => (
+                          <tr key={j.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '12px' }}>{j.title}</td>
+                            <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{j.department}</td>
+                            <td style={{ padding: '12px' }}>{j.type}</td>
+                            <td style={{ padding: '12px' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '12px', background: j.status === 'published' ? 'var(--forest)' : j.status === 'closed' ? 'var(--text-faint)' : 'var(--accent)', color: '#fff' }}>{j.status}</span>
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              {(role === 'super_admin' || role === 'admin') && (
+                                <>
+                                  {j.status === 'draft' && <button onClick={() => handleUpdateJobStatus(j.id, 'published')} style={{ background: 'var(--forest)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Publish</button>}
+                                  {j.status === 'published' && <button onClick={() => handleUpdateJobStatus(j.id, 'closed')} style={{ background: 'var(--text-faint)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Close</button>}
+                                  <button onClick={() => handleDelete('jobs', j.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'liveclasses', 'assignments', 'feedback'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'liveclasses', 'assignments', 'feedback', 'jobs'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
