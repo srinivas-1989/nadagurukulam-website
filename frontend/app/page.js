@@ -36,7 +36,7 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [],
-    live_sessions: [], assignments: [], feedback: [], jobs: []
+    live_sessions: [], assignments: [], feedback: [], jobs: [], activities: []
   });
 
   const [editing, setEditing] = useState(null);
@@ -44,7 +44,7 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const endpoints = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'courses', 'course_modules', 'live_sessions', 'assignments', 'feedback'];
+      const endpoints = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'courses', 'course_modules', 'live_sessions', 'assignments', 'feedback', 'activities'];
       const results = await Promise.all(endpoints.map(ep => fetch(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])));
       const mapped = {};
       endpoints.forEach((ep, idx) => { mapped[ep] = Array.isArray(results[idx]) ? results[idx] : []; });
@@ -186,6 +186,24 @@ export default function Home() {
       body: JSON.stringify({ status })
     });
     fetchData();
+  };
+
+  // Activities form state (Staff Manage, Teacher/Guest Faculty Own, Student view)
+  const [newActivityBatch, setNewActivityBatch] = useState('');
+  const [newActivityTitle, setNewActivityTitle] = useState('');
+  const [newActivityCategory, setNewActivityCategory] = useState('Performance');
+  const [newActivityDate, setNewActivityDate] = useState('');
+  const [newActivityDesc, setNewActivityDesc] = useState('');
+
+  const handleAddActivity = async (e) => {
+    e.preventDefault();
+    if (!newActivityBatch || !newActivityTitle || !newActivityDate) return;
+    await fetch(`${apiUrl}/api/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batch_id: newActivityBatch, title: newActivityTitle, category: newActivityCategory, date: newActivityDate, description: newActivityDesc })
+    });
+    setNewActivityBatch(''); setNewActivityTitle(''); setNewActivityCategory('Performance'); setNewActivityDate(''); setNewActivityDesc(''); fetchData();
   };
 
   const handleAddUser = async (e) => {
@@ -680,8 +698,62 @@ export default function Home() {
               </div>
             )}
 
+            {/* ACTIVITIES MODULE */}
+            {activeModule === 'activities' && (
+              <div>
+                {(role === 'super_admin' || role === 'admin' || role === 'teacher' || role === 'guest_faculty' || role === 'staff') && (
+                  <form onSubmit={handleAddActivity} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <select value={newActivityBatch} onChange={e => setNewActivityBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
+                      <option value="">Select Batch...</option>
+                      {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <input placeholder="Activity Title (e.g. Annual Day Performance)" value={newActivityTitle} onChange={e => setNewActivityTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 250px' }} />
+                    <select value={newActivityCategory} onChange={e => setNewActivityCategory(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="Performance">Performance</option>
+                      <option value="Competition">Competition</option>
+                      <option value="Workshop">Workshop</option>
+                      <option value="Achievement">Achievement</option>
+                    </select>
+                    <input type="date" value={newActivityDate} onChange={e => setNewActivityDate(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                    <textarea placeholder="Description / Evidence" value={newActivityDesc} onChange={e => setNewActivityDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>{role === 'staff' ? 'Add Activity' : 'Submit Activity'}</button>
+                  </form>
+                )}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  {dbData.activities.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No activities logged yet.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                          <th style={{ padding: '12px' }}>Title</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Category</th><th style={{ padding: '12px' }}>Date</th><th style={{ padding: '12px' }}>Description</th><th style={{ padding: '12px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dbData.activities.map(a => {
+                          const batch = dbData.batches.find(b => b.id === a.batch_id);
+                          return (
+                            <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '12px' }}>{a.title}</td>
+                              <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
+                              <td style={{ padding: '12px' }}>{a.category}</td>
+                              <td style={{ padding: '12px' }}>{a.date}</td>
+                              <td style={{ padding: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.description}</td>
+                              <td style={{ padding: '12px' }}>
+                                {(role === 'super_admin' || role === 'admin' || role === 'staff') && <button onClick={() => handleDelete('activities', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'liveclasses', 'assignments', 'feedback', 'jobs'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'liveclasses', 'assignments', 'feedback', 'jobs', 'activities'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
