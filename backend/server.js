@@ -34,8 +34,11 @@ const crud = (table, orderCol = 'created_at') => ({
   },
   update: async (req, res) => {
     try {
-      // Add updated_at timestamp if column exists
-      const updateData = { ...req.body, updated_at: new Date().toISOString() };
+      // Only tables that actually have an updated_at column get a timestamp,
+      // otherwise the UPDATE errors on "column updated_at does not exist".
+      const updateData = TABLES_WITH_UPDATED_AT.has(table)
+        ? { ...req.body, updated_at: new Date().toISOString() }
+        : req.body;
       const { data, error } = await supabase.from(table).update(updateData).eq('id', req.params.id).select();
       if (error) throw error;
       res.json(data[0]);
@@ -50,14 +53,29 @@ const crud = (table, orderCol = 'created_at') => ({
   }
 });
 
-// Routing Registry
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities'];
+// Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'jobs', 'enquiries']);
+const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', disciplines: 'name' };
+
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules'];
 modules.forEach(m => {
-  const handler = crud(m === 'curriculum' ? 'disciplines' : m === 'timetable' ? 'timetable_slots' : m === 'liveclasses' ? 'live_sessions' : m === 'lessonplans' ? 'lesson_plans' : m);
+  const table = TABLE_FOR[m] || m;
+  const handler = crud(table, ORDER_FOR[table]);
   app.get(`/api/${m}`, handler.list);
   app.post(`/api/${m}`, handler.create);
   app.put(`/api/${m}/:id`, handler.update);
   app.delete(`/api/${m}/:id`, handler.delete);
+});
+
+// Roles are data too: read-only for now (the role picker renders these).
+// Full role management + an editable permission matrix come with the auth hardening pass.
+app.get('/api/roles', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('roles').select('*').order('key');
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.listen(PORT, () => console.log(`Nada Gurukulam API active on ${PORT}`));

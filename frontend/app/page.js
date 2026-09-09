@@ -2,15 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export default function Home() {
-  const ROLES = [
-    { key: 'super_admin', name: 'Super Admin', blurb: 'Everything — every module, full control.' },
-    { key: 'admin', name: 'Admin', blurb: 'Day-to-day operations across most modules.' },
-    { key: 'teacher', name: 'Teacher', blurb: 'Own batches — lesson plans, live classes, assignments.' },
-    { key: 'guest_faculty', name: 'Guest Faculty', blurb: 'Same as Teacher, scoped to assigned sessions only.' },
-    { key: 'staff', name: 'Staff', blurb: 'Enquiries, Jobs, Events, Activities.' },
-    { key: 'student', name: 'Student', blurb: 'Own timetable, assignments, live classes, feedback.' }
-  ];
-  const ROLE_MAP = {}; ROLES.forEach(r => ROLE_MAP[r.key] = r);
+  // Roles are data (the `roles` table, seeded by the Phase 4 schema) — the picker renders the API's response.
 
   const MODULES = [
     { key: 'overview', name: 'Overview', access: { super_admin: 'Full', admin: 'View' }, desc: 'Dashboard tiles across every module.' },
@@ -36,18 +28,25 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [],
-    live_sessions: [], assignments: [], feedback: [], jobs: [], activities: []
+    live_sessions: [], assignments: [], feedback: [], activities: []
   });
+  const [roles, setRoles] = useState([]);
 
   const [editing, setEditing] = useState(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 
   const fetchData = async () => {
     try {
-      const endpoints = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'courses', 'course_modules', 'live_sessions', 'assignments', 'feedback', 'activities'];
-      const results = await Promise.all(endpoints.map(ep => fetch(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])));
+      // [api endpoint, state key] — the API route and the state key differ for live classes.
+      const endpoints = [
+        ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'],
+        ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
+        ['course_modules', 'course_modules'], ['liveclasses', 'live_sessions'],
+        ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities']
+      ];
+      const results = await Promise.all(endpoints.map(([ep]) => fetch(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])));
       const mapped = {};
-      endpoints.forEach((ep, idx) => { mapped[ep] = Array.isArray(results[idx]) ? results[idx] : []; });
+      endpoints.forEach(([ep, key], idx) => { mapped[key] = Array.isArray(results[idx]) ? results[idx] : []; });
       setDbData(mapped);
     } catch (err) { console.error('Fetch error:', err); }
   };
@@ -55,6 +54,12 @@ export default function Home() {
   useEffect(() => {
     if (view === 'admin') fetchData();
   }, [view, activeModule]);
+
+  // The public homepage and the role picker are data-driven too — nothing is hardcoded here.
+  useEffect(() => {
+    fetchData();
+    fetch(`${apiUrl}/api/roles`).then(r => r.json()).then(setRoles).catch(() => {});
+  }, []);
 
   const handleDelete = async (endpoint, id) => {
     if (!confirm('Are you sure you want to delete this record?')) return;
@@ -252,7 +257,7 @@ export default function Home() {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {role && (
             <span style={{ background: 'rgba(255,255,255,0.15)', padding: '5px 14px', borderRadius: '99px', fontSize: '13px' }}>
-              Role: <b>{ROLE_MAP[role]?.name}</b>
+              Role: <b>{roles.find(r => r.key === role)?.name || role}</b>
             </span>
           )}
           {view !== 'public' && (
@@ -293,20 +298,14 @@ export default function Home() {
           </section>
 
           <main style={{ maxWidth: '1080px', margin: '40px auto', padding: '0 24px' }}>
-            <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Six Disciplines Taught</h3>
+            <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Disciplines Taught</h3>
             <p style={{ color: 'var(--text-soft)', marginBottom: '24px' }}>Offered completely free of charge, funded entirely by donations.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-              {[
-                { name: 'Carnatic Vocal', desc: 'South Indian classical vocal tradition — sarali varisai through varnams and kritis.' },
-                { name: 'Hindustani Vocal', desc: 'North Indian classical vocal tradition — raga and taal fundamentals through khayal.' },
-                { name: 'Bharatanatyam', desc: 'Classical dance — adavus, nritta and abhinaya through the margam repertoire.' },
-                { name: 'Mridangam', desc: 'South Indian percussion — talam fundamentals through accompaniment practice.' },
-                { name: 'Tabla', desc: 'North Indian percussion — theka and laya fundamentals through solo compositions.' },
-                { name: 'Flute', desc: 'Carnatic bamboo flute — breath and fingering technique through raga alapana.' }
-              ].map((art, idx) => (
-                <div key={idx} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '22px', boxShadow: 'var(--shadow-sm)' }}>
+              {dbData.curriculum.length === 0 && <p style={{ color: 'var(--text-faint)', gridColumn: '1 / -1' }}>Disciplines will appear here as they&apos;re added in the portal (Curricula module).</p>}
+              {dbData.curriculum.map(art => (
+                <div key={art.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '22px', boxShadow: 'var(--shadow-sm)' }}>
                   <h4 style={{ fontSize: '18px', color: 'var(--primary)', marginBottom: '8px' }}>{art.name}</h4>
-                  <p style={{ fontSize: '14px', color: 'var(--text-soft)', margin: 0 }}>{art.desc}</p>
+                  <p style={{ fontSize: '14px', color: 'var(--text-soft)', margin: 0 }}>{art.description || art.levels || '—'}</p>
                 </div>
               ))}
             </div>
@@ -319,13 +318,14 @@ export default function Home() {
         <div style={{ maxWidth: '720px', margin: '60px auto', padding: '0 24px', flex: 1 }}>
           <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>Select Portal Role</h2>
           <p style={{ color: 'var(--text-soft)', textAlign: 'center', marginBottom: '32px' }}>
-            Preview the portal permissions across all six system roles per the Phase 3 permission matrix.
+            Preview the portal permissions per the Phase 3 permission matrix (roles come from the database).
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-            {ROLES.map(r => (
+            {roles.length === 0 && <p style={{ color: 'var(--text-faint)', gridColumn: '1 / -1' }}>Loading roles… (is the API at {apiUrl} running?)</p>}
+            {roles.map(r => (
               <button key={r.key} onClick={() => { setRole(r.key); setActiveModule('overview'); setView('admin'); }} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px', textAlign: 'left', cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}>
                 <b style={{ display: 'block', fontSize: '16px', color: 'var(--primary)', marginBottom: '6px' }}>{r.name}</b>
-                <span style={{ fontSize: '13px', color: 'var(--text-soft)', lineHeight: 1.4, display: 'block' }}>{r.blurb}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-soft)', lineHeight: 1.4, display: 'block' }}>{r.description || '—'}</span>
               </button>
             ))}
           </div>
