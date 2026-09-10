@@ -1,0 +1,27 @@
+# Render blueprint for the Express backend.
+# Apply: `render blueprint apply` or import via dashboard → New → Blueprint → this repo.
+# Env vars marked sync:false are set in dashboard (never committed).
+
+services:
+  - type: web
+    name: nadagurukulam-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
