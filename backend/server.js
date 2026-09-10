@@ -19,7 +19,7 @@ const ALLOWED_ORIGINS = [
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS blocked: ${origin}`));
+    return cb(null, false);
   },
   credentials: true,
 }));
@@ -78,7 +78,7 @@ function canAccess(level, action) {
   return LEVEL_ORDER[level] >= (thresholds[action] ?? 0);
 }
 
-// Maps the API route key to the modules list key for permission lookup
+// API key → module_key for permission lookup (api key is the URL segment, e.g. /api/curriculum)
 const API_TO_MODULE = {
   users: 'users', curriculum: 'curriculum', batches: 'batches',
   timetable: 'timetable', liveclasses: 'liveclasses', lessonplans: 'lessonplans',
@@ -87,10 +87,18 @@ const API_TO_MODULE = {
   courses: 'curriculum', course_modules: 'curriculum', course_types: 'curriculum',
   roles: 'roles', role_permissions: 'roles'
 };
+// Reverse: table name → module_key (crud is instantiated with table names)
+const TABLE_TO_MODULE = {
+  disciplines: 'curriculum', timetable_slots: 'timetable',
+  live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
+  courses: 'curriculum', course_modules: 'curriculum', course_types: 'curriculum'
+};
 
 // ── Row-level scoping helpers ──────────────────────────────────────────────
 // Own = only rows in caller's batches; Self = only caller's own row.
 // Returns null if the table has no ownership concept for this level (caller gets 403).
+// NOTE: supabase-js builders are thenables — awaiting a builder executes it.
+// So this helper must stay synchronous; ownedBatchIds are fetched beforehand.
 
 async function getOwnedBatchIds(profileId) {
   const { data: enrollRows } = await supabase.from('enrollments').select('batch_id').eq('student_id', profileId);
@@ -103,7 +111,9 @@ async function getOwnedBatchIds(profileId) {
   return [...ids];
 }
 
-async function applyListScope(query, table, level, profile) {
+const OWN_BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities']);
+
+function applyListScope(query, table, level, profile, ownedBatchIds) {
   if (level === 'View' || level === 'Submits' || level === 'Manage' || level === 'Full') return query;
 
   if (level === 'Self') {
@@ -116,16 +126,13 @@ async function applyListScope(query, table, level, profile) {
   }
 
   if (level === 'Own') {
-    const BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities']);
-    if (BATCH_TABLES.has(table)) {
-      const owned = await getOwnedBatchIds(profile.id);
-      if (owned.length === 0) return query.in('batch_id', ['00000000-0000-0000-0000-000000000000']);
-      return query.in('batch_id', owned);
+    if (OWN_BATCH_TABLES.has(table)) {
+      if (!ownedBatchIds || ownedBatchIds.length === 0) return query.in('batch_id', ['00000000-0000-0000-0000-000000000000']);
+      return query.in('batch_id', ownedBatchIds);
     }
     if (table === 'batches') {
-      const owned = await getOwnedBatchIds(profile.id);
-      if (owned.length === 0) return query.in('id', ['00000000-0000-0000-0000-000000000000']);
-      return query.in('id', owned);
+      if (!ownedBatchIds || ownedBatchIds.length === 0) return query.in('id', ['00000000-0000-0000-0000-000000000000']);
+      return query.in('id', ownedBatchIds);
     }
     if (table === 'users') return query.eq('id', profile.id);
     if (table === 'events' || table === 'jobs' || table === 'lesson_plans') return query.eq('author_id', profile.id);
@@ -195,13 +202,17 @@ async function checkTimetableConflict(candidate) {
 const crud = (table, orderCol = 'created_at') => ({
   list: async (req, res) => {
     try {
-      const moduleKey = API_TO_MODULE[table] || table;
+      const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
       if (!level || !canAccess(level, 'list')) {
         return res.status(403).json({ error: 'You do not have View access for this module.' });
       }
+      let ownedBatchIds = null;
+      if (level === 'Own' && (table === 'batches' || OWN_BATCH_TABLES.has(table))) {
+        ownedBatchIds = await getOwnedBatchIds(req.auth.profile.id);
+      }
       let query = supabase.from(table).select('*');
-      query = await applyListScope(query, table, level, req.auth.profile);
+      query = applyListScope(query, table, level, req.auth.profile, ownedBatchIds);
       if (query === null) {
         return res.status(403).json({ error: 'Your access level does not permit listing this module.' });
       }
@@ -209,11 +220,11 @@ const crud = (table, orderCol = 'created_at') => ({
       const { data, error } = await query;
       if (error) throw error;
       res.json(data || []);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { console.error('list', table, err.stack); res.status(500).json({ error: err.message }); }
   },
   create: async (req, res) => {
     try {
-      const moduleKey = API_TO_MODULE[table] || table;
+      const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
       if (!level || !canAccess(level, 'create')) {
         return res.status(403).json({ error: 'You do not have Create access for this module.' });
@@ -233,7 +244,7 @@ const crud = (table, orderCol = 'created_at') => ({
   },
   update: async (req, res) => {
     try {
-      const moduleKey = API_TO_MODULE[table] || table;
+      const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
       if (!level || !canAccess(level, 'update')) {
         return res.status(403).json({ error: 'You do not have Manage access for this module.' });
@@ -254,7 +265,7 @@ const crud = (table, orderCol = 'created_at') => ({
   },
   delete: async (req, res) => {
     try {
-      const moduleKey = API_TO_MODULE[table] || table;
+      const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
       if (!level || !canAccess(level, 'delete')) {
         return res.status(403).json({ error: 'You do not have Full access for this module.' });
@@ -323,8 +334,8 @@ mongoose.connect(process.env.MONGODB_URI || '', { dbName: 'nadagurukulam' })
 const cmsBlockSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true, index: true },
   content: { type: mongoose.Schema.Types.Mixed, default: {} },
-}, { timestamps: true });
-const CmsBlock = mongoose.models.CmsBlock || mongoose.model('CmsBlock', cmsBlockSchema);
+}, { timestamps: true, collection: 'cms_blocks' });
+const CmsBlock = mongoose.models.CmsBlock || mongoose.model('CmsBlock', cmsBlockSchema, 'cms_blocks');
 
 // Every editable public-site section is a cms_blocks document: one doc per block.
 app.get('/api/cms', async (req, res) => {
