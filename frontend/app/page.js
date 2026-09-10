@@ -34,37 +34,28 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const resolveRole = (uid) =>
+    supabase.from('users').select('role_key').eq('auth_user_id', uid).single();
+
   // Load initial session
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        // Get user's role from users table
-        supabase
-          .from('users')
-          .select('role_key')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setRole(data.role_key);
-            setView('admin');
-          });
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (s) {
+        resolveRole(s.user.id).then(({ data }) => {
+          if (data) setRole(data.role_key);
+          setView('admin');
+        });
       }
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        supabase
-          .from('users')
-          .select('role_key')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setRole(data.role_key);
-            setView('admin');
-          });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess) {
+        resolveRole(sess.user.id).then(({ data }) => {
+          if (data) setRole(data.role_key);
+          setView('admin');
+        });
       } else {
         setRole(null);
         setView('public');
@@ -93,15 +84,21 @@ export default function Home() {
 
   // Auth helper functions
   const apiCall = async (url, options = {}) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session: sess } } = await supabase.auth.getSession();
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
-    if (session?.access_token) {
-      headers.Authorization = `Bearer ${session.access_token}`;
+    if (sess?.access_token) {
+      headers.Authorization = `Bearer ${sess.access_token}`;
     }
-    return fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      setSession(null);
+      setRole(null);
+      setView('login');
+    }
+    return res;
   };
 
   // Permission matrix as data (role_permissions table): permsMap[role_key][module_key] = { id, level }.
@@ -133,13 +130,11 @@ export default function Home() {
   const loadCms = () => fetch(`${apiUrl}/api/cms/home`).then(r => r.json()).then(d => setCmsHome(d.content)).catch(() => {});
 
   const handleSaveCms = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const authHeader = session ? { Authorization: `Bearer ${session.access_token}` } : {};
-    await fetch(`${apiUrl}/api/cms/home`, {
+    const res = await apiCall(`${apiUrl}/api/cms/home`, {
       method: 'PUT',
-      headers: { ...authHeader, 'Content-Type': 'application/json' },
       body: JSON.stringify(cmsForm)
     });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Save failed'); return; }
     setCmsEditing(false); loadCms();
   };
 
@@ -163,23 +158,16 @@ export default function Home() {
     } catch (err) { console.error('Fetch error:', err); }
   };
 
-  useEffect(() => {
-    if (view === 'admin') fetchData();
-  }, [view, activeModule]);
+  // Public content (CMS) is unauthenticated; admin data requires a session.
+  useEffect(() => { loadCms(); }, []);
 
-  // The public homepage and the role picker are data-driven too — nothing is hardcoded here.
   useEffect(() => {
+    if (view === 'admin' && session) fetchData();
+  }, [view, activeModule, session]);
+
+  useEffect(() => {
+    if (!session) return;
     fetchData();
-    loadCms();
-  }, []);
-
-  // Load CMS content and user data on initial load
-  useEffect(() => {
-    loadCms();
-    // Load roles for role picker (if not authenticated)
-    if (!session) {
-      fetch(`${apiUrl}/api/roles`).then(r => r.json()).then(setRoles).catch(() => {});
-    }
   }, [session]);
 
   // If the selected course type was deleted, fall back to the first available type.
@@ -191,7 +179,8 @@ export default function Home() {
 
   const handleDelete = async (endpoint, id) => {
     if (!confirm('Are you sure you want to delete this record?')) return;
-    await fetch(`${apiUrl}/api/${endpoint}/${id}`, { method: 'DELETE' });
+    const res = await apiCall(`${apiUrl}/api/${endpoint}/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Delete failed'); return; }
     fetchData();
   };
 
@@ -259,22 +248,16 @@ export default function Home() {
   const handleAddAssignment = async (e) => {
     e.preventDefault();
     if (!newAssignBatch || !newAssignTitle || !newAssignDue) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    const authHeader = session ? { Authorization: `Bearer ${session.access_token}` } : {};
-    await fetch(`${apiUrl}/api/assignments`, {
+    await apiCall(`${apiUrl}/api/assignments`, {
       method: 'POST',
-      headers: { ...authHeader, 'Content-Type': 'application/json' },
       body: JSON.stringify({ batch_id: newAssignBatch, title: newAssignTitle, type: newAssignType, due_date: newAssignDue, description: newAssignDesc, status: 'open' })
     });
     setNewAssignBatch(''); setNewAssignTitle(''); setNewAssignType('audio_video'); setNewAssignDue(''); setNewAssignDesc(''); fetchData();
   };
 
   const handleUpdateAssignmentStatus = async (id, status) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const authHeader = session ? { Authorization: `Bearer ${session.access_token}` } : {};
-    await fetch(`${apiUrl}/api/assignments/${id}`, {
+    await apiCall(`${apiUrl}/api/assignments/${id}`, {
       method: 'PUT',
-      headers: { ...authHeader, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
     fetchData();
@@ -380,11 +363,11 @@ export default function Home() {
       const ok = confirm(`Conflicts with an existing slot (${clash.day_of_week} ${clash.start_time}–${clash.end_time}, ${batchName === dbData.batches.find(b => b.id === candidate.batch_id)?.name ? 'same batch' : 'room ' + clash.room}). Add anyway?`);
       if (!ok) return;
     }
-    await fetch(`${apiUrl}/api/timetable`, {
+    const slotRes = await apiCall(`${apiUrl}/api/timetable`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(candidate)
     });
+    if (!slotRes.ok) { const e = await slotRes.json().catch(() => ({})); alert(e.error || 'Failed to add slot'); return; }
     setNewSlotStart(''); setNewSlotEnd(''); setNewSlotRoom(''); fetchData();
   };
 
@@ -397,9 +380,8 @@ export default function Home() {
   const handleAddLessonPlan = async (e) => {
     e.preventDefault();
     if (!newPlanBatch || !newPlanSubject || !newPlanDate) return;
-    await fetch(`${apiUrl}/api/lessonplans`, {
+    await apiCall(`${apiUrl}/api/lessonplans`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ batch_id: newPlanBatch, subject: newPlanSubject, session_date: newPlanDate, objectives: newPlanObjectives, status: 'draft' })
     });
     setNewPlanSubject(''); setNewPlanDate(''); setNewPlanObjectives(''); fetchData();
@@ -410,11 +392,11 @@ export default function Home() {
       const note = prompt(status === 'needs_revision' ? 'What needs revision?' : 'Reviewer note (optional)') || '';
       review_comments = note;
     }
-    await fetch(`${apiUrl}/api/lessonplans/${id}`, {
+    const r = await apiCall(`${apiUrl}/api/lessonplans/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, review_comments: review_comments || null })
     });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.error || 'Transition failed'); return; }
     fetchData();
   };
 
@@ -427,20 +409,19 @@ export default function Home() {
   const handleAddEvent = async (e) => {
     e.preventDefault();
     if (!newEventTitle || !newEventDate || !newEventVenue) return;
-    await fetch(`${apiUrl}/api/events`, {
+    await apiCall(`${apiUrl}/api/events`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newEventTitle, date: newEventDate, venue: newEventVenue, description: newEventDesc, status: 'draft' })
     });
     setNewEventTitle(''); setNewEventDate(''); setNewEventVenue(''); setNewEventDesc(''); fetchData();
   };
 
   const handleEventTransition = async (id, status) => {
-    await fetch(`${apiUrl}/api/events/${id}`, {
+    const r = await apiCall(`${apiUrl}/api/events/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.error || 'Transition failed'); return; }
     fetchData();
   };
 
@@ -453,9 +434,8 @@ export default function Home() {
   const handleAddEnquiry = async (e) => {
     e.preventDefault();
     if (!newEnqName || !newEnqContact) return;
-    await fetch(`${apiUrl}/api/enquiries`, {
+    await apiCall(`${apiUrl}/api/enquiries`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newEnqName, contact: newEnqContact, type: newEnqType, message: newEnqMessage, status: 'new' })
     });
     setNewEnqName(''); setNewEnqContact(''); setNewEnqMessage(''); fetchData();
@@ -473,18 +453,16 @@ export default function Home() {
     e.preventDefault();
     const key = newRoleName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     if (!key) return;
-    await fetch(`${apiUrl}/api/roles`, {
+    await apiCall(`${apiUrl}/api/roles`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, name: newRoleName, description: newRoleDesc })
     });
     setNewRoleName(''); setNewRoleDesc(''); fetchData();
   };
 
   const handleUpdateRole = async (id) => {
-    await fetch(`${apiUrl}/api/roles/${id}`, {
+    await apiCall(`${apiUrl}/api/roles/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: editRoleName, description: editRoleDesc })
     });
     setEditingRole(null); fetchData();
@@ -492,7 +470,7 @@ export default function Home() {
 
   const handleDeleteRole = async (r) => {
     if (!confirm(`Delete role "${r.name}"? Users holding it must be reassigned first.`)) return;
-    const res = await fetch(`${apiUrl}/api/roles/${r.id}`, { method: 'DELETE' });
+    const res = await apiCall(`${apiUrl}/api/roles/${r.id}`, { method: 'DELETE' });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
     fetchData();
   };
@@ -500,14 +478,14 @@ export default function Home() {
   const handlePermChange = async (roleKey, moduleKey, level) => {
     const row = permsMap[roleKey]?.[moduleKey];
     if (level === '—') {
-      if (row) await fetch(`${apiUrl}/api/role_permissions/${row.id}`, { method: 'DELETE' });
+      if (row) await apiCall(`${apiUrl}/api/role_permissions/${row.id}`, { method: 'DELETE' });
     } else if (row) {
-      await fetch(`${apiUrl}/api/role_permissions/${row.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_level: level })
+      await apiCall(`${apiUrl}/api/role_permissions/${row.id}`, {
+        method: 'PUT', body: JSON.stringify({ access_level: level })
       });
     } else {
-      await fetch(`${apiUrl}/api/role_permissions`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      await apiCall(`${apiUrl}/api/role_permissions`, {
+        method: 'POST',
         body: JSON.stringify({ role_key: roleKey, module_key: moduleKey, access_level: level })
       });
     }
@@ -517,9 +495,8 @@ export default function Home() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newName || !newEmail) return;
-    await fetch(`${apiUrl}/api/users`, {
+    await apiCall(`${apiUrl}/api/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName, email: newEmail, role_key: newUserRole })
     });
     setNewName(''); setNewEmail(''); fetchData();
@@ -528,9 +505,8 @@ export default function Home() {
   const handleAddDiscipline = async (e) => {
     e.preventDefault();
     if (!newDiscName) return;
-    await fetch(`${apiUrl}/api/curriculum`, {
+    await apiCall(`${apiUrl}/api/curriculum`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newDiscName, levels: newDiscLevels, description: newDiscDesc })
     });
     setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); fetchData();
@@ -539,9 +515,8 @@ export default function Home() {
   const handleAddCourse = async (e) => {
     e.preventDefault();
     if (!courseName || !courseCode) return;
-    await fetch(`${apiUrl}/api/courses`, {
+    await apiCall(`${apiUrl}/api/courses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ discipline_id: courseDisc || dbData.curriculum[0]?.id, course_type: courseType, semester: courseSem, code: courseCode, name: courseName, credits: courseCredits, teaching_hours: courseHours })
     });
     setCourseCode(''); setCourseName(''); fetchData();
@@ -556,25 +531,22 @@ export default function Home() {
 
   const handleAddCourseType = async () => {
     if (!newCourseTypeName) return;
-    await fetch(`${apiUrl}/api/course_types`, {
+    await apiCall(`${apiUrl}/api/course_types`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newCourseTypeName, semester_count: Number(newCourseTypeSemesters) || 4 })
     });
     setNewCourseTypeName(''); setNewCourseTypeSemesters(4); fetchData();
   };
 
   const handleUpdateCourseType = async (t, payload) => {
-    await fetch(`${apiUrl}/api/course_types/${t.id}`, {
+    await apiCall(`${apiUrl}/api/course_types/${t.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    // Renaming a type keeps its existing courses labelled with the new name.
     if (payload.name && payload.name !== t.name) {
       const affected = dbData.courses.filter(c => c.course_type === t.name);
-      await Promise.all(affected.map(c => fetch(`${apiUrl}/api/courses/${c.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ course_type: payload.name })
+      await Promise.all(affected.map(c => apiCall(`${apiUrl}/api/courses/${c.id}`, {
+        method: 'PUT', body: JSON.stringify({ course_type: payload.name })
       })));
     }
     setEditingCourseType(null); fetchData();

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -12,7 +12,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-app.use(cors());
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS blocked: ${origin}`));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // ============================================================================
@@ -37,38 +47,6 @@ async function authMiddleware(req, res, next) {
       .single();
     if (profileErr || !profile) {
       // User exists in Supabase Auth but not in our users table — deny
-      return res.status(403).json({ error: 'User not registered in portal' });
-    }
-    req.auth = { user, profile };
-    next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    res.status(500).json({ error: 'Auth verification failed' });
-  }
-}
-
-// ============================================================================
-// AUTH MIDDLEWARE — verify Supabase JWT, resolve user role & permissions
-// ============================================================================
-async function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
-  }
-  const token = authHeader.slice(7);
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-    // Fetch the user's role from public.users
-    const { data: profile, error: profileErr } = await supabase
-      .from('users')
-      .select('role_key, id, name, email')
-      .eq('id', user.id)
-      .single();
-    if (profileErr || !profile) {
-      // User exists in auth but not in our users table — deny
       return res.status(403).json({ error: 'User not registered in portal' });
     }
     req.auth = { user, profile };
@@ -110,7 +88,110 @@ const API_TO_MODULE = {
   roles: 'roles', role_permissions: 'roles'
 };
 
-// Enhanced CRUD — server-side permission check added
+// ── Row-level scoping helpers ──────────────────────────────────────────────
+// Own = only rows in caller's batches; Self = only caller's own row.
+// Returns null if the table has no ownership concept for this level (caller gets 403).
+
+async function getOwnedBatchIds(profileId) {
+  const { data: enrollRows } = await supabase.from('enrollments').select('batch_id').eq('student_id', profileId);
+  const { data: facultyRows } = await supabase.from('batch_faculty').select('batch_id').eq('faculty_id', profileId);
+  const { data: ownedBatches } = await supabase.from('batches').select('id').eq('faculty_id', profileId);
+  const ids = new Set();
+  (enrollRows || []).forEach(r => ids.add(r.batch_id));
+  (facultyRows || []).forEach(r => ids.add(r.batch_id));
+  (ownedBatches || []).forEach(r => ids.add(r.id));
+  return [...ids];
+}
+
+async function applyListScope(query, table, level, profile) {
+  if (level === 'View' || level === 'Submits' || level === 'Manage' || level === 'Full') return query;
+
+  if (level === 'Self') {
+    if (table === 'users') return query.eq('id', profile.id);
+    if (table === 'lesson_plans') return query.eq('author_id', profile.id);
+    if (table === 'events' || table === 'jobs') return query.eq('author_id', profile.id);
+    if (table === 'documents') return query.eq('uploader_id', profile.id);
+    if (table === 'session_attendance') return query.eq('user_id', profile.id);
+    return null;
+  }
+
+  if (level === 'Own') {
+    const BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities']);
+    if (BATCH_TABLES.has(table)) {
+      const owned = await getOwnedBatchIds(profile.id);
+      if (owned.length === 0) return query.in('batch_id', ['00000000-0000-0000-0000-000000000000']);
+      return query.in('batch_id', owned);
+    }
+    if (table === 'batches') {
+      const owned = await getOwnedBatchIds(profile.id);
+      if (owned.length === 0) return query.in('id', ['00000000-0000-0000-0000-000000000000']);
+      return query.in('id', owned);
+    }
+    if (table === 'users') return query.eq('id', profile.id);
+    if (table === 'events' || table === 'jobs' || table === 'lesson_plans') return query.eq('author_id', profile.id);
+    return null;
+  }
+
+  return query;
+}
+
+async function checkRowOwnership(table, level, profile, rowId) {
+  if (!level || level === 'View' || level === 'Manage' || level === 'Full' || level === 'Submits') return true;
+  const { data: row } = await supabase.from(table).select('*').eq('id', rowId).single();
+  if (!row) return true;
+  if (level === 'Self') {
+    if (table === 'users') return row.id === profile.id;
+    if (table === 'lesson_plans') return row.author_id === profile.id;
+    if (table === 'events' || table === 'jobs') return row.author_id === profile.id;
+    if (table === 'documents') return row.uploader_id === profile.id;
+    if (table === 'session_attendance') return row.user_id === profile.id;
+    return false;
+  }
+  if (level === 'Own') {
+    const owned = await getOwnedBatchIds(profile.id);
+    const BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities']);
+    if (BATCH_TABLES.has(table)) return owned.includes(row.batch_id);
+    if (table === 'batches') return owned.includes(row.id);
+    if (table === 'events' || table === 'jobs' || table === 'lesson_plans') return row.author_id === profile.id;
+    if (table === 'users') return row.id === profile.id;
+    return false;
+  }
+  return true;
+}
+
+// Server-side guards for status transitions that require higher privilege
+async function checkPublishGate(table, body, level) {
+  const needsManage = (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage'];
+  if (!needsManage) return null;
+  if ((table === 'events' || table === 'jobs') && body.status === 'published') {
+    return 'Publishing requires Manage or Full access.';
+  }
+  if (table === 'lesson_plans' && (body.status === 'approved' || body.status === 'needs_revision')) {
+    return 'Approving or returning lesson plans requires Manage or Full access.';
+  }
+  return null;
+}
+
+// Timetable conflict check — server-side overlap detection
+async function checkTimetableConflict(candidate) {
+  const { data: existing } = await supabase
+    .from('timetable_slots')
+    .select('id, day_of_week, start_time, end_time, batch_id, room')
+    .eq('day_of_week', candidate.day_of_week);
+  if (!existing || existing.length === 0) return null;
+  const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+  const cStart = toMin(candidate.start_time);
+  const cEnd = toMin(candidate.end_time);
+  for (const s of existing) {
+    if (s.batch_id !== candidate.batch_id && s.room !== candidate.room) continue;
+    const sStart = toMin(s.start_time);
+    const sEnd = toMin(s.end_time);
+    if (cStart < sEnd && sStart < cEnd) return s;
+  }
+  return null;
+}
+
+// Enhanced CRUD — server-side permission + ownership + transition gates
 const crud = (table, orderCol = 'created_at') => ({
   list: async (req, res) => {
     try {
@@ -120,6 +201,10 @@ const crud = (table, orderCol = 'created_at') => ({
         return res.status(403).json({ error: 'You do not have View access for this module.' });
       }
       let query = supabase.from(table).select('*');
+      query = await applyListScope(query, table, level, req.auth.profile);
+      if (query === null) {
+        return res.status(403).json({ error: 'Your access level does not permit listing this module.' });
+      }
       if (orderCol) query = query.order(orderCol, { ascending: false });
       const { data, error } = await query;
       if (error) throw error;
@@ -133,6 +218,14 @@ const crud = (table, orderCol = 'created_at') => ({
       if (!level || !canAccess(level, 'create')) {
         return res.status(403).json({ error: 'You do not have Create access for this module.' });
       }
+      const gateErr = await checkPublishGate(table, req.body, level);
+      if (gateErr) return res.status(403).json({ error: gateErr });
+      if (table === 'timetable_slots') {
+        const clash = await checkTimetableConflict(req.body);
+        if (clash && level !== 'Full') {
+          return res.status(409).json({ error: `Timetable conflict: overlaps with slot ${clash.day_of_week} ${clash.start_time}–${clash.end_time} (room ${clash.room}).` });
+        }
+      }
       const { data, error } = await supabase.from(table).insert([req.body]).select();
       if (error) throw error;
       res.status(201).json(data[0]);
@@ -145,6 +238,10 @@ const crud = (table, orderCol = 'created_at') => ({
       if (!level || !canAccess(level, 'update')) {
         return res.status(403).json({ error: 'You do not have Manage access for this module.' });
       }
+      const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
+      if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
+      const gateErr = await checkPublishGate(table, req.body, level);
+      if (gateErr) return res.status(403).json({ error: gateErr });
       const blocked = await guard(table, req.params.id, req.body);
       if (blocked) return res.status(403).json({ error: blocked });
       const updateData = TABLES_WITH_UPDATED_AT.has(table)
@@ -192,7 +289,7 @@ const guard = async (table, id, body = {}) => {
 };
 
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
-const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'jobs', 'enquiries']);
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
 const ORDER_FOR = { courses: 'code', course_modules: 'module_number', disciplines: 'name', course_types: 'name', roles: 'name', role_permissions: 'module_key' };
 
@@ -246,9 +343,16 @@ app.get('/api/cms/:key', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/cms/:key', async (req, res) => {
+app.put('/api/cms/:key', authMiddleware, async (req, res) => {
   try {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
+    const isSuper = req.auth.profile.role_key === 'super_admin';
+    if (!isSuper) {
+      const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+      if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) {
+        return res.status(403).json({ error: 'Only Super Admin (or Full on Curriculum) can edit site content.' });
+      }
+    }
     const block = await CmsBlock.findOneAndUpdate(
       { key: req.params.key },
       { key: req.params.key, content: req.body },

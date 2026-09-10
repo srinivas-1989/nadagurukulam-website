@@ -45,13 +45,6 @@ async function testPermissionEnforcement() {
   const viewRoleResult = canAccess('View', 'list');
   console.log('View role list access:', viewRoleResult); // Should be true
 
-  // Test getAccessLevel simulation
-  const mockRolePermissions = [
-    { role_key: 'super_admin', module_key: 'users', access_level: 'Full' },
-    { role_key: 'teacher', module_key: 'batches', access_level: 'Manage' },
-    { role_key: 'student', module_key: 'batches', access_level: 'View' }
-  ];
-
   const getAccessLevel = (roleKey, moduleKey) => {
     const permission = mockRolePermissions.find(p => p.role_key === roleKey && p.module_key === moduleKey);
     return permission ? permission.access_level : null;
@@ -69,6 +62,14 @@ async function testPermissionEnforcement() {
   const nonExistentAccess = getAccessLevel('student', 'events');
   console.log('Student events access level:', nonExistentAccess); // Should be null
 }
+
+// Shared permission data — used by both test functions
+const mockRolePermissions = [
+  { role_key: 'super_admin', module_key: 'users', access_level: 'Full' },
+  { role_key: 'super_admin', module_key: 'roles', access_level: 'Full' },
+  { role_key: 'teacher', module_key: 'batches', access_level: 'Manage' },
+  { role_key: 'student', module_key: 'batches', access_level: 'View' }
+];
 
 // Test the server-side permission check logic
 async function testCrudPermissions() {

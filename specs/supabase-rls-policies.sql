@@ -93,18 +93,22 @@ create policy "Batches are readable by enrolled students / faculty"
   on public.batches for select
   to authenticated
   using (
-    auth_user_id = ANY (
-      select u.auth_user_id from public.users u
-      where u.role_key = 'student'
-      and exists (
-        select 1 from public.enrollments e
-        where e.student_id = u.id and e.batch_id = batches.id
-      )
+    exists (
+      select 1 from public.users u
+      join public.enrollments e on e.student_id = u.id
+      where u.auth_user_id = auth.uid() and e.batch_id = batches.id
     )
     or exists (
       select 1 from public.users u
       where u.auth_user_id = auth.uid()
-      and u.role_key in ('teacher', 'guest_faculty')
+      and u.role_key in ('teacher', 'guest_faculty', 'admin', 'super_admin')
+    )
+    or exists (
+      select 1 from public.users u
+      join public.role_permissions rp on rp.role_key = u.role_key
+      where u.auth_user_id = auth.uid()
+      and rp.module_key = 'batches'
+      and rp.access_level in ('View', 'Manage', 'Full')
     )
   );
 
