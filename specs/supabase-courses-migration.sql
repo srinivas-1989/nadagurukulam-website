@@ -6,6 +6,7 @@ create table if not exists public.courses (
   semester text not null, -- e.g. 'Semester I', 'Semester II'
   code text unique not null, -- e.g. 'MBNP110'
   name text not null, -- e.g. 'Nritya Marga Purvanga-1'
+  course_type text default 'Masters', -- Masters / Undergraduate (drives the semester list in the UI)
   type text default 'DSC', -- DSC, SEC, etc.
   credits int default 6,
   teaching_hours int default 90,

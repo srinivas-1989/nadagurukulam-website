@@ -26,14 +26,9 @@ create table if not exists public.users (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Seed default roles
+-- Seed only the one fixed role; every other role is created/edited in the portal.
 insert into public.roles (key, name, description) values
-  ('super_admin', 'Super Admin', 'Everything — all modules, creates all accounts.'),
-  ('admin', 'Admin', 'Day-to-day operations; cannot create Admin/Super Admin.'),
-  ('teacher', 'Teacher', 'Own batches: lesson plans, live classes, assignments.'),
-  ('guest_faculty', 'Guest Faculty', 'Scoped specifically to assigned sessions.'),
-  ('staff', 'Staff', 'Enquiries, Jobs, Events, Activities.'),
-  ('student', 'Student', 'Portal for timetable, assignments, live classes.')
+  ('super_admin', 'Super Admin', 'Everything — all modules, creates all accounts and roles.')
 on conflict (key) do nothing;
 
 
@@ -92,7 +87,8 @@ create table if not exists public.live_sessions (
   title text not null,
   room_name text unique not null,
   session_date date not null,
-  start_time time not null,
+  start_time time,
+  room_link text,
   status text default 'scheduled' check (status in ('scheduled', 'live', 'ended', 'cancelled')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

@@ -1,33 +1,41 @@
-:root {
-  /* Maroon Primary (NDG Official Guidelines) */
-  --primary: #81171a;
-  --primary-deep: #591b17;
-  --primary-light: #9c2428;
+/* Nada Gurukulam design system — per NDG Design Guidelines V1 (2026-06-09 PDF).
+   Source of truth: NDG_Design Guidelines_V1_20260609.pdf (client's iCloud, Art Works).
+   Light-only by design: cream grounds, never pitch black — dark mode is not
+   defined by the guidelines and intentionally not implemented. */
 
-  /* Saffron Accent */
-  --accent: #dd9f3c;
-  --accent-deep: #c58539;
+@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Amita:wght@400;700&family=Tiro+Devanagari+Sanskrit:ital@0;1&family=Gentium+Basic:ital@0;1&family=Petit+Formal+Script&display=swap');
+
+:root {
+  /* PRIMARY (Guidelines p.3) */
+  --primary: #81171a;        /* Maroon */
+  --primary-deep: #591b17;   /* Deep Maroon — for texts */
+  --primary-light: #9c2428;
+  --accent: #dd9f3c;         /* Saffron */
+  --accent-deep: #c58539;    /* Deep Saffron — for texts */
   --accent-light: #f5b759;
 
-  /* Authentic Backgrounds (Strictly Cream, Never Pitch Black) */
-  --bg: #fdf3e0;
+  /* BACKGROUNDS: cream page, saffron band = cream + saffron @25% opacity */
+  --bg: #fdf3e0;             /* Cream */
   --bg-saffron: #fbf0d7;
-  --surface: #ffffff;
+  --surface: #fffdf6;
   --surface-muted: #f8eee0;
   --border: #e6d6c4;
   --divider: #d9c5b2;
 
-  /* Bodycopy Grey */
+  /* BODYCOPY greys (Guidelines p.3) */
   --text: #3c3c3b;
   --text-soft: #4a4949;
   --text-faint: #575756;
 
-  /* Shadows & Layout */
+  /* Elevation & shape */
   --shadow-sm: 0 1px 3px rgba(89, 27, 23, 0.06);
   --shadow-md: 0 4px 14px rgba(89, 27, 23, 0.08);
   --shadow-lg: 0 12px 28px rgba(89, 27, 23, 0.12);
   --radius: 8px;
   --radius-lg: 12px;
+  /* NDG signature shape: two-side-rounded (opposite corners rounded) */
+  --radius-xl: 26px 6px 26px 6px;
+  --radius-xl-sm: 14px 3px 14px 3px;
 }
 
 * {
@@ -45,10 +53,51 @@ body {
 }
 
 h1, h2, h3, h4, .font-display {
-  font-family: 'Futura', 'Futura-Medium', 'Jost', sans-serif;
+  font-family: 'Futura', 'Futura ND', 'Jost', sans-serif;
   color: var(--primary-deep);
-  font-weight: 600;
+  font-weight: 500;
   margin: 0;
+}
+
+/* Devanagari (Guidelines p.5): Amita for display, Tiro for body */
+.font-devanagari { font-family: 'Tiro Devanagari Sanskrit', 'Amita', serif; }
+.font-devanagari-display { font-family: 'Amita', 'Tiro Devanagari Sanskrit', serif; }
+
+/* IAST / shloka romanisation (Guidelines p.5): Gentium Basic Italic */
+.font-iast { font-family: 'Gentium Basic', Georgia, serif; font-style: italic; }
+
+/* Informal script accent (taglines) */
+.font-script { font-family: 'Petit Formal Script', cursive; }
+
+/* NDG brand elements */
+.ndg-watermark {
+  position: absolute;
+  opacity: 0.12;               /* Guidelines: typically 10–15% */
+  pointer-events: none;
+  user-select: none;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.ndg-corner {
+  position: absolute;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.ndg-om-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--primary);
+}
+.ndg-om-divider::before,
+.ndg-om-divider::after {
+  content: '';
+  height: 1px;
+  width: 72px;
+  background: var(--divider);
 }
 
 button {
