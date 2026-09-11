@@ -26,3 +26,5 @@ frontend/build/
 # Render / Build outputs
 dist/
 build/
+.vercel
+.env*
