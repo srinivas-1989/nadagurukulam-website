@@ -1295,12 +1295,12 @@ export default function Home() {
                               <td style={{ padding: '12px', fontSize: '12.5px', color: 'var(--text-soft)', maxWidth: '220px' }}>{p.review_comments || '—'}</td>
                               <td style={{ padding: '12px' }}>
                                 {canCreate('lessonplans') && (p.status === 'draft' || p.status === 'needs_revision') && (
-                                  <button onClick={() => handlePlanTransition(p.id, 'submitted')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Submit for review</button>
+                                  <button onClick={() => handlePlanTransition(p.id, 'submitted', '')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Submit for review</button>
                                 )}
                                 {canAdmin('lessonplans') && p.status === 'submitted' && (
                                   <>
                                     <button onClick={() => handlePlanTransition(p.id, 'approved', '')} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Approve</button>
-                                    <button onClick={() => handlePlanTransition(p.id, 'needs_revision')} style={{ background: 'var(--text-faint)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Return</button>
+                                    <button onClick={() => handlePlanTransition(p.id, 'needs_revision', '')} style={{ background: 'var(--text-faint)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Return</button>
                                   </>
                                 )}
                                 {canAdmin('lessonplans') && <button onClick={() => handleDelete('lessonplans', p.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginLeft: '4px' }}>Delete</button>}
