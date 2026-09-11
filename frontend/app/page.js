@@ -158,17 +158,11 @@ export default function Home() {
     } catch (err) { console.error('Fetch error:', err); }
   };
 
-  // Public content (CMS) is unauthenticated; admin data requires a session.
   useEffect(() => { loadCms(); }, []);
 
   useEffect(() => {
     if (view === 'admin' && session) fetchData();
   }, [view, activeModule, session]);
-
-  useEffect(() => {
-    if (!session) return;
-    fetchData();
-  }, [session]);
 
   // If the selected course type was deleted, fall back to the first available type.
   useEffect(() => {

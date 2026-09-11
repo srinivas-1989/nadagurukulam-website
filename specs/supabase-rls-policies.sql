@@ -50,6 +50,7 @@ grant execute on function public.my_batch_ids() to authenticated, anon;
 -- ============================================================================
 -- ROLES & USERS
 -- ============================================================================
+drop policy if exists "Roles are readable by all authenticated users" on public.roles;
 create policy "Roles are readable by all authenticated users"
   on public.roles for select
   to authenticated
@@ -62,17 +63,20 @@ create policy "Super Admin can manage roles"
   using (public.has_permission('roles', array['Full']))
   with check (public.has_permission('roles', array['Full']));
 
+drop policy if exists "Users can read their own row" on public.users;
 create policy "Users can read their own row"
   on public.users for select
   to authenticated
   using (auth.uid() = auth_user_id);
 
+drop policy if exists "Super Admin can manage users" on public.users;
 create policy "Super Admin can manage users"
   on public.users for all
   to authenticated
   using (public.has_permission('users', array['Full']))
   with check (public.has_permission('users', array['Full']));
 
+drop policy if exists "Role permissions are readable by all authenticated" on public.role_permissions;
 create policy "Role permissions are readable by all authenticated"
   on public.role_permissions for select
   to authenticated
@@ -88,6 +92,7 @@ create policy "Super Admin can manage role_permissions"
 -- ============================================================================
 -- ACADEMIC STRUCTURE
 -- ============================================================================
+drop policy if exists "Disciplines are readable by all authenticated" on public.disciplines;
 create policy "Disciplines are readable by all authenticated"
   on public.disciplines for select
   to authenticated
@@ -100,6 +105,7 @@ create policy "Super Admin can manage disciplines"
   using (public.has_permission('curriculum', array['Full']))
   with check (public.has_permission('curriculum', array['Full']));
 
+drop policy if exists "Batches are readable by enrolled students / faculty" on public.batches;
 create policy "Batches are readable by enrolled students / faculty"
   on public.batches for select
   to authenticated
@@ -109,6 +115,7 @@ create policy "Batches are readable by enrolled students / faculty"
     or public.has_permission('batches', array['View','Manage','Full'])
   );
 
+drop policy if exists "Super Admin / Admin can manage batches" on public.batches;
 create policy "Super Admin / Admin can manage batches"
   on public.batches for all
   to authenticated
@@ -118,6 +125,7 @@ create policy "Super Admin / Admin can manage batches"
 -- ============================================================================
 -- TIMETABLE & LIVE CLASSES
 -- ============================================================================
+drop policy if exists "Timetable slots are readable by batch members" on public.timetable_slots;
 create policy "Timetable slots are readable by batch members"
   on public.timetable_slots for select
   to authenticated
@@ -127,12 +135,14 @@ create policy "Timetable slots are readable by batch members"
     or public.has_permission('timetable', array['View','Manage','Full'])
   );
 
+drop policy if exists "Super Admin / Admin can manage timetable" on public.timetable_slots;
 create policy "Super Admin / Admin can manage timetable"
   on public.timetable_slots for all
   to authenticated
   using (public.has_permission('timetable', array['Manage','Full']))
   with check (public.has_permission('timetable', array['Manage','Full']));
 
+drop policy if exists "Live sessions are readable by batch members" on public.live_sessions;
 create policy "Live sessions are readable by batch members"
   on public.live_sessions for select
   to authenticated
@@ -142,6 +152,7 @@ create policy "Live sessions are readable by batch members"
     or public.has_permission('liveclasses', array['View','Manage','Full'])
   );
 
+drop policy if exists "Super Admin / Admin can manage live sessions" on public.live_sessions;
 create policy "Super Admin / Admin can manage live sessions"
   on public.live_sessions for all
   to authenticated
@@ -151,6 +162,7 @@ create policy "Super Admin / Admin can manage live sessions"
 -- ============================================================================
 -- LESSON PLANS
 -- ============================================================================
+drop policy if exists "Lesson plans readable by batch members and author" on public.lesson_plans;
 create policy "Lesson plans readable by batch members and author"
   on public.lesson_plans for select
   to authenticated
@@ -160,6 +172,7 @@ create policy "Lesson plans readable by batch members and author"
     or public.has_permission('lessonplans', array['View','Manage','Full'])
   );
 
+drop policy if exists "Super Admin / Admin can manage lesson plans" on public.lesson_plans;
 create policy "Super Admin / Admin can manage lesson plans"
   on public.lesson_plans for all
   to authenticated
@@ -169,6 +182,7 @@ create policy "Super Admin / Admin can manage lesson plans"
 -- ============================================================================
 -- ASSIGNMENTS
 -- ============================================================================
+drop policy if exists "Assignments readable by batch members" on public.assignments;
 create policy "Assignments readable by batch members"
   on public.assignments for select
   to authenticated
@@ -178,6 +192,7 @@ create policy "Assignments readable by batch members"
     or public.has_permission('assignments', array['View','Manage','Full'])
   );
 
+drop policy if exists "Super Admin / Admin can manage assignments" on public.assignments;
 create policy "Super Admin / Admin can manage assignments"
   on public.assignments for all
   to authenticated
@@ -187,6 +202,7 @@ create policy "Super Admin / Admin can manage assignments"
 -- ============================================================================
 -- FEEDBACK
 -- ============================================================================
+drop policy if exists "Feedback readable by recipient or author" on public.feedback;
 create policy "Feedback readable by recipient or author"
   on public.feedback for select
   to authenticated
@@ -197,6 +213,7 @@ create policy "Feedback readable by recipient or author"
     or public.my_role_key() in ('admin', 'super_admin')
   );
 
+drop policy if exists "Super Admin / Admin can manage feedback" on public.feedback;
 create policy "Super Admin / Admin can manage feedback"
   on public.feedback for all
   to authenticated
@@ -206,10 +223,12 @@ create policy "Super Admin / Admin can manage feedback"
 -- ============================================================================
 -- EVENTS
 -- ============================================================================
+drop policy if exists "Published events are public (anyone)" on public.events;
 create policy "Published events are public (anyone)"
   on public.events for select
   using (status = 'published');
 
+drop policy if exists "Authenticated users can read all events" on public.events;
 create policy "Authenticated users can read all events"
   on public.events for select
   to authenticated
@@ -225,10 +244,12 @@ create policy "Author or Admin can manage events"
 -- ============================================================================
 -- JOBS
 -- ============================================================================
+drop policy if exists "Published jobs are public" on public.jobs;
 create policy "Published jobs are public"
   on public.jobs for select
   using (status = 'published');
 
+drop policy if exists "Authenticated users can read all jobs" on public.jobs;
 create policy "Authenticated users can read all jobs"
   on public.jobs for select
   to authenticated
@@ -244,6 +265,7 @@ create policy "Staff/Admin can manage jobs"
 -- ============================================================================
 -- ENQUIRIES
 -- ============================================================================
+drop policy if exists "Enquiries readable by staff and author" on public.enquiries;
 create policy "Enquiries readable by staff and author"
   on public.enquiries for select
   to authenticated
@@ -259,6 +281,7 @@ create policy "Super Admin can manage enquiries"
 -- ============================================================================
 -- ACTIVITIES
 -- ============================================================================
+drop policy if exists "Activities readable by batch members" on public.activities;
 create policy "Activities readable by batch members"
   on public.activities for select
   to authenticated
@@ -268,6 +291,7 @@ create policy "Activities readable by batch members"
     or public.has_permission('activities', array['View','Manage','Full'])
   );
 
+drop policy if exists "Super Admin / Admin can manage activities" on public.activities;
 create policy "Super Admin / Admin can manage activities"
   on public.activities for all
   to authenticated
@@ -277,6 +301,7 @@ create policy "Super Admin / Admin can manage activities"
 -- ============================================================================
 -- DOCUMENTS & DOCUMENT ACCESS LOG
 -- ============================================================================
+drop policy if exists "Documents readable by visibility rules" on public.documents;
 create policy "Documents readable by visibility rules"
   on public.documents for select
   to authenticated
@@ -294,6 +319,7 @@ create policy "Uploader can manage their documents"
   using (uploader_id = public.my_user_id())
   with check (uploader_id = public.my_user_id());
 
+drop policy if exists "Document access log readable by accessor" on public.document_access_log;
 create policy "Document access log readable by accessor"
   on public.document_access_log for select
   to authenticated
@@ -302,6 +328,7 @@ create policy "Document access log readable by accessor"
 -- ============================================================================
 -- COURSE TYPES & COURSE MODULES (structured MPA format)
 -- ============================================================================
+drop policy if exists "Course types are readable by all authenticated" on public.course_types;
 create policy "Course types are readable by all authenticated"
   on public.course_types for select
   to authenticated
@@ -314,6 +341,7 @@ create policy "Super Admin can manage course types"
   using (public.has_permission('curriculum', array['Full']))
   with check (public.has_permission('curriculum', array['Full']));
 
+drop policy if exists "Course modules are readable by all authenticated" on public.course_modules;
 create policy "Course modules are readable by all authenticated"
   on public.course_modules for select
   to authenticated
@@ -327,8 +355,54 @@ create policy "Super Admin can manage course modules"
   with check (public.has_permission('curriculum', array['Full']));
 
 -- ============================================================================
+-- COURSES (structured MPA format — was missing, blocked all direct reads)
+-- ============================================================================
+drop policy if exists "Courses are readable by all authenticated" on public.courses;
+create policy "Courses are readable by all authenticated"
+  on public.courses for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Super Admin can manage courses" on public.courses;
+create policy "Super Admin can manage courses"
+  on public.courses for all
+  to authenticated
+  using (public.has_permission('curriculum', array['Full']))
+  with check (public.has_permission('curriculum', array['Full']));
+
+-- ============================================================================
+-- EVENT RSVPS & JOB APPLICANTS (were RLS-enabled with zero policies)
+-- ============================================================================
+drop policy if exists "Event RSVPs readable by event managers" on public.event_rsvps;
+create policy "Event RSVPs readable by event managers"
+  on public.event_rsvps for select
+  to authenticated
+  using (public.has_permission('events', array['View','Manage','Full']));
+
+drop policy if exists "Event managers can manage RSVPs" on public.event_rsvps;
+create policy "Event managers can manage RSVPs"
+  on public.event_rsvps for all
+  to authenticated
+  using (public.has_permission('events', array['Manage','Full']))
+  with check (public.has_permission('events', array['Manage','Full']));
+
+drop policy if exists "Job applicants readable by job managers" on public.job_applicants;
+create policy "Job applicants readable by job managers"
+  on public.job_applicants for select
+  to authenticated
+  using (public.has_permission('jobs', array['View','Manage','Full']));
+
+drop policy if exists "Job managers can manage applicants" on public.job_applicants;
+create policy "Job managers can manage applicants"
+  on public.job_applicants for all
+  to authenticated
+  using (public.has_permission('jobs', array['Manage','Full']))
+  with check (public.has_permission('jobs', array['Manage','Full']));
+
+-- ============================================================================
 -- BATCH FACULTY & ENROLLMENTS
 -- ============================================================================
+drop policy if exists "Batch faculty readable by batch members" on public.batch_faculty;
 create policy "Batch faculty readable by batch members"
   on public.batch_faculty for select
   to authenticated
@@ -337,6 +411,7 @@ create policy "Batch faculty readable by batch members"
     or batch_id = any(public.my_batch_ids())
   );
 
+drop policy if exists "Enrollments readable by student or faculty" on public.enrollments;
 create policy "Enrollments readable by student or faculty"
   on public.enrollments for select
   to authenticated
@@ -348,6 +423,7 @@ create policy "Enrollments readable by student or faculty"
 -- ============================================================================
 -- SESSION ATTENDANCE
 -- ============================================================================
+drop policy if exists "Attendance readable by session participants" on public.session_attendance;
 create policy "Attendance readable by session participants"
   on public.session_attendance for select
   to authenticated

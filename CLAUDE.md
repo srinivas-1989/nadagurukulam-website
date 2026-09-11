@@ -30,11 +30,11 @@ The project moved from planning artifacts (Phases 1–4, see §9) to a **real ru
 | 1–4 | Outline, public-site spec, portal spec, data model | **Done** (published artifacts, §10) |
 | 3.5 | Clickable prototype (artifact, pre-repo) | **Done** — historical, superseded by the real build |
 | 5 | Visual design — NDG V1 applied to the real app | **In progress** — globals.css tokens, hero brand elements, radii, fonts, real logos done; remaining: rest of public pages / portal polish |
-| 6 | Build on the real stack | **In progress** — Express+Supabase+MongoDB backend and Next.js frontend run locally against the client's real cloud accounts; **no auth yet** |
+| 6 | Build on the real stack | **Done** — Express+Supabase+MongoDB backend and Next.js frontend run locally; Supabase Auth + server-side permission/ownership gates + RLS policies wired (see §3–§5) |
 | 7 | Content migration & QA | Not started (data entry is the client's, via the UI) |
 | 8 | Launch & handover | Not started |
 
-**Security state (important):** the backend has **no authentication** — every `/api/*` route is open to whoever can reach port 10000. Supabase RLS is enabled on all tables but **no policies exist yet** (the backend uses the service_role key, which bypasses RLS). **Do not deploy or expose the backend publicly until the auth/RLS hardening pass.** Credentials live only in gitignored `backend/.env` and `frontend/.env.local` — never echo them into chat, never commit them, keep the service_role key backend-only.
+**Security state:** auth hardening complete — every `/api/*` (including `PUT /api/cms/:key`) requires `authMiddleware` (JWT → `auth_user_id` lookup); server enforces `role_permissions` + `Own`/`Self` scoping + publish gates + timetable conflict; RLS enabled and policies applied (idempotent via `node backend/scripts/apply-rls.js`, 2 policies/table, `courses`/`event_rsvps`/`job_applicants` covered); anon key in frontend only, service_role backend-only. Credentials live only in gitignored `backend/.env` and `frontend/.env.local` — never echo them or commit them.
 
 ---
 
@@ -70,10 +70,10 @@ All decisions default to whatever keeps running cost at or near zero (donation-f
 | Layer | Choice | Why / state |
 |---|---|---|
 | Frontend | **Next.js 16 (App Router, React 18)** locally; **Vercel** later | Free Hobby tier, SSR/ISR natively. NOTE: this Next version may differ from training data — read `frontend/node_modules/next/dist/docs/` before nontrivial framework work. |
-| Backend | **Express** (Node) locally on :10000; **Render.com** later | One `server.js` with a generic CRUD factory + registry; no auth yet. |
-| Structured data | **Supabase Postgres** (project `yucoydfekjmbiinvfhzg`, ap-southeast-1) | Backend uses the **service_role** key. RLS enabled, no policies yet (see §2 security note). |
+| Backend | **Express** (Node) locally on :10000; **Render.com** later | `server.js` CRUD factory + `authMiddleware` (JWT→`auth_user_id`) + `getAccessLevel`/`applyListScope`/`checkRowOwnership`/`checkPublishGate`/`checkTimetableConflict` + CORS allowlist + `/health` endpoints; CMS `PUT` gated. |
+| Structured data | **Supabase Postgres** (project `yucoydfekjmbiinvfhzg`, ap-southeast-1) | Backend uses the **service_role** key (bypasses RLS). RLS enabled with **47 policies across all 24 tables** (idempotent via `node backend/scripts/apply-rls.js`; fixed gaps in `courses`/`event_rsvps`/`job_applicants`). |
 | Flexible data | **MongoDB Atlas** (cluster0.e6leqhx.mongodb.net, db `nadagurukulam`) | CMS blocks first (`cms_blocks`); lesson plans, feedback forms, notifications later. API-layer enforcement. **Gotcha:** Node's c-ares rejects Atlas's DNS SRV response (`querySrv EBADRESP`) even though the OS resolves it — use the standard `mongodb://` multi-host URI (hosts `ac-fcvmszr-shard-00-0[0-2]`, replicaSet `ac-fcvmszr-shard-0`, `tls=true`, `authSource=admin`) instead of `mongodb+srv://`. Connection is optional at boot: if Mongo is down, Postgres modules keep working and `/api/cms/*` returns 503. |
-| Auth | **Supabase Auth** — **not wired yet** | The "login" is a role picker over the `roles` table; fine for build/preview, must be replaced before any real use. |
+| Auth | **Supabase Auth** — **wired** | `frontend/lib/supabase.js` uses anon key; `backend/server.js:authMiddleware` verifies JWT via `supabase.auth.getUser(token)` → `auth_user_id` lookup; `frontend/app/page.js:apiCall` injects `Bearer` + 401→login. No role picker. |
 | Live classes | **Jitsi Meet** | Free, no caps, self-hostable later. Room links generated from timetable slots. |
 | Files | Supabase Storage + short-lived signed URLs (design in §6-era Phase 4 spec) | Swap to R2/B2 later without breaking links. |
 | Languages | English only at launch; CMS blocks carry `locale` from day one | |
@@ -88,7 +88,7 @@ Academic: `disciplines`, `courses` (has `course_type` text), `course_modules`, `
 Scheduling/live: `timetable_slots`, `live_sessions` (`start_time` nullable, `room_link`), `session_attendance`.
 Documents: `documents`, `document_access_log`.
 Public: `events`, `event_rsvps`, `jobs`, `job_applicants`, `enquiries`.
-Migration SQL files (idempotent, run via Supabase SQL Editor or `backend/scripts/apply-schema.js` once the DB password is reset — a ** Supabase DB password reset is still pending**, `postgres` role password auth fails): `specs/phase4-supabase-schema.sql`, `specs/supabase-courses-migration.sql`, `specs/supabase-course-types-migration.sql`, `specs/supabase-roles-migration.sql`.
+Migration SQL files (all idempotent, via `DATABASE_URL` with `pg`): schema via `node backend/scripts/apply-schema.js`, RLS+auth link via `node backend/scripts/apply-rls.js` (47 policies + `supabase-auth-user-link.sql` trigger). `specs/phase4-supabase-schema.sql`, `supabase-courses-migration.sql`, `supabase-course-types-migration.sql`, `supabase-roles-migration.sql`, `supabase-rls-policies.sql`, `supabase-auth-user-link.sql`.
 
 ### MongoDB collections — Atlas, API-layer-enforced
 `cms_blocks` (one doc per public-site section; `key` unique, `content` Mixed; `home` holds heroHeading/heroTagline/heroLede/disciplinesHeading/disciplinesSub), then later `curriculum_content`, `lesson_plans`, `feedback_forms`/`feedback_responses`, `notifications`.
@@ -199,11 +199,9 @@ Phase 2's page-by-page public-site spec (About, Admissions, Events, Jobs, Contac
 
 ## 8. Open items
 
-- **Auth + RLS hardening (blocks any public deployment):** wire Supabase Auth, enforce role_permissions server-side, write RLS policies, add the Admin-approves gates server-side. The backend must not be exposed publicly before this.
-- **Supabase DB password reset** — `apply-schema.js` can't connect (`password authentication failed for user "postgres"`); migrations have been run manually via the Supabase SQL Editor so far. Reset the password to re-enable scripted migrations.
-- **Deployment (Vercel + Render + CI)** — blocked behind auth hardening.
-- **Per-user scoping ("Own"/"Self")** needs real auth identities; today the role picker grants whole-role access.
-- **Remaining hardcoded-content audit (client sign-off pending):** timetable conflict detection is client-side only (should move server-side); public site beyond the homepage is still static Phase-2-era design; footer/contact details.
+- **Auth + RLS hardening — DONE (2026-09-11):** Supabase Auth JWT + `auth_user_id` link + server-side `role_permissions` + `Own`/`Self` scoping + publish gates + timetable conflict + CORS allowlist + RLS 47 policies (idempotent, verified via `apply-rls.js` ×2). No longer blocks deploy.
+- **Deployment (Vercel + Render + CI)** — unblocked; `render.yaml` + `vercel.json` + `/health` ready. Needs `SUPABASE_URL`/`SERVICE_ROLE`/`MONGODB_URI`/`FRONTEND_URL` env on Render + `NEXT_PUBLIC_*` on Vercel.
+- **Remaining hardcoded-content audit (client sign-off pending):** public site beyond the homepage is still static Phase-2-era design; footer/contact details.
 - **Domain access (action on Srinivas):** restore registrar/DNS control of `nadagurukulam.org`.
 - **Content TBD from client:** admissions eligibility criteria, fee/cost line, institution phone number.
 - **Two-factor auth for Super Admin/Admin** — deferred to the auth pass.
