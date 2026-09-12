@@ -349,6 +349,37 @@ const cmsBlockSchema = new mongoose.Schema({
 }, { timestamps: true, collection: 'cms_blocks' });
 const CmsBlock = mongoose.models.CmsBlock || mongoose.model('CmsBlock', cmsBlockSchema, 'cms_blocks');
 
+const curriculumContentSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true, index: true },
+  content: { type: mongoose.Schema.Types.Mixed, default: {} },
+}, { timestamps: true, collection: 'curriculum_content' });
+const CurriculumContent = mongoose.models.CurriculumContent || mongoose.model('CurriculumContent', curriculumContentSchema, 'curriculum_content');
+
+// Curriculum detailed syllabus content endpoint
+app.get('/api/curriculum-content/:key', async (req, res) => {
+  try {
+    if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
+    const doc = await CurriculumContent.findOne({ key: req.params.key }).lean();
+    res.json(doc ? { key: doc.key, content: doc.content } : { key: req.params.key, content: null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/curriculum-content/:key', authMiddleware, async (req, res) => {
+  try {
+    if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
+    const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+    if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
+      return res.status(403).json({ error: 'You do not have Manage access for curriculum content.' });
+    }
+    const doc = await CurriculumContent.findOneAndUpdate(
+      { key: req.params.key },
+      { key: req.params.key, content: req.body },
+      { upsert: true, new: true, runValidators: true }
+    ).lean();
+    res.json({ key: doc.key, content: doc.content });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Every editable public-site section is a cms_blocks document: one doc per block.
 app.get('/api/cms', async (req, res) => {
   try {

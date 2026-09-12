@@ -1,0 +1,489 @@
+[
+  {
+    "metadata": {
+      "semester": "1: Fundamental Grammar"
+    },
+    "modules": [
+      {
+        "module_number": 1,
+        "title": "Basic Vocabulary : Study of Nada, Shruti, Swara (Shuddha/Vikrit), Saptak, and the concept of Laya.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Raga Characteristics : Vadi, Samvadi, Anuvadi, Vivadi, Varjya, and Vakra swaras.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Thaat & Time Theory : The 10 Thaat system of Pt. Bhatkhande; Classification of Ragas by time (Purvanga/Uttaranga).",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Raga Lakshana : Detailed study of 5 foundational Ragas (e.g., Yaman, Alhaiya Bilawal, Bhairav).",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Notation Systems : Mastery of Pt. V.N. Bhatkhande and Pt. V.D. Paluskar notation for melody and rhythm.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Major Vocal Forms : Structural study of Dhrupad, Dhamar, and Khayal (Vilambit/Drut).",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Secondary Forms : Definition and characteristics of Tarana, Trivat, Chaturang, and Sargam Geet.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Early Treatises : Overview of Natyasastra and Dattilam regarding Vocal music.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Ancient Era : Study of Matanga’s Brihaddesi and the emergence of the Raga concept.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Medieval Era : Sangita Ratnakara of Sharngadeva—an overview of the Saptadhyayi.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Transition Period : Swaramela Kalanidhi and the works of Ahobala (Sangit Parijat).",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Institutionalization : The role of music conferences and the contributions of Pt. Bhatkhande.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Tala Fundamentals : Matra, Vibhag, Sam, Khali, Tali, and the 10 Pranas of Tala.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Major Talas : Study of Teental, Ektal, Jhaptal, Rupak, Chautal, Dhamar.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Layakari : Mathematical notation of Dugun, Tigun, Chaugun, and Ari/Kuad ($1.5$ speed).",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Accompaniment Ethics : Relationship between the vocalist and the Tabla player.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Origin of Gharanas : Socio-cultural factors and the transition from Dhrupad to Khayal.",
+        "hours": null,
+        "topics": [
+          "cultural factors and the transition from Dhrupad to Khayal"
+        ],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Major Khayal Gharanas : Gwalior, Agra, Kirana, Jaipur-Atrauli, Patiala.",
+        "hours": null,
+        "topics": [
+          "Atrauli, Patiala"
+        ],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Stylistic Differences : Analyzing Tan-patterns, Meend, and Kanas across different schools.",
+        "hours": null,
+        "topics": [
+          "patterns, Meend, and Kanas across different schools"
+        ],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Biographies : Life and work of Tansen, Sadarang-Adarang, and 20th-century pioneers.",
+        "hours": null,
+        "topics": [
+          "Adarang, and 20th-century pioneers"
+        ],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Rasa Theory : The Rasa Sutra and its application in Hindustani performance.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Semi-Classical Genres : Aesthetics of Thumri, Tappa, Dadra, and Bhajan.",
+        "hours": null,
+        "topics": [
+          "Classical Genres : Aesthetics of Thumri, Tappa, Dadra, and Bhajan"
+        ],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Folk Influences : Study of Maand, Baul, and Bhatiyali and their interaction with classical music.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Concert Planning : Principles of choosing Ragas based on time and audience dynamics.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Research Methodology in Music",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Teaching & Research Aptitude (Paper 1 Core)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Logical Reasoning & Higher Education System (Paper 1 Core)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Musicological Research & Fieldwork Techniques",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "The Research Dissertation (Project Work).",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Professional Music Management & Law.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Advanced Pedagogy & Practical Teaching.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "UGC NET & JRF Intensive Review.",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      }
+    ],
+    "objectives": [],
+    "outcomes": [],
+    "assessments": [],
+    "raw_text": "HINDUSTANI VOCAL THEORY\n\nYear 1: Structural Foundations\n\nSemester 1: Fundamental Grammar\n\nModule 1: Basic Vocabulary : Study of Nada, Shruti, Swara (Shuddha/Vikrit), Saptak, and the concept of Laya.\n\nModule 2: Raga Characteristics : Vadi, Samvadi, Anuvadi, Vivadi, Varjya, and Vakra swaras.\n\nModule 3: Thaat & Time Theory : The 10 Thaat system of Pt. Bhatkhande; Classification of Ragas by time (Purvanga/Uttaranga).\n\nModule 4: Raga Lakshana : Detailed study of 5 foundational Ragas (e.g., Yaman, Alhaiya Bilawal, Bhairav).\n\nMethodology: Lecture-demonstrations using the Harmonium/Tanpura for interval identification.\n\nSemester 2: Notation & Classical Forms\n\nModule 1: Notation Systems : Mastery of Pt. V.N. Bhatkhande and Pt. V.D. Paluskar notation for melody and rhythm.\n\nModule 2: Major Vocal Forms : Structural study of Dhrupad, Dhamar, and Khayal (Vilambit/Drut).\n\nModule 3: Secondary Forms : Definition and characteristics of Tarana, Trivat, Chaturang, and Sargam Geet.\n\nModule 4: Early Treatises : Overview of Natyasastra and Dattilam regarding Vocal music.\n\nMethodology: Notation workshops where students transcribe recorded Bandishes.\n\nYear 2: History & Rhythm\n\nSemester 3: Historical Treatises\n\nModule 1: Ancient Era : Study of Matanga’s Brihaddesi and the emergence of the Raga concept.\n\nModule 2: Medieval Era : Sangita Ratnakara of Sharngadeva—an overview of the Saptadhyayi.\n\nModule 3: Transition Period : Swaramela Kalanidhi and the works of Ahobala (Sangit Parijat).\n\nModule 4: Institutionalization : The role of music conferences and the contributions of Pt. Bhatkhande.\n\nMethodology: Comparative textual analysis and student-led seminars on historical shifts.\n\nSemester 4: The Tala System\n\nModule 1: Tala Fundamentals : Matra, Vibhag, Sam, Khali, Tali, and the 10 Pranas of Tala.\n\nModule 2: Major Talas : Study of Teental, Ektal, Jhaptal, Rupak, Chautal, Dhamar.\n\nModule 3: Layakari : Mathematical notation of Dugun, Tigun, Chaugun, and Ari/Kuad ($1.5$ speed).\n\nModule 4: Accompaniment Ethics : Relationship between the vocalist and the Tabla player.\n\nMethodology: Rhythmic drills (clapping/recitation) and mathematical calculation of Tihais.\n\nYear 3: Style & Aesthetics\n\nSemester 5: The Gharana System\n\nModule 1: Origin of Gharanas : Socio-cultural factors and the transition from Dhrupad to Khayal.\n\nModule 2: Major Khayal Gharanas : Gwalior, Agra, Kirana, Jaipur-Atrauli, Patiala.\n\nModule 3: Stylistic Differences : Analyzing Tan-patterns, Meend, and Kanas across different schools.\n\nModule 4: Biographies : Life and work of Tansen, Sadarang-Adarang, and 20th-century pioneers.\n\nMethodology: Comparative listening using archival audio to identify stylistic markers.\n\nSemester 6: Aesthetics & Semi-Classical Forms\n\nModule 1: Rasa Theory : The Rasa Sutra and its application in Hindustani performance.\n\nModule 2: Semi-Classical Genres : Aesthetics of Thumri, Tappa, Dadra, and Bhajan.\n\nModule 3: Folk Influences : Study of Maand, Baul, and Bhatiyali and their interaction with classical music.\n\nModule 4: Concert Planning : Principles of choosing Ragas based on time and audience dynamics.\n\nMethodology: Creative workshops on Bhava (expression) and guest artist interactions.\n\nYear 4: Research & Teaching Aptitude, Dissertation and UGC NET\n\nSemester 7: Musicology, Teaching & Research Aptitude\n\nModule 1: Research Methodology in Music\n\nModule 2: Teaching & Research Aptitude (Paper 1 Core)\n\nModule 3: Logical Reasoning & Higher Education System (Paper 1 Core)\n\nModule 4: Musicological Research & Fieldwork Techniques\n\nSemester 8: Dissertation & UGC NET\n\nModule 1: The Research Dissertation (Project Work).\n\nModule 2: Professional Music Management & Law.\n\nModule 3: Advanced Pedagogy & Practical Teaching.\n\nModule 4: UGC NET & JRF Intensive Review.\n\nMethodology: Mock NET exams and hands-on training with notation software.",
+    "source_file": "HINDUSTANI VOCAL THEORY.docx",
+    "processed_date": "2026-09-12T10:32:23.894932"
+  },
+  {
+    "metadata": {
+      "type": "s: * Varja Ragas (omitted notes).",
+      "code": "the mathematical logic behind the 72 Melakarta system using the Katapayadi formula.",
+      "semester": "Hours: 45 Hours",
+      "credits": "3"
+    },
+    "modules": [
+      {
+        "module_number": 1,
+        "title": "Musical Terminology & Sangeetha Lakshana",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "The 72 Melakarta Scheme",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Raga Classification (Janaka & Janya)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Early Compositional Forms",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "The Art and Evolution of South Indian Notation System",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Pitamaha & Early Composers",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Ancient Tamil Musicology (Silappadikaram)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Voice Culture & Physiology",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "The Tala Dasa Pranas",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "The 35 Tala Scheme & Jati Variations",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "The Concept of Graha (Eduppu) & Its Types",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Yati and Rhythmic Geometry",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "The Varnam – The Master Architect",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "The Kirtana & Kriti (Devotional & Artistic Forms)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Comparative Study: Carnatic vs. Hindustani",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "The Grammar of Manodharma & Introduction to Advanced Improvisation",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Historical Treatises & Lexicons",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Raga Lakshana (Standard Raga Study)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "The Trinity of Carnatic Music and the Post-Trinity Era",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Vaggeyakara Mudras & Signatures",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "The Modern Concert Era - Evolution & Innovation",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "The Art of Accompaniment & Concert Ethics",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Concepts of Rasa and Bhava in Performance",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Principles of Concert Planning (Katcheri Dharma)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "Research Methodology in Music",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Teaching & Research Aptitude (Paper 1 Core)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Logical Reasoning & Higher Education System (Paper 1 Core)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "Musicological Research & Fieldwork Techniques",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 1,
+        "title": "The Research Dissertation (Project Work)",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 2,
+        "title": "Professional Music Management & Law",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 3,
+        "title": "Advanced Pedagogy & Practical Teaching",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      },
+      {
+        "module_number": 4,
+        "title": "UGC NET & JRF Intensive Review",
+        "hours": null,
+        "topics": [],
+        "co_mapping": null
+      }
+    ],
+    "objectives": [],
+    "outcomes": [],
+    "assessments": [],
+    "raw_text": "CARNATIC VOCAL THEORY\n\nProgram Outcomes (POs)\n\nUpon completion of the 4-year BPA program, students will be able to:\n\nPO1: Demonstrate mastery over the theoretical and practical aspects of Carnatic music.\n\nPO2: Analyze and interpret ancient musical treatises in a modern context.\n\nPO3: Perform complex Manodharma (improvisational) aspects with creative and technical precision.\n\nPO4: Conduct independent research in musicology using standardized methodologies.\n\nPO5: Qualify for competitive academic exams like UGC NET/JRF for higher research.\n\nTheory Syllabus Structure\n\nTotal Credits: 3\n\nTotal Semester Hours: 45 Hours\n\nDistribution: 4 Modules per Semester\n\nHours per Module: ~11 Hours\n\nSemester 1: Fundamental Concepts & Melakarta\n\nCourse Objectives (COb)\n\nTo introduce the technical vocabulary and grammatical foundations of Carnatic music.\n\nTo decode the mathematical logic behind the 72 Melakarta system using the Katapayadi formula.\n\nTo develop the ability to categorize Ragas based on their structural characteristics.\n\nTo understand the evolution of early musical forms from basic exercises to structured compositions.\n\nCourse Outcomes (CO)\n\nUpon completion of this course, the student will be able to:\n\nCO1: Define and explain core musical terminologies and the concept of Sangeetha Lakshana.\n\nCO2: Calculate the position and swara nomenclature of any Melakarta raga using the Katapayadi Sankhya.\n\nCO3: Analyze and classify Janya ragas based on their relationship with parent scales.\n\nCO4: Distinguish between various early compositional forms through structural and melodic analysis.\n\nPedagogy\n\nClassroom Lecture, Audio Demonstrations,\n\nProblem-solving workshops, Logic puzzles\n\nComparative Analysis, Listening Sessions\n\nGuided listening, Structural mapping\n\nSemester 1: Module-wise Detailed Syllabus\n\nModule 1: Musical Terminology & Sangeetha Lakshana\n\nThe Origin of Sound: Study of Nada—classification into Ahata (man-made/struck) and Anahata (natural/unstruck) sounds;   the three levels of sound intensity (Mandhra, Madhya, Tara).\n\nShruti & Swara: Definition & introduction of the 22 Shrutis (lineage of pitch/microtones) and the 12 Swarasthanas (semitones).\n\nSwara nomenclature: Detailed study of the 12 Swarasthanas and the 16 names (Shodasa Swara); system used in Carnatic music to identify variants of Ri, Ga, Dha, and Ni.\n\nSthayi & Laya: Understanding Sthayi (octave), and the three speeds of rhythm Laya (tempo; Prathama, Dwitiya, Tritiya), and the concept of Adhara Shadjam.\n\nCourse Outcomes – CO1RBT Levels – L1, L2\n\nModule 2: The 72 Melakarta Scheme\n\nLogic of the System: Introduction to the 72 parent ragas as codified by Venkatamakhin.\n\nThe Katapayadi Sankhya: The Sanskrit alphanumeric code used to determine a raga's number and notes.\n\nThe Chakra System: Classification of the 72 ragas into 12 Chakras (groups of 6), such as Indu, Netra, Agni, etc. Suddha & Prati Madhyama ragas - The division of the scheme into the first 36 (Purva) and the latter 36 (Uttara) Ragas.\n\nVivadi Swaras: Theoretical understanding of ragas containing dissonant intervals and their placement in the scheme.\n\nCourse Outcomes – CO2RBT Levels – L3, L4\n\nModule 3: Raga Classification (Janaka & Janya)\n\nParent and Derivative Ragas: The characteristics of a \"Parent\" Raga (Must be Sampurna, have same notes in ascent/descent etc.), relationship between Janaka (parent) and Janya (descendant) ragas.\n\nJanya Raga Sub-types: * Varja Ragas (omitted notes).\n\nVakra Ragas (Non-linear or zig-zag scales).\n\nUpanga and Bhashanga Ragas that stay strictly within the parent notes versus those that introduce \"foreign\" notes (Anya Swara).\n\nThe Concept of Anya Swara: How specific compositions introduce notes outside the parent scale for aesthetic beauty.\n\nGhanaraga Panchakam: Introduction and theoretical overview of the five “Ghana” (heavy) ragas (Nata, Gaula, Arabhi, Varali, Sri) traditionally used for deep improvisation.\n\nCourse Outcomes – CO3RBT Levels – L2, L4\n\nModule 4: Early Compositional Forms\n\nAbhyasa Gana: The educational repertoire of Carnatic music. The sequence of learning—Sarali Varisais, Jantai, Alankaram.\n\nGitam: Structural analysis of the simplest melodic form; The first melodic composition; study of Pillari and Sanchari Gitams; structural study of Lakshana Gitams (which describe raga grammar) and Lakshya Gitams.\n\nJatiswaram and Swarajati: Analysis of forms that blend rhythm (Jatis) with melody (Swaras); the transition from technical exercises to performance pieces. Distinguishing between forms that are purely melodic (Jatiswaram) and those that transitioned into dance and storytelling (Swarajati).\n\nNotation Symbols: Introduction to basic Solfa notation: signs for Aksharakala, pauses (Anudrutam), and octave dots.\n\nCourse Outcomes – CO4RBT Levels – L2, L5\n\nMethodology for Semester 1:\n\nMathematical Drills: Using the Katapayadi formula to calculate Raga numbers.\n\nComparative Listening: Identifying the difference between a Sampurna (complete) and Varja (incomplete) raga.\n\nNotation Training: Writing basic Gitams in the Indian Solfa system.\n\nLearning Resources\n\nPrimary Texts: South Indian Music (Volumes I-III) by Prof. P. Sambamoorthy.\n\nReference Books: The Spiritual Heritage of Tyagaraja by C. Ramanujachari; A Dictionary of South Indian Music by P. Sambamoorthy.\n\nDigital Tools: 'Melakarta' mobile apps for scale visualization; 'Sruti' software for frequency identification.\n\nMultimedia: Recorded archives of the Music Academy, Madras, for authentic demonstrations of early forms.\n\nSuggested Activities\n\nThe Katapayadi Challenge: Students are given names of rare Melas and must decode their number and swaras on the spot.\n\nRaga Mapping: Creating a \"Family Tree\" chart for a specific Melakarta (e.g., Mayamalavagowla) and its popular Janya ragas.\n\nForm Analysis: Listening to a Gitam and a Swarajati and drafting a technical table highlighting the structural differences (Presence of Sahitya, Tala complexity, etc.).\n\nAssessment Details\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nUnit Tests (10%): Short descriptive questions on terminology and Mela logic.\n\nAssignments (10%): A research paper on the \"Significance of 22 Shrutis in the Melakarta System.\"\n\nSeminar/Viva (10%): Oral examination on identifying the Chakra and Mela of a given raga name.\n\n2. Semester End Examination (SEE) - 70%\n\nSection A (Recall): Definition of 10 key terms (e.g., Anudhrutam, Vivadi Swara).\n\nSection B (Application): Detailed questions on the construction of the 72 Melakarta chart and the rules of the Katapayadi formula.\n\nSection C (Synthesis/Analysis): Essay-type questions comparing Janaka and Janya ragas or discussing the evolution of the Gitam form.\n\n*********\n\nSemester 2: Notation System, Early History, and Voice Culturing\n\nCourse Objectives (Cob)\n\nCob 1: To master the technicalities of the South Indian musical script and its evolution.\n\nCob 2: To analyze the life and contributions of Purandara Dasa and early pre-Trinity composers.\n\nCob 3: To explore the ancient Tamil musical landscape through the literary evidence of Silappadikaram.\n\nCob 4: To understand the anatomical and physiological basis of voice production and health.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO 1: Transcribe compositions into standardized Carnatic notation with rhythmic and melodic accuracy.\n\nCO 2: Understand the role of the Haridasa movement and early composers in shaping current pedagogical practices.\n\nCO 3: Correlate ancient Tamil Pans and instruments with modern Carnatic equivalents.\n\nCO 4: Apply principles of voice culture to enhance tonal quality and prevent vocal strain.\n\nPedagogy\n\nWorkshop Method: Hands-on transcription sessions from audio to script.\n\nBiographical Inquiry: Researching the sociopolitical context of the Pitamaha.\n\nInterdisciplinary Study: Using literature (Silappadikaram) to extract musicological data.\n\nDemonstration-Performance: Practical sessions on breathing and resonance.\n\nSemester 2: Module-wise Detailed Syllabus\n\nModule 1: The Art and Evolution of South Indian Notation System\n\nNotation Symbols: Mastery of symbols for different octaves (dots above/below), duration (commas, semicolons), and speed divisions. Symbols for first, second, and third speeds (Prathama, Dwitiya, Tritiya Kalam).\n\nStructural Notating: Techniques for notating a Swaravali or a Gitam with correct rhythmic subdivisions. Techniques for writing Varnams and Kritis including Pallavi, Anupallavi, and Charanam demarcations.\n\nGamaka Representation: Traditional and modern ways of indicating oscillations (Kampita), slides (Jaru), and stress (Spuritham) in text.\n\nComparative Scripting: A look at how notation has evolved from palm-leaf manuscripts to the standardized modern system. Bhatkhande-style Influence; Adapting symbols for different octaves (Sthayis) and rhythmic pulses (Akshara Kalas).\n\nCourse Outcomes – CO1RBT Levels – L3, L6\n\nModule 2: Pitamaha & Early Composers\n\nPurandara Dasa: The “Pitamaha” (Grandfather) of Carnatic music; his role in standardization of the grading system (Sarali to Alankaram); creating the Abhyasa Gana (foundational exercises); his social philosophy and the “Suladi” format.\n\nTallapaka Annamacharya: The pioneer of the Sankirtana tradition; structural analysis of Pallavi-Charanam format in his Adhyatma and Sringara compositions and his role in the Venkateswara temple tradition.\n\nDasa Sahitya: The spiritual and social philosophy behind the Devaranamas. How Kanaka Dasa and other used the “Ugabhoga” and “Devaranama” to bridge the gap between classical and folk devotion.\n\nBhadrachala Ramadasu: His influence on the Kirtana form and the development of devotional music.\n\nCourse Outcomes – CO2RBT Levels – L2, L4\n\nModule 3: Ancient Tamil Musicology (Silappadikaram)\n\nExploring the non-Sanskritic roots of South Indian music through Tamil literature.\n\nThe Epic of the Anklet: Contextual study of music and dance in Ilango Adigal’s Silappadikaram.\n\nThe Pan System: Study of ancient Tamil Pans and their equivalence to modern Ragas (e.g., Sempalaipalai to Harikambhoji).\n\nVatta-Palai & Yazh: Understanding the ancient circular mapping of notes and the evolution of the Yazh (ancient harp) into the Veena.\n\nKural, Thutham, Kaikkilai: Nomenclature of the seven notes in the ancient Tamil tradition.\n\nCourse Outcomes – CO3RBT Levels – L4, L5\n\nModule 4: Voice Culture & Physiology\n\nVocal Anatomy: The science of the larynx, the lungs, vocal cords, the role of the diaphragm in breath support, and the sinus cavities in resonance and pitch production.\n\nSadhakam (Practice) Techniques/Breathing Mechanics: Theoretical study of diaphragmatic breathing and breath-holding (Kumbhaka) for long phrases (Karvai). Traditional methods for developing “Sharira” (voice quality), flexibility, and volume control across three octaves, methods for developing Akara (vowel clarity), Bhruka (humming), and Humkara.\n\nAcoustics of the Voice – Range and Flexibility: Understanding how vowel sounds (Akara, Ikara, Ukara) change the shape of the oral cavity and affect tonal colour. Exercises to increase vocal reach across three octaves (Tristhayi).\n\nVocal Health: Ayurvedic and modern perspectives on maintaining the voice and preventing strain.\n\nCourse Outcomes – CO4RBT Levels – L3\n\nMethodology for Semester 2\n\nNotation Scripting Lab: Converting 17th-century palm-leaf style notation samples into modern standardized script to understand the evolution of symbols.\n\nComparative Charting: Mapping ancient Tamil Pans to their corresponding modern Melakarta ragas.\n\nLexical Mapping: Creating a \"Tamil-Sanskrit Music Glossary\" to correlate terms like Kural with Shadjam or Pan with Raga.\n\nBio-Acoustic Observation: Using real-time pitch-tracking software to visualize how different vowel shapes (Akara vs. Ikara) affect the harmonic resonance of the voice.\n\nTranscription Workshops: Converting a recorded melodic phrase into a written notation.\n\nDictation Drills: The teacher sings a phrase, and students must correctly notate it with octave and speed markings.\n\nBiographical Seminars: Student-led discussions on the impact of Purandara Dasa’s standardized teaching system. Comparing the lyrical styles of Purandara Dasa and Annamacharya.\n\nLearning Resources\n\nPrimary Text: Sangita Sampradaya Pradarshini (Subbarama Dikshitar) for notation study.\n\nHistory: The History of South Indian Music by R. Rangaramanuja Ayyangar.\n\nTamil Musicology: Pancha Marabu and translations of Silappadikaram (Arangetru Kadai).\n\nScience: Voice Culture by S.A.K. Durga.\n\nSuggested Activities\n\nNotation “Translation”: Taking a simple Western melody or a folk song and attempting to write it using Carnatic Solfa notation.\n\nThe Dasa Walk: A seminar on how Purandara Dasa structured the Sarali Varisais to build muscle memory in beginners.\n\nThe Virtual Museum: Exploring the instruments mentioned in Silappadikaram (like the Yazh) through digital museum archives.\n\nVocal Mapping: Using a biological chart to identify the diaphragm, vocal folds, and resonators during a practice session.\n\nAssessment Plan\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nNotation Lab (10%): A practical test where students must transcribe a recorded 4-line Gitam accurately.\n\nHistory Presentation (10%): A group presentation on the \"Pre-Trinity\" era and the evolution of the Kriti form.\n\nVoice Culture Practical (10%): Assessment of breath control and sustained pitch (Akaram) stability.\n\n2. Semester End Examination (SEE) - 70%\n\nPart A (20 Marks): Short questions on notation symbols, Dasa Sahitya, and Tamil Pans.\n\nPart B (30 Marks): Essay on the contribution of Purandara Dasa or the musical significance of the Arangetru Kadai.\n\nPart C (20 Marks): Technical analysis of the human vocal apparatus or the comparative logic between ancient and modern notation.\n\n*********\n\nSemester 3: Tala Dasa Pranas & Rhythmic Geometry\n\nCourse Objectives (Cob)\n\nCob 1: To analyze the ten vital elements (Tala Dasa Pranas) that govern the life and movement of rhythm.\n\nCob 2: To master the mathematical logic of the 35 Tala Scheme through the permutation of Suladi Sapta Talas and Jati variations.\n\nCob 3: To understand the concept of Graha (Eduppu) and its role in the aesthetic placement of a composition within a rhythmic cycle.\n\nCob 4: To explore the visual and structural patterns of Yati and their application in sophisticated melodic and rhythmic designs.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO 1: Evaluate the structural integrity of any Tala based on the Dasa Prana framework.\n\nCO 2: Calculate and demonstrate the total Akshara Kalas of any Tala within the 35-Tala system.\n\nCO 3: Identify and execute different Eduppus (Grahas) in varied compositions to maintain rhythmic equilibrium.\n\nCO 4: Design rhythmic patterns using different Yati structures (Gopucha, Srotovaha, etc.) in both melody and rhythm.\n\nPedagogy\n\nMathematical Workshops: Step-by-step derivation of Tala counts using Jati and Gati permutations.\n\nRhythmic Visualization: Using diagrams to map Yati patterns and Graha placements.\n\nPractical Drills: Hands-on training in keeping “Thalam” while executing complex “Eduppus.”\n\nComparative Analysis: Studying different compositions to see how “Pranas” like Laya and Marga are applied.\n\nSemester 3: Module-wise Detailed Syllabus\n\nModule 1: The Tala Dasa Pranas\n\nThe Ten Life-Breaths: Detailed study of the five physical and five mental aspects of Tala: Kaala, Marga, Kriya, Anga, Graha, Jati, Kalai, Laya, Yati, and Prastara.\n\nKaala & Marga: Understanding the units of time and the “pathway” of the rhythm (e.g., Dakshina, Vartika, Chitra).\n\nKriya: Classification into Nishabda (silent) and Sashabda (sounded) movements of the hand.\n\nAngas: Beyond the Shadangas—understanding the role of Anudhrutam, Dhrutam, Laghu, Guru, Plutam, and Kakapadam.\n\nCourse Outcomes – CO1 RBT Levels – L2, L5\n\nModule 2: The 35 Tala Scheme & Jati Variations\n\nThe Suladi Sapta Talas: Definition and structure of the seven basic talas: Dhruva, Matya, Rupaka, Jhampa, Triputa, Ata, and Eka.\n\nJati Permutations: The impact of changing the Laghu value (Trisra, Chaturasra, Khanda, Misra, Sankeerna) on the seven talas to create the 35-tala matrix.\n\nThe 175 Tala Concept: A theoretical introduction to how the 35 talas expand into 175 through the application of the five Gatis (pulses).\n\nPractical Calculation: Calculating the total Matra and Akshara counts for complex talas like Misra Jati Jhampa Tala or Khanda Jati Ata Tala.\n\nCourse Outcomes – CO2 RBT Levels – L3, L4\n\nModule 3: The Concept of Graha (Eduppu) & Its Types\n\nDefinition of Graha: The starting point of the song (Sahitya) in relation to the starting point of the Tala cycle.\n\nSama Graha: When the song and the tala start simultaneously.\n\nVishama Graha: Detailed study of \n\nAnagata (song starts after the tala)\n\nAtita (song starts before the tala).\n\nMathematical Precision: Calculating Eduppu in terms of Matras and Aksharas for various Kritis and Varnams.\n\nCourse Outcomes – CO3 RBT Levels – L3, L4\n\nModule 4: Yati and Rhythmic Geometry\n\nThe Six Yatis: Structural analysis of rhythmic flow: Sama, Gopucha (cow’s tail), Srotovaha (river flow), Damaru (hourglass), Mridanga (drum shape), and Vishama.\n\nYati in Sahitya: Examples from Muthuswami Dikshitar’s compositions (e.g., Tyagaraja Yoga Vaibhavam) where words follow geometric patterns.\n\nYati in Kalpanaswaras: Learning to build rhythmic ending patterns (Korvais) using Srotovaha and Gopucha logic.\n\nCourse Outcomes – CO4 RBT Levels – L4, L6\n\nMethodology for Semester 3:\n\nTala Charting: Creating a visual matrix of the 35 talas with their specific Anga notations.\n\nEduppu Drills: Listening to 10 different compositions and identifying whether the Graha is Sama or Vishama.\n\nPattern Design: Students will be asked to write a simple 4-bar rhythmic phrase following a Srotovaha Yati (gradually increasing length).\n\nMnemonic Recitation (Konnakol): Reciting the Jatis of the 35 talas to internalize the varied Laghu lengths.\n\nLearning Resources\n\nPrimary Text: South Indian Music (Book IV) by Prof. P. Sambamoorthy.\n\nReference: Laya Vadyas by Prof. P. Sambamoorthy.\n\nDigital: ‘Tala Keeper’ apps and metronomes for practice.\n\nPerformance Analysis: Videos of Tani Avartanams (percussion solos) to observe Dasa Pranas in action.\n\nSuggested Activities\n\nThe Tala Quiz: Identifying the Jati of a Tala based on a provided hand gesture sequence.\n\nGeometric Composition: Writing a short verse where the number of syllables follows a Gopucha Yati (decreasing syllables).\n\nEduppu Mapping: Using a stopwatch or metronome to mark the exact beat where the Anagata Graha of a popular Kriti falls.\n\nAssessment Plan\n\nContinuous Internal Evaluation (CIE) – 30%\n\nMathematical Test (10%): Calculating the Akshara counts for a set of 5 Suladi Talas with mixed Jatis.\n\nYati Project (10%): Designing a rhythmic Korvai based on the Mridanga Yati pattern.\n\nPractical Viva (10%): Demonstrating the five Jatis through hand gestures while maintaining a constant tempo.\n\nSemester End Examination (SEE) – 70%\n\nPart A (20 Marks): Short technical questions on the names of the Dasa Pranas and Yatis.\n\nPart B (30 Marks): Detailed essay on the 35 Tala Scheme or the classification of Vishama Grahas.\n\nPart C (20 Marks): Solving rhythmic problems involving Matra calculations and Anga notation for specific Talas.\n\n*********\n\nSemester 4: Advanced Compositional Structures, Comparative Study & Manodharma\n\nCourse Objectives (Cob)\n\nCob1: To analyze the architectural complexity of the Varnam as the foundational blueprint for Raga and Tala.\n\nCob2: To distinguish between the structural and aesthetic nuances of Kirtana and Kriti forms.\n\nCob3: To perform a comparative analysis of the scales and performance philosophies of Carnatic and Hindustani systems.\n\nCob4: To establish a theoretical framework for the five branches of Manodharma Sangeetha.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO1: Deconstruct the structural elements of Tana and Pada Varnams and explain their pedagogical significance.\n\nCO2: Identify the evolution of the Kriti form through the contributions of the Trinity and post-Trinity composers.\n\nCO3: Correlate Carnatic Ragas with their Hindustani counterparts and analyze differences in ornamentation.\n\nCO4: Understand the grammatical rules governing Alapana, Kalpanaswara, and Niraval.\n\nPedagogy\n\nStructure Mapping: Analyzing concert recordings to identify transition points between composed and improvised sections.\n\nComparative Listening: Side-by-side audio analysis of Carnatic and Hindustani interpretations of similar scales.\n\nInquiry-Based Learning: Researching the shift from the devotional Kirtana to the art-focused Kriti.\n\nAnalytical Transcription: Mapping the mathematical permutations used in professional-level Kalpanaswaras.\n\nSemester 4: Module-wise Detailed Syllabus\n\nModule 1: The Varnam – The Master Architect\n\nStructural Anatomy: Detailed study of Pallavi, Anupallavi, Muktayi Swara, Charanam, and Chittaswaras.\n\nTana vs. Pada Varnam: Comparing the rhythmic focus and technical speed of Tana Varnams with the melodic, emotive, and Sahitya-rich Pada Varnams used in dance.\n\nPedagogical Significance: Why the Varnam is considered the “Grammar of the Raga”; its role in developing Gatra Dharma (voice culture) and Tala stability.\n\nGhanaraga Panchaka Varnams: Introduction to the importance of the five major ragas through the Varnam format.\n\nCourse Outcomes – CO1 RBT Levels – L4, L5\n\nModule 2: The Kirtana & Kriti (Devotional & Artistic Forms)\n\nThe Kirtana: Evolution of the devotional form; focus on Nama Siddhanta and simple melodic structures; study of Annamayya’s compositions, the Divyanama and Utsava Sampradaya Kirtanas.\n\nThe Kriti: The peak of “Art Music”; study of the sophisticated Pallavi-Anupallavi-Charanam structure; the introduction of Sangatis (variations) by Tyagaraja.\n\nPost-Trinity Innovations: Study of the Swara-sahitya, Madhyamakala Sahitya, and Chittaswaras added to Kritis to enhance complexity.\n\nLyrical Components: Understanding the role of Mudra (composer’s signature), Prosody (Prasa, Yati, Anuprasa), and Rasa.\n\nCourse Outcomes – CO2 RBT Levels – L2, L4\n\nModule 3: Comparative Study: Carnatic vs. Hindustani\n\nSystemic Overlap: Historical divergence of the two systems; identifying common roots in ancient texts (13th-14th Century).\n\nScale Systems: \n\nComparing the 72 Melakarta (mathematical) system of the South with the 10 Thaat (classification-based) system of the North. \n\nComparative study of major scales: Sankarabharanam vs. Bilawal, Mayamalavagowla vs. Bhairav, Kalyani vs. Yaman, Todi vs. Bhairavi.\n\nRhythmic Structures: \n\nDetailed study of Tala vs. Taal; \n\nThe concept of the Laghu (variable) vs. the Theka (fixed patterns).\n\nPerformance Aesthetics: \n\nComparison of the Katcheri format vs. the Khayal format; \n\nThe difference between Gamaka (oscillations) and Meend (glides).\n\nTerminology Translation: Mapping Southern terms to Northern equivalents (e.g., Mela to Thaat, Tala to Taal, Sruti to Sur).\n\nCourse Outcomes – CO3 RBT Levels – L4, L5\n\nModule 4: The Grammar of Manodharma & Introduction to Advanced Improvisation\n\nThe Five Branches: \n\nTheoretical introduction to Raga Alapana, Niraval, Kalpanaswara, Ragam-Tanam-Pallavi (RTP), and Pallavi.\n\nRagam-Tanam-Pallavi (RTP) Overview: Brief theoretical introduction to the pinnacle of Manodharma.\n\nAlapana Paddhati: The stages of Raga exploration—Akshiptika (Introduction), Ragavardhani (Expansion), Makharini (Conclusion), Vidari, and Sthayi.\n\nKalpanaswaras (Swarakalpana):\n\nSarvalaghu: Flowing, natural rhythmic patterns.\n\nKanakkus: Mathematical, calculated rhythmic patterns ending in Tihais or Korvais. \n\nIntroduction to Sarvalaghu (flow-based) vs. Kanaka-Rakta (calculated) swara permutations.\n\nEthics of Improvisation: \n\nMaintaining the Raga Swaroopa while exploring creativity; the role of the accompanist during Manodharma.\n\nUnderstanding the “Dos and Don’ts” of staying within a Raga’s identity during spontaneous singing.\n\nCourse Outcomes – CO4 RBT Levels – L2, L3\n\nMethodology for Semester 4:\n\nConcert Deconstruction: Students will listen to a 90-minute concert and timestamp every transition from Kalpita (composed) to Manodharma (improvised) music.\n\nRaga Comparison Project: Developing a chart that lists 10 Carnatic Ragas alongside their Hindustani equivalents and noting three distinct differences in phrasing.\n\nStructural Charting: Creating a visual map of a heavy Tyagaraja Kriti showing the progression of Sangatis.\n\nImprovisation Journal: Writing down five potential Niraval lines from known Kritis and justifying why they are rhythmically suitable.\n\nLearning Resources\n\nPrimary Text: South Indian Music (Book V) by Prof. P. Sambamoorthy.\n\nReference: The Ragas of North India by Walter Kaufmann; Great Composers by P. Sambamoorthy.\n\nDigital: Comparative playlists on Spotify/YouTube featuring artists like M.S. Subbulakshmi and Pt. Bhimsen Joshi on similar ragas.\n\nSuggested Activities\n\nThe “Mela-Thaat” Quiz: Fast-paced identification of the Hindustani Thaat for a given Carnatic Melakarta.\n\nVarnam Analysis: Taking a notation of a Varnam and circling the Jiva Swaras (life-giving notes) highlighted in the Muktayi Swara section.\n\nSangati Tracking: Singing a simple line and creating four different Sangatis that progressively increase in melodic complexity.\n\nAssessment Plan\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nComparative Essay (10%): A 1000-word paper on \"The influence of the Persian system on the Hindustani-Carnatic divide.\"\n\nStructural Analysis Test (10%): Identifying the parts of a Varnam or Kriti from a provided notation sheet.\n\nViva Voce (10%): Explaining the rules of Raga Alapana for a specific chosen Raga.\n\n2. Semester End Examination (SEE) - 70%\n\nPart A (20 Marks): Short questions on the definitions of Mudra, Sangati, Thaat, and Manodharma.\n\nPart B (30 Marks): Essay questions comparing Kirtana and Kriti or Tana and Pada Varnams.\n\nPart C (20 Marks): Technical mapping of the Dasa Vidha Gamakas in a specific Varnam or comparing the treatment of Raga Kalyani across both Indian systems.\n\n*********\n\nSemester 5: The Historical Treatises, Raga Lakshanas & The Trinity\n\nCourse Objectives (COb)\n\nCOb1: To master the standardized technical profile (Raga Lakshana) of major, minor, and rare Ragas.\n\nCOb2: To analyze the historical evolution of musicology through a chronological study of Treatises and Lexicons.\n\nCOb3: To evaluate the life, distinct musical styles, and transformative contributions of the Musical Trinity and their disciples.\n\nCOb4: To decode the hidden identities and poetic significance of Vaggeyakara Mudras and composer signatures.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO1: Document and present a detailed technical profile of any given Raga, including its Arohana-Avarohana, Jiva Swaras, and Sancharas.\n\nCO2: Compare and contrast the theories presented in seminal texts like the Natya Shastra, Brihaddesi, and Swaramelakalanidhi.\n\nCO3: Distinguish between the compositional \"banis\" (styles) of Tyagaraja, Muthuswami Dikshitar, and Syama Sastri.\n\nCO4: Identify the composer of a Kriti by analyzing its Ankita Mudra and structural characteristics.\n\nPedagogy\n\nLexicon Research: Mapping modern Raga identities to ancient definitions found in historical treatises.\n\nBiographical Deconstruction: Study of the Trinity's life through the lens of their specific compositional \"blueprints\" (e.g., Ghana Ragas vs. Vibhakti Kritis).\n\nLakshana Workshops: Collaborative building of Raga \"Bio-data\" files using historical and contemporary sources.\n\nSignature Hunting: Analyzing lyrical texts to find subtle or hidden Mudras across different centuries of composers.\n\nSemester 5: Module-wise Detailed Syllabus\n\nModule 1: Historical Treatises & Lexicons\n\nAncient Era: Study of Bharata’s Natya Shastra (concept of Jaati and Gramas) and Matanga’s Brihaddesi (the first definition of \"Raga\").\n\nMedieval Era: Analysis of Sarngadeva’s Sangita Ratnakara and Ramamatya’s Swaramelakalanidhi (evolution of the Mela concept).\n\nModern Bridge: Somanatha’s Ragavibodha and Govinda’s Sangraha Chudamani (the 72 Melakarta scheme refinement).\n\nLexical Evolution: How the terminology of the Shruti and Swara shifted through these texts over a millennium.\n\nCourse Outcomes – CO2 RBT Levels – L4, L5\n\nModule 2: Raga Lakshana (Standard Raga Study)\n\nTechnical Parameters: Detailed study of Arohana-Avarohana, Varjya/Vakra patterns, and classification (Upanga/Bhashanga).\n\nThe main Characteristics of a Raga: \n\nRaga Dasa Lakshanas as per Bharata’s Natya Sastra (4th Century B.C.) and \n\nRaga Trayodasa Lakshanas as per the Sarangadeva’s Sangita Ratnakara (13th Century A.D.). \n\nUnderstanding Graha, amsa, tara, mandra, nyasa, apanyasa, sanyasa, vinyasa, bahutva, alpatva, antara marga, shadava and audava.\n\nStandard Study of Ragas: Extensive profile building for:\n\nMajor Ragas: Todi, Sankarabharanam, Kalyani, Bhairavi, Kambhoji.\n\nJanya & Minor Ragas: Mohanam, Hamsadhwani, Anandabhairavi, Sahana, Ritigowla.\n\nSanchara Documentation: Writing characteristic phrases that define the Swaroopa (personality) of the Raga.\n\nCourse Outcomes – CO1 RBT Levels – L2, L4\n\nModule 3: The Trinity of Carnatic Music and the Post-Trinity Era\n\nTyagaraja: Mastery of the Kriti format and melodic variations (Sangatis); the use of Sangatis and the emphasis on Bhakti and Rama Nama. (The Naukacharitram and Prahlada Bhakti Vijayam.)\n\nMuthuswami Dikshitar: The Vibhakti Kritis and Navagraha series; the Vainika style of vocalization and extensive use of Madhyamakala Sahitya. Raga-Mudras and the Gopucha/Srotovaha Yati applications.\n\nSyama Sastri: The architect of rhythm; mastery of Misra Chapu Tala and the Swarajati form (Ratnatrayam).\n\nThe Post-Trinity Influence: Study of the disciples (The Sishya Parampara) and composers like Swati Tirunal, Patnam Subramania Iyer, and Papanasam Sivan.\n\nCourse Outcomes – CO3 RBT Levels – L2, L4 \n\nModule 4: Vaggeyakara Mudras & Signatures\n\nTypes of Mudras: Understanding the different \"stamps\":\n\nAnkita Mudra: Composer's name/pen-name (e.g., Guruguha, Tyagaraja, Syama Krishna).\n\nRaga Mudra: Mention of the Raga name within the lyrics.\n\nTala Mudra: Mention of the Tala within the composition.\n\nVageyakara Mudra: Identifying the specific poetic style unique to a composer.\n\nVamsa/Guru Mudra: References to their lineage or spiritual teacher (e.g., Guruguha for Dikshitar).\n\nKshetra Mudra: Naming the specific temple or location for which the song was composed (e.g., Kanchi, Srirangam).\n\nPrabandha Mudra: Indicators of the song's structural type or rhythm.\n\nHistorical Survey: Signatures of pre-Trinity (Annamacharya, Purandara Dasa) versus modern composers (Balamuralikrishna, Lalgudi Jayaraman).\n\nSignificance: The role of Mudras in authenticating compositions and preserving authorship in an oral tradition.\n\nCourse Outcomes – CO4 RBT Levels – L2, L3\n\nMethodology for Semester 5:\n\nTreatise Timeline: Creating a visual infographic or timeline showing the evolution of musical theory from Jaati to Raga.\n\nThe \"Style Guide\" Project: Comparing three compositions in the same Raga (e.g., Bhairavi) by each of the Trinity to identify their unique stylistic markers.\n\nLakshana Lab: Students present a \"Raga Profile\" using both theoretical notation and practical demonstration of key Sancharas.\n\nMudra Decoding: A competitive exercise identifying the composer of unknown lyrics based solely on the Ankita Mudra. \n\nLibrary Research: Identifying 10 Raga Mudras and 10 Ankita Mudras from the Kriti collections in the music library.\n\nLearning Resources\n\nPrimary Text: South Indian Music (Book IV & V) by Prof. P. Sambamoorthy.\n\nReference: The Chaturdandi Prakashika of Venkatamakhin; Composers of the Trinity by various authors (Music Academy publications).\n\nDigital: 'Kriti Archive' websites and audio databases for comparative Banis.\n\nSuggested Activities\n\nThe Trinity Trivia: Identifying a composition by hearing only the Chittaswara or a specific Madhyamakala phrase.\n\nLexicon Cross-Reference: Looking up a Raga in the Sangita Sampradaya Pradarshini and comparing its notes with the modern version.\n\nMudra Hunt: Scanning a sheet of 20 Kritis to highlight and categorize every Mudra found (Raga, Tala, or Composer).\n\nAssessment Plan\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nTreatise Review (10%): A written comparison of any two major historical texts.\n\nRaga Lakshana Folder (10%): Submission of five comprehensive Raga Bio-data sheets.\n\nListening Viva (10%): Identifying the composer of a recording based on stylistic markers and Mudras.\n\n2. Semester End Examination (SEE) - 70%\n\nPart A (20 Marks): Short technical questions on Dasa Lakshanas and specific composer Mudras.\n\nPart B (30 Marks): Essay questions on the contribution of a specific member of the Trinity or the evolution of the Mela theory across treaties.\n\nPart C (20 Marks): Detailed Raga Lakshana description of a major Mela and its Janya derivatives.\n\n*********\n\nSemester 6: The Modern Concert (Katcheri)\n\nCourse Objectives (COb)\n\nCOb1: To trace the historical transition of Carnatic music from royal court patronage to the modern democratic Sabha system.\n\nCOb2: To understand the technical and ethical dynamics of the ensemble, specifically the supportive roles of the Violin and Mridangam.\n\nCOb3: To explore the psychological and aesthetic application of Rasa (emotion) and Bhava (expression) in a live performance context.\n\nCOb4: To master the strategic principles of Katcheri Dharma (concert ethics and planning) for professional stage presentation.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO1: Analyze the impact of modernization and acoustics on concert formats and vocal techniques.\n\nCO2: Evaluate the collaborative relationship between the lead performer and accompanists during various stages of a concert.\n\nCO3: Apply aesthetic principles to evoke specific emotional responses through Raga and Sahitya selection.\n\nCO4: Design a professionally balanced concert repertoire (Katcheri Paddyathi) suited for different durations and audiences.\n\nPedagogy\n\nHistorical Mapping: Reviewing archival records and oral histories to track the shift in performance spaces.\n\nEnsemble Simulation: Mock concert sessions where students rotate roles to understand the perspective of accompanists.\n\nAesthetic Analysis: Deep-listening sessions focused on identifying the Rasas intended by composers and interpreted by performers.\n\nRepertoire Curation Workshops: Practical exercises in building concert lists based on temporal and thematic constraints.\n\nSemester 6: Module-wise Detailed Syllabus\n\nModule 1: The Modern Concert Era - Evolution & Innovation\n\nThe Transition of Patronage: The shift from the Tanjore and Mysore royal courts to the mercantile and intellectual \"Sabhas\" of Madras (Chennai).\n\nDemocratization of Art: How the transition to public Sabhas influenced Raga selection, time management, and the shortening of elaborate Ragam-Tanam-Pallavis.\n\nThe Music Academy & Institutionalization: The role of the 1927 Madras Music Conference in codifying theory and establishing the \"December Season\" as a global cultural event.\n\nMusical Acoustics & Innovation: \n\nThe physics of the acoustics of modern venues and the evolution of the Sangeetha Sabha culture. \n\nThe modern concert hall; sound absorption, reflection, and the impact of electronic amplification on vocal \"close-mic\" techniques.\n\nEvolution from the manual Tambura to electronic Sruti boxes and apps; the impact of recording formats (78 RPM records & LP discs to digital) on composition length.\n\nModern digital archiving and the role of social media/streaming in the global spread of Carnatic music.\n\nCourse Outcomes – CO1 RBT Levels – L2, L4\n\nModule 2: The Art of Accompaniment & Concert Ethics\n\nThe melodic accompaniment’s Role: \n\nTechniques of \"following/shadowing\" the vocalist; \n\nThe ethics of the solo turn in Alapana and Swara; maintaining melodic fidelity. \n\nEthics of mimicking vs. complementing the main artist.\n\nThe percussion accompaniment’s Role: \n\nThe role of the Mridangam, Ghatam, and Khanjira;\n\nProviding rhythmic \"Sarvalaghu\" support; \n\nThe art of the Gumki; anticipation of Eduppus and the structure of the Tani Avartanam (percussion solo).\n\nEnsemble Hierarchy: Understanding the unspoken cues between the lead artist and the \"Upapakkavadyams\" (Ghatam, Kanjira, Morsing).\n\nPlatform Etiquette: Stage presence, seating arrangements,microphone etiquette, and the mutual respect required for a successful collaborative performance.\n\nSupporting the Manodharma: How a melodic accompanists and percussionist respond to spontaneous Alapana and Kalpanaswaras.\n\nCourse Outcomes – CO2 RBT Levels – L3, L5\n\nModule 3: Concepts of Rasa and Bhava in Performance\n\nRasa Theory: Study of the Nava Rasas (Nine Emotions) and their specific manifestation in Carnatic Ragas (e.g., Karuna in Sahana, Veera in Atana).\n\nBhava (Expression): \n\nThe difference between Vachika (lyrical) and Angika (physical/expressive) Bhava; \n\nDistinguishing between Vibhava (cause), Anubhava (physical effect), and Sanchari Bhava (fleeting emotions) within a song.\n\nThe role of Aparoksha Anubhava (direct experience) of the composer.\n\nRaga-Rasa Correspondence: \n\nScientific and psychological theories on why certain intervals evoke specific moods.\n\nThe role of lyrics in evoking emotion; the concept of Dhwani (suggestive meaning) in the compositions of the Trinity.\n\nThe Performer-Audience Bridge: \n\nThe concept of Sahridaya (the empathetic listener) and the transfer of emotion from the stage to the gallery.\n\nTechniques for using Gamakas and Kaku (voice modulation) to enhance the emotional delivery of a Kriti.\n\nCourse Outcomes – CO3 RBT Levels – L3, L4\n\nModule 4: Principles of Concert Planning (Katcheri Dharma)\n\nThe Ariyakudi Revolution: In-depth study of Ariyakudi Ramanuja Iyengar and the standardization of the Katcheri Paddhati (the modern concert sequence).\n\nThe Anatomy of a Concert List:\n\nThe Opening: Selecting a Varnam or a brisk Ganapathi Kriti to establish the Sruti and tempo.\n\nThe Middle (Main/Sub-main): Balancing heavy Ragas (Todi, Kalyani) with medium-paced pieces.\n\nThe Pinnacle: Theoretical placement of the Ragam-Tanam-Pallavi (RTP).\n\nThe Conclusion: Thukkadas (lighter pieces), Padams, Jawalis, Tillanas, and the Mangalam.\n\nRepertoire Selection: \n\nBalancing \"Heavy\" (Ghanam) Ragas with \"Pratimadhyama\" Ragas; \n\nPrinciples of selecting compositions in different Talas (beats), Eduppus (starting points), and Gatis (rhythmic pulses) to avoid monotony and different composers to ensure variety.\n\nTime Management: \n\nAdapting a concert list for a 60-minute, 90-minute, or 3-hour slot; \n\nThe \"Golden Ratio\" of Manodharma vs. Kalpita music.\n\nKatcheri Dharma (Ethics): \n\nMutual respect between the vocalist and the instrumentalists.\n\nThe art of providing space for the Tani Avartanam (percussion solo).\n\nUnderstanding the audience profile and the occasion (Temple, Wedding, or Sabha).\n\nCourse Outcomes – CO4 RBT Levels – L4, L6\n\nMethodology for Semester 6:\n\nAcoustics Lab: Experimenting with singing in different spaces (reverberant vs. dampened) to understand the role of the ear-monitor and room acoustics.\n\nThe \"Shadowing\" Project: Attending a live concert and specifically mapping the interaction (eye contact, cues) between the vocalist and the violinist.\n\nRasa Profiling: Creating a chart for 10 common Ragas and documenting the dominant Rasa and the specific Prayogas (phrases) that trigger it.\n\nMock Katcheri: Curating and defending a 45-minute concert list before a panel of peers.\n\nLearning Resources\n\nPrimary Text: South Indian Music (Book VI) by Prof. P. Sambamoorthy.\n\nReference: Between Two Tanpuras by Vamanrao Deshpande (for aesthetic comparison); The Art of Accompaniment (various journal articles).\n\nDigital: Multi-track concert recordings that allow students to isolate the Violin or Mridangam tracks.\n\nSuggested Activities\n\nThe \"Ariyakudi\" Challenge: Reconstructing a concert list based on the archives of the 1940s and comparing it to a modern 2020s concert list.\n\nMicrophone Workshop: Practicing distance control and volume modulation with a professional PA system.\n\nEmotion Match: Playing a Raga Alapana and having classmates guess the intended Rasa based on the performer's treatment.\n\nAssessment Plan\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nAccompaniment Critique (10%): A written report analyzing the supportive role of the violinist in a selected professional recording.\n\nRepertoire Draft (10%): Designing a themed concert list (e.g., \"The compositions of Syama Sastri\") with a full justification of the sequence.\n\nViva Voce (10%): Discussing the application of Katcheri Dharma in high-pressure performance scenarios.\n\n2. Semester End Examination (SEE) - 70%\n\nPart A (20 Marks): Short questions on Rasa names, Katcheri sequence, and the role of the Gumki.\n\nPart B (30 Marks): Essay questions on the evolution of the Sabha system or the psychological link between Raga and Emotion.\n\nPart C (20 Marks): Designing a full 2.5-hour concert list including Tala, Raga, Composer, and Manodharma details.\n\n*********\n\nSemester 7: Musicology, Teaching & Research Aptitude\n\nCourse Objectives (COb)\n\nCOb1: To introduce the formal principles and methodologies of academic research specifically tailored for musicological studies.\n\nCOb2: To develop essential teaching and research competencies required for the UGC NET Paper 1 framework.\n\nCOb3: To master logical reasoning and understand the structural evolution of the Indian Higher Education system.\n\nCOb4: To apply research tools in documenting, analyzing, and preserving musical traditions through fieldwork and archival study.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO1: Formulate a research problem and design a structured thesis proposal in musicology.\n\nCO2: Apply pedagogical theories and research ethics in an academic environment.\n\nCO3: Analyze logical arguments and navigate the regulatory landscape of Indian higher education.\n\nCO4: Conduct primary and secondary research using field documentation techniques and bibliographic analysis.\n\nPedagogy\n\nSeminar-Based Learning: Student-led discussions on contemporary research papers in Indian musicology.\n\nMock UGC NET Drills: Regular practice sessions focusing on Paper 1 reasoning and general awareness.\n\nCase Study Method: Analyzing successful musicological dissertations to understand structural flow.\n\nProblem-Solving Workshops: Using Venn diagrams and syllogisms to strengthen logical reasoning skills.\n\nSemester 7: Module-wise Detailed Syllabus\n\nModule 1: Research Methodology in Music\n\nFundamentals of Musicology: \n\nDefining the field; \n\nDistinguishing between historical musicology, ethnomusicology, and systematic musicology.\n\nTypes of research (Historical, Analytical, Experimental); \n\nTools of research; \n\nResearch Design: \n\nIdentification of research gaps; \n\nFormulating a hypothesis; \n\nSelecting appropriate qualitative and quantitative methods for music research.\n\nData Sources: Primary sources (Manuscripts, inscriptions, oral traditions) vs. Secondary sources (Books, journals, digital archives).\n\nThesis Formatting: The structural components of a dissertation—Introduction, Literature Review, Methodology, Analysis, and Conclusion.\n\nCourse Outcomes – CO1 RBT Levels – L3, L6\n\nModule 2: Teaching & Research Aptitude (Paper 1 Core)\n\nTeaching Aptitude: \n\nConcepts, objectives, and levels of teaching; \n\nCharacteristics of learners; \n\nFactors affecting teaching; offline vs. online teaching methods (SWAYAM, MOOCs).\n\nResearch Aptitude: \n\nMeaning and types of research; \n\nSteps of research; \n\nThesis and article writing.\n\nResearch Ethics: Understanding plagiarism, intellectual property rights (IPR), and the ethical considerations of interviewing living artists.\n\nICT in Research: \n\nUsing software tools for data analysis, citation management (Mendeley/Zotero), and digital music archiving.\n\nApplication of Information and Communication Technology (ICT) in research; \n\nCourse Outcomes – CO2 RBT Levels – L2, L4\n\nModule 3: Logical Reasoning & Higher Education System (Paper 1 Core)\n\nLogical Reasoning: \n\nUnderstanding the structure of arguments; \n\nDeductive and inductive reasoning; \n\nVenn diagrams; \n\nIndian Logic (Pramanas)—Pratyaksha, Anumana, Upamana, Shabda.\n\nHigher Education Evolution: Ancient Indian education (Gurukula, Takshashila, Nalanda) and the transition to modern university systems.\n\nRegulatory Framework: The role of the UGC, AIU, NAAC, and the National Education Policy (NEP) in shaping arts and music education.\n\nProfessional Education: Technical, vocational, and value-based education within the creative arts sector.\n\nCourse Outcomes – CO3 RBT Levels – L2, L4\n\nModule 4: Musicological Research & Fieldwork Techniques\n\nFieldwork Documentation: Techniques for high-fidelity audio/video recording; conducting structured and semi-structured interviews with veteran musicians.\n\nPrimary Source Analysis: Deciphering notation in palm-leaf manuscripts or 19th-century print; authenticating rare compositions.\n\nBibliographic Studies: Compiling an annotated bibliography; understanding citation styles (APA, MLA, Chicago) relevant to musicology.\n\nOrganology & Iconography Research: Methodology for studying instrument evolution through temple sculptures and paintings.\n\nCourse Outcomes – CO4 RBT Levels – L4, L5\n\nMethodology for Semester 7:\n\nProposal Drafting: Students must select a potential research topic and submit a 5-page formal research proposal.\n\nNET Paper 1 Simulations: Weekly timed tests covering Logical Reasoning and Teaching Aptitude.\n\nField Interview Simulation: A practical exercise where students interview a peer as an \"artist\" and document the session according to research standards.\n\nPlagiarism Workshop: Learning to use software like Urkund/Turnitin and practicing paraphrasing and citation.\n\nLearning Resources\n\nPrimary Text: Research Methodology in Music by Dr. S.A.K. Durga; UGC NET/JRF: Teaching and Research Aptitude by K.V.S. Madaan.\n\nReference: The Study of Ethnomusicology by Bruno Nettl; Higher Education in India (UGC Publications).\n\nDigital: Access to JSTOR, Shodhganga, and the Oxford Music Online database.\n\nSuggested Activities\n\nThe \"Pramana\" Debate: A classroom debate where students must use Indian logical structures to argue a point in music theory.\n\nLiterature Review Hunt: Finding five different scholarly articles on a single Raga and summarizing the conflicting theories found within them.\n\nDigital Archiving: A workshop on cataloguing old cassettes or LP records into a digital database with metadata.\n\nAssessment Plan\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nResearch Proposal (15%): A formal document outlining a potential Year 4 dissertation topic.\n\nReasoning Quiz (10%): A test focused on logical reasoning and Higher Education structures.\n\nEthics Seminar (5%): A presentation on the importance of copyright and credit in oral traditions.\n\n2. Semester End Examination (SEE) - 70%\n\nPart A (20 Marks): Objective questions following the UGC NET Paper 1 pattern.\n\nPart B (30 Marks): Essay-type questions on research design or the evolution of Indian higher education.\n\nPart C (20 Marks): Technical questions on research ethics, citation styles, and primary source analysis in musicology.\n\n*********\n\nSemester 8: Dissertation & UGC NET\n\nCourse Objectives (COb)\n\nCOb1: To execute a comprehensive, independent research project resulting in a formal Dissertation.\n\nCOb2: To equip students with the legal and managerial knowledge required to navigate the Professional Music Industry.\n\nCOb3: To refine instructional skills through Advanced Pedagogy and hands-on teaching practice.\n\nCOb4: To conduct an intensive synthesis of musicological and general knowledge for UGC NET & JRF certification.\n\nCourse Outcomes (CO)\n\nBy the end of this course, students will be able to:\n\nCO1: Produce a high-quality dissertation that contributes original insights to the field of musicology.\n\nCO2: Navigate contracts, copyright laws, and digital distribution rights as a professional musician.\n\nCO3: Design and deliver an effective music curriculum tailored to different learner profiles.\n\nCO4: Demonstrate mastery over both Paper 1 (General) and Paper 2 (Music) requirements for national eligibility.\n\nPedagogy\n\nMentorship Model: One-on-one supervision sessions to guide the dissertation process.\n\nPracticum Teaching: Supervised classroom sessions where students teach junior batches.\n\nProfessional Simulation: Mock contract negotiations and copyright registration workshops.\n\nIntensive Revision: High-speed drills and retrospective analysis of past competitive examination papers.\n\nSemester 8: Module-wise Detailed Syllabus\n\nModule 1: The Research Dissertation (Project Work)\n\nExecution & Analysis: \n\nRefining the research question and finalizing the chapter outline.\n\nApplying analytical tools (melodic/rhythmic/textual) to the research subject.\n\nPrimary & Secondary Research: Conducting field interviews, analyzing recordings, and reviewing existing literature/treatises.\n\nDrafting the Thesis: \n\nWriting the chapters based on the proposal approved in Semester 7.\n\nCitation & Referencing: Strict adherence to academic styles (APA/Chicago) and bibliography finalization.\n\nDefense Preparation: Developing a viva-voce presentation (PPT) and a lecture-demonstration (Lec-Dem) to defend the research findings and respond to critical scholarly inquiry before a committee.\n\nCourse Outcomes – CO1 RBT Levels – L6\n\nModule 2: Professional Music Management & Law\n\nIntellectual Property (IPR): \n\nUnderstanding the Copyright Act (1957) in India; \n\nMechanical, performance, and synchronization rights.\n\nDigital Rights Management (DRM): Navigating streaming platforms, royalty collection agencies (IPRS, PPL), and social media monetization.\n\nGrant Writing & Proposals: How to apply for government fellowships (e.g., Ministry of Culture) and international arts grants.\n\nContract Law: Basic components of artist management contracts, performance agreements, and recording deals.\n\nEvent Management: Financial planning for concerts, grant writing for cultural institutions, and self-promotion strategies.\n\nCourse Outcomes – CO2 RBT Levels – L3, L4\n\nModule 3: Advanced Pedagogy & Practical Teaching\n\nMicro-teaching: \n\nPlanning and delivering 15-minute specialized modules on complex topics like Vivadi Ragas or Tala Pranas.\n\nMethods for teaching group classes versus one-on-one Gurukula style.\n\nCurriculum Design: Designing a progressive syllabus for different age groups.\n\nEvaluation Metrics: \n\nCreating objective and subjective assessment tools for music theory and practice.\n\nCreating grading rubrics for practical music exams and conducting Viva Voce.\n\nPsychology of Music Learning: Identifying and addressing common student plateaus and performance anxiety.\n\nCourse Outcomes – CO3 RBT Levels – L3, L6\n\nModule 4: UGC NET & JRF Intensive Review\n\nPaper 1 (General): Final drills on Teaching Aptitude, Research Ethics, and Higher Education Systems.\n\nPaper 2 (Music): \n\nUnits I-III: Historical evolution, ancient treatises, and terminologies.\n\nUnits IV-VI: Raga-Tala systems, classification, and musical forms.\n\nUnits VII-X: Biographies of composers, instrumentology, and aesthetics\n\nCritical Thinking: Solving higher-order syllogisms and Logical Reasoning (Indian Logic), puzzles specific to recent exam patterns.\n\nMock Exam Strategy: Time-management techniques for handling 150 multiple-choice questions (MCQs).\n\nCourse Outcomes – CO4 RBT Levels – L4, L5\n\nMethodology for Semester 8:\n\nThe \"Lec-Dem\" Series: Each student must present a 30-minute lecture-demonstration on their dissertation topic.\n\nThe \"Thesis Defense\" Seminar: A mock viva-voce where students present their research to a panel of external faculty.\n\nTeaching Practicum: Students are required to document 10 hours of supervised teaching at the undergraduate level.\n\nLegal Workshop: Drafting a sample \"No Objection Certificate\" (NOC) and a \"Performance Contract\" for a hypothetical concert.\n\nDaily NET Drills: Solving 20 MCQs daily with a focus on negative marking avoidance and logic-based elimination.\n\nPortfolio Building: Creating a professional website or digital profile showcasing their performance and academic work.\n\nLearning Resources\n\nPrimary Text: Manual for Writers of Research Papers (Turabian); UGC NET Music by various authors.\n\nReference: Music Business Handbook and Career Guide by David Baskerville; Teaching Music in Higher Education by Rhonda Miller.\n\nDigital: Access to 'Copyright Office of India' portal; UGC NET official mock test portals.\n\nUGC NET/JRF/SET Teaching & Research Aptitude (General Paper-I) by K.V.S. Madaan.\n\nTeaching and Research Aptitude by Sajit Kumar.\n\nNational Education Policy 2020 - Government of India Document.\n\nSuggested Activities\n\nThe \"Copyright Challenge\": Students bring in a song or sample and must determine who owns each layer of rights (Lyrics, Melody, Recording).\n\nSyllabus Construction: Creating a 6-month certificate course outline for \"Music Appreciation for Beginners.\"\n\nReview Session: Summarizing the core philosophy of a major treatise (like Sangita Ratnakara) in exactly 10 bullet points for quick revision.\n\nAssessment Plan\n\n1. Continuous Internal Evaluation (CIE) - 30%\n\nTeaching Portfolio (15%): Submission of lesson plans and a self-reflection report on the teaching practicum.\n\nManagement Quiz (10%): A test focused on Copyright laws and professional management scenarios.\n\nMock NET Result (5%): Score achieved in a standardized internal Paper 1 & 2 combined test.\n\n2. Semester End Examination (SEE) - 70%\n\nDissertation Submission & Viva (50 Marks): Evaluation of the final thesis and the oral defense performance.\n\nFinal Written Exam (20 Marks): Focused on Professional Law, Pedagogy, and comprehensive Musicological theory.\n\n*********",
+    "source_file": "CARNATIC VOCAL THEORY.docx",
+    "processed_date": "2026-09-12T10:32:23.948951"
+  }
+]

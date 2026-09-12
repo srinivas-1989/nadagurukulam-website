@@ -78,7 +78,7 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_types: [],
-    live_sessions: [], assignments: [], feedback: [], activities: [], role_permissions: []
+    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], role_permissions: []
   });
   const [roles, setRoles] = useState([]);
 
@@ -121,11 +121,59 @@ export default function Home() {
     heroLede: "Nada Gurukulam blends India's timeless classical performing arts traditions with contemporary academic management under Sadguru Sri Madhusudan Sai. 100% free of cost.",
     disciplinesHeading: 'Disciplines Taught',
     disciplinesSub: 'Offered completely free of charge, funded entirely by donations.',
+    footerAddress: 'Nada Gurukulam, Muddenahalli, India',
+    footerPhone: '+91 99999 99999',
+    footerEmail: 'contact@nadagurukulam.org'
   };
   const [cmsHome, setCmsHome] = useState(null);
   const [cmsEditing, setCmsEditing] = useState(false);
   const [cmsForm, setCmsForm] = useState(CMS_FALLBACK);
   const cms = { ...CMS_FALLBACK, ...(cmsHome || {}) };
+
+  // Detailed Syllabus State (MongoDB curriculum_content)
+  const [activeSyllabusCourse, setActiveSyllabusCourse] = useState(null);
+  const [syllabusContent, setSyllabusContent] = useState(null);
+  const [editingSyllabus, setEditingSyllabus] = useState(false);
+  const [syllabusForm, setSyllabusForm] = useState({});
+
+  const loadSyllabus = (courseId) => {
+    if (!courseId) return;
+    fetch(`${apiUrl}/api/curriculum-content/course_${courseId}`)
+      .then(r => r.json())
+      .then(d => setSyllabusContent(d.content))
+      .catch(() => setSyllabusContent(null));
+  };
+
+  useEffect(() => {
+    if (activeSyllabusCourse) {
+      loadSyllabus(activeSyllabusCourse.id);
+    } else {
+      setSyllabusContent(null);
+      setEditingSyllabus(false);
+    }
+  }, [activeSyllabusCourse]);
+
+  const handleSaveSyllabus = async () => {
+    if (!activeSyllabusCourse) return;
+    const res = await apiCall(`${apiUrl}/api/curriculum-content/course_${activeSyllabusCourse.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(syllabusForm)
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Save failed'); return; }
+    setEditingSyllabus(false);
+    loadSyllabus(activeSyllabusCourse.id);
+  };
+
+  const deleteSyllabus = async () => {
+    if (!activeSyllabusCourse) return;
+    const res = await apiCall(`${apiUrl}/api/curriculum-content/course_${activeSyllabusCourse.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(null)
+    });
+    if (!res.ok) { alert('Delete failed'); return; }
+    setSyllabusContent(null);
+    setEditingSyllabus(false);
+  };
 
   const loadCms = () => fetch(`${apiUrl}/api/cms/home`).then(r => r.json()).then(d => setCmsHome(d.content)).catch(() => {});
 
@@ -145,7 +193,7 @@ export default function Home() {
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_types', 'course_types'], ['liveclasses', 'live_sessions'],
-        ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'],
+        ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'],
         ['role_permissions', 'role_permissions']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
@@ -191,10 +239,18 @@ export default function Home() {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('teacher');
+  const [editingUser, setEditingUser] = useState(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserRoleKey, setEditUserRoleKey] = useState('');
 
   const [newDiscName, setNewDiscName] = useState('');
   const [newDiscLevels, setNewDiscLevels] = useState('');
   const [newDiscDesc, setNewDiscDesc] = useState('');
+  const [editingDisc, setEditingDisc] = useState(null);
+  const [discEditName, setDiscEditName] = useState('');
+  const [discEditLevels, setDiscEditLevels] = useState('');
+  const [discEditDesc, setDiscEditDesc] = useState('');
 
   // Course form (MPA Syllabus format)
   const [courseDisc, setCourseDisc] = useState('');
@@ -506,6 +562,20 @@ export default function Home() {
     setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); fetchData();
   };
 
+  const handleUpdateUser = async (u) => {
+    const payload = { name: editUserName.trim(), email: editUserEmail.trim(), role_key: editUserRoleKey };
+    if (!payload.name || !payload.email || !payload.role_key) return;
+    const res = await apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
+    setEditingUser(null); fetchData();
+  };
+
+  const handleUpdateDiscipline = async (d, payload) => {
+    const res = await apiCall(`${apiUrl}/api/curriculum/${d.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
+    setEditingDisc(null); fetchData();
+  };
+
   const handleAddCourse = async (e) => {
     e.preventDefault();
     if (!courseName || !courseCode) return;
@@ -581,10 +651,11 @@ export default function Home() {
       {/* VIEW 1: PUBLIC HOMEPAGE */}
       {view === 'public' && (
         <div style={{ flex: 1 }}>
-          <section style={{ background: 'var(--bg-saffron)', padding: '64px 8vw 72px', position: 'relative', overflow: 'hidden' }}>
+          <section style={{ background: 'var(--bg-saffron)', padding: '64px 8vw 72px', position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
             {/* NDG brand elements: corner quarter-circles, Nataraja watermark (10–15% opacity) */}
             <div className="ndg-corner" style={{ top: '-140px', right: '-140px', width: '340px', height: '340px', borderRadius: '50%', background: 'var(--primary)' }} />
             <div className="ndg-corner" style={{ bottom: '-170px', left: '-170px', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--accent)', opacity: 0.35 }} />
+            <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', bottom: '16px', border: '1px dashed var(--divider)', borderRadius: 'var(--radius-xl)', pointerEvents: 'none', opacity: 0.6 }} />
             <img className="ndg-watermark" src="/logo-mark.png" alt="" style={{ bottom: '-60px', right: '3vw', width: '380px', height: 'auto', opacity: 0.1 }} />
             {role === 'super_admin' && !cmsEditing && (
               <button onClick={() => { setCmsForm(cms); setCmsEditing(true); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.7)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, zIndex: 2 }}>
@@ -598,6 +669,9 @@ export default function Home() {
                 <textarea value={cmsForm.heroLede} onChange={e => setCmsForm({ ...cmsForm, heroLede: e.target.value })} placeholder="Lede paragraph" rows={3} style={{ padding: '8px', border: '1px solid var(--border)' }} />
                 <input value={cmsForm.disciplinesHeading} onChange={e => setCmsForm({ ...cmsForm, disciplinesHeading: e.target.value })} placeholder="Disciplines section heading" style={{ padding: '8px', border: '1px solid var(--border)' }} />
                 <input value={cmsForm.disciplinesSub} onChange={e => setCmsForm({ ...cmsForm, disciplinesSub: e.target.value })} placeholder="Disciplines section subline" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                <input value={cmsForm.footerAddress} onChange={e => setCmsForm({ ...cmsForm, footerAddress: e.target.value })} placeholder="Footer Address" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                <input value={cmsForm.footerPhone} onChange={e => setCmsForm({ ...cmsForm, footerPhone: e.target.value })} placeholder="Footer Phone" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                <input value={cmsForm.footerEmail} onChange={e => setCmsForm({ ...cmsForm, footerEmail: e.target.value })} placeholder="Footer Email" style={{ padding: '8px', border: '1px solid var(--border)' }} />
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={handleSaveCms} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Save</button>
                   <button onClick={() => setCmsEditing(false)} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer' }}>Cancel</button>
@@ -637,6 +711,22 @@ export default function Home() {
               ))}
             </div>
           </main>
+
+          <footer style={{ background: 'var(--surface-muted)', borderTop: '1px solid var(--border)', padding: '40px 24px', marginTop: '60px' }}>
+            <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+              <div>
+                <h4 style={{ fontSize: '18px', color: 'var(--primary-deep)', margin: '0 0 6px' }}>Nada Gurukulam</h4>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-soft)' }}>{cms.footerAddress}</p>
+              </div>
+              <div style={{ fontSize: '14px', color: 'var(--text-soft)', textAlign: 'right' }}>
+                <div>Phone: {cms.footerPhone}</div>
+                <div>Email: {cms.footerEmail}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '12px', color: 'var(--text-faint)', borderTop: '1px solid var(--divider)', paddingTop: '16px' }}>
+              © {new Date().getFullYear()} Nada Gurukulam. All rights reserved.
+            </div>
+          </footer>
         </div>
       )}
 
@@ -773,14 +863,31 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {dbData.users.map(u => (
-                        <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '12px' }}>{u.name}</td>
-                          <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{u.email}</td>
-                          <td style={{ padding: '12px', textTransform: 'capitalize' }}>{u.role_key}</td>
-                          <td style={{ padding: '12px' }}>
-                            {isFull('users') && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}>Delete</button>}
-                          </td>
-                        </tr>
+                        editingUser === u.id ? (
+                          <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                            <td style={{ padding: '8px' }}><input value={editUserName} onChange={e => setEditUserName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}><input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}>
+                              <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }}>
+                                {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                              </select>
+                            </td>
+                            <td style={{ padding: '8px', display: 'flex', gap: '6px' }}>
+                              <button onClick={() => handleUpdateUser(u)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                              <button onClick={() => setEditingUser(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '12px' }}>{u.name}</td>
+                            <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{u.email}</td>
+                            <td style={{ padding: '12px', textTransform: 'capitalize' }}>{roles.find(r => r.key === u.role_key)?.name || u.role_key}</td>
+                            <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {canAdmin('users') && <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {isFull('users') && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                            </td>
+                          </tr>
+                        )
                       ))}
                     </tbody>
                   </table>
@@ -795,14 +902,53 @@ export default function Home() {
                   Dynamic university syllabus structure (Programs, Semesters, and Courses matching the MPA format).
                 </p>
                 {canCreate('curriculum') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                    {/* Add Discipline */}
-                    <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <input placeholder="Program / Discipline (e.g. MPA Bharatanatyam)" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} required />
-                      <input placeholder="Levels (e.g. 2 Years / 4 Semesters)" value={newDiscLevels} onChange={e => setNewDiscLevels(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
-                      <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Program</button>
-                    </form>
+                  <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                    <input placeholder="Program / Discipline name" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} required />
+                    <input placeholder="Levels (e.g. 2 Years / 4 Semesters)" value={newDiscLevels} onChange={e => setNewDiscLevels(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Program</button>
+                  </form>
+                )}
 
+                {/* Programs list — every discipline from DB, fully editable; visible to anyone with curriculum View */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '24px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                        <th style={{ padding: '10px 12px' }}>Program</th><th style={{ padding: '10px 12px' }}>Levels</th><th style={{ padding: '10px 12px' }}>Description</th><th style={{ padding: '10px 12px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dbData.curriculum.length === 0 ? (
+                        <tr><td colSpan="4" style={{ padding: '18px', textAlign: 'center', color: 'var(--text-faint)' }}>No programs yet.</td></tr>
+                      ) : dbData.curriculum.map(d => (
+                        editingDisc === d.id ? (
+                          <tr key={d.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                            <td style={{ padding: '8px' }}><input value={discEditName} onChange={e => setDiscEditName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}><input value={discEditLevels} onChange={e => setDiscEditLevels(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}><input value={discEditDesc} onChange={e => setDiscEditDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px', display: 'flex', gap: '6px' }}>
+                              <button onClick={() => handleUpdateDiscipline(d, { name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim() })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                              <button onClick={() => setEditingDisc(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 12px', fontWeight: 600 }}>{d.name}</td>
+                            <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.levels || '—'}</td>
+                            <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.description || '—'}</td>
+                            <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {isFull('curriculum') && <button onClick={() => handleDelete('curriculum', d.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                            </td>
+                          </tr>
+                        )
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {canCreate('curriculum') && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
                     {/* Add Course */}
                     <form onSubmit={handleAddCourse} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       <select value={courseDisc} onChange={e => setCourseDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
@@ -870,13 +1016,109 @@ export default function Home() {
                           <td style={{ padding: '12px' }}>{c.semester}</td>
                           <td style={{ padding: '12px' }}>{c.credits} Credits</td>
                           <td style={{ padding: '12px' }}>
-                            <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+                            <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '6px' }}>Delete</button>
+                            <button onClick={() => setActiveSyllabusCourse(c)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+
+                {/* SYLLABUS DETAIL VIEW */}
+                {activeSyllabusCourse && (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginTop: '24px', padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                      <h3 style={{ fontSize: '20px', color: 'var(--primary-deep)', margin: 0 }}>{activeSyllabusCourse.code} — {activeSyllabusCourse.name}</h3>
+                      <button onClick={() => setActiveSyllabusCourse(null)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-faint)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>← Back to Courses</button>
+                    </div>
+                    {syllabusContent ? (
+                      <div style={{ display: 'grid', gap: '16px' }}>
+                        {syllabusContent.objectives && syllabusContent.objectives.length > 0 && (
+                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
+                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '12px' }}>Course Objectives</h4>
+                            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-soft)' }}>
+                              {syllabusContent.objectives.map((obj, idx) => <li key={idx}>{obj}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {syllabusContent.outcomes && syllabusContent.outcomes.length > 0 && (
+                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
+                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '12px' }}>Course Outcomes</h4>
+                            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-soft)' }}>
+                              {syllabusContent.outcomes.map((out, idx) => <li key={idx}>{out}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {syllabusContent.modules && syllabusContent.modules.length > 0 && (
+                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
+                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '16px' }}>Syllabus Modules</h4>
+                            {syllabusContent.modules.map((mod, mi) => (
+                              <div key={mi} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: mi < syllabusContent.modules.length - 1 ? '1px solid var(--divider)' : 'none' }}>
+                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)', marginBottom: '8px' }}>
+                                  Module {mi + 1}: {mod.title || 'Untitled Module'}
+                                </div>
+                                {mod.topics && mod.topics.length > 0 && (
+                                  <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-soft)' }}>
+                                    {mod.topics.map((topic, ti) => <li key={ti}>{topic}</li>)}
+                                  </ul>
+                                )}
+                                {mod.hours && (
+                                  <div style={{ fontSize: '12.5px', color: 'var(--accent-deep)', marginTop: '6px' }}>
+                                    Hours allocated: {mod.hours}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {syllabusContent.assessments && (
+                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
+                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '12px' }}>Assessment Plan</h4>
+                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-soft)', fontSize: '13px', fontFamily: 'inherit' }}>
+                              {syllabusContent.assessments}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px' }}>
+                        No detailed syllabus content yet. Click &quot;Edit Syllabus&quot; below to add.
+                      </div>
+                    )}
+                    {canCreate('curriculum') && (
+                      <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button onClick={() => { setEditingSyllabus(true); setSyllabusForm({ ...syllabusForm, ...(syllabusContent || {}) }); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>
+                          {syllabusContent ? 'Edit Syllabus' : 'Add Syllabus'}
+                        </button>
+                        {syllabusContent && <button onClick={deleteSyllabus} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Delete</button>}
+                      </div>
+                    )}
+                    {editingSyllabus && (
+                      <div style={{ marginTop: '24px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '20px' }}>
+                        <h4 style={{ color: 'var(--primary-deep)', marginBottom: '16px' }}>{syllabusContent ? 'Edit' : 'Add'} Detailed Syllabus</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px' }}>Course Objectives (one per line)</label>
+                            <textarea value={syllabusForm.objectives?.join('\n') || ''} onChange={e => setSyllabusForm({ ...syllabusForm, objectives: e.target.value.split('\n').filter(l => l.trim()) })} rows={4} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px' }}>Course Outcomes (one per line)</label>
+                            <textarea value={syllabusForm.outcomes?.join('\n') || ''} onChange={e => setSyllabusForm({ ...syllabusForm, outcomes: e.target.value.split('\n').filter(l => l.trim()) })} rows={4} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px' }}>Assessment Plan (free text)</label>
+                            <textarea value={syllabusForm.assessments || ''} onChange={e => setSyllabusForm({ ...syllabusForm, assessments: e.target.value })} rows={4} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={handleSaveSyllabus} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Save</button>
+                            <button onClick={() => { setEditingSyllabus(false); setSyllabusForm({}); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1045,8 +1287,8 @@ export default function Home() {
               <div>
                 {canCreate('jobs') && (
                   <form onSubmit={handleAddJob} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <input placeholder="Job Title (e.g. Bharatanatyam Instructor)" value={newJobTitle} onChange={e => setNewJobTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 250px' }} />
-                    <input placeholder="Department (e.g. Performing Arts)" value={newJobDept} onChange={e => setNewJobDept(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <input placeholder="Job Title" value={newJobTitle} onChange={e => setNewJobTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 250px' }} />
+                    <input placeholder="Department" value={newJobDept} onChange={e => setNewJobDept(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
                     <select value={newJobType} onChange={e => setNewJobType(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
                       <option value="Full-time">Full-time</option>
                       <option value="Part-time">Part-time</option>
@@ -1274,7 +1516,7 @@ export default function Home() {
                   </form>
                 )}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-                  {dbData.lesson_plans.length === 0 ? (
+                  {(dbData.lesson_plans || []).length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No lesson plans yet.</div>
                   ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
@@ -1284,7 +1526,7 @@ export default function Home() {
                         </tr>
                       </thead>
                       <tbody>
-                        {dbData.lesson_plans.map(p => {
+                        {(dbData.lesson_plans || []).map(p => {
                           const batch = dbData.batches.find(b => b.id === p.batch_id);
                           return (
                             <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>

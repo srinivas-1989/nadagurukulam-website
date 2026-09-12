@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///Users/saislife/Documents/GitHub/nadagurukulam-website/frontend/app/page.js"],"sourcesContent":["export default function Home() {\n  return (\n    <main style={{ padding: '40px', fontFamily: 'sans-serif', background: '#fffde9', color: '#470500', minHeight: '100vh' }}>\n      <h1>Nada Gurukulam — Academic Portal & Public Site</h1>\n      <p>One World, One Family | Sri Sathya Sai University for Human Excellence</p>\n      <hr style={{ margin: '20px 0', borderColor: '#e4d5cb' }} />\n      <p>Frontend structure initialized successfully. Connect Supabase &amp; Render backend to launch live.</p>\n    </main>\n  );\n}\n"],"names":["Home","style","padding","fontFamily","background","color","minHeight","margin","borderColor"],"mappings":";;;;;;AAAe,SAASA;IACtB,qBACE,8OAAC;QAAKC,OAAO;YAAEC,SAAS;YAAQC,YAAY;YAAcC,YAAY;YAAWC,OAAO;YAAWC,WAAW;QAAQ;;0BACpH,8OAAC;0BAAG;;;;;;0BACJ,8OAAC;0BAAE;;;;;;0BACH,8OAAC;gBAAGL,OAAO;oBAAEM,QAAQ;oBAAUC,aAAa;gBAAU;;;;;;0BACtD,8OAAC;0BAAE;;;;;;;;;;;;AAGT"}}]
-}
