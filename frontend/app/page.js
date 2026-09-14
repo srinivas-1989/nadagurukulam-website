@@ -116,6 +116,19 @@ export default function Home() {
 
   const [editing, setEditing] = useState(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+  const [uploadingKey, setUploadingKey] = useState(null);
+  const uploadFile = async (file, onUrl) => {
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { alert('File too large (max 15 MB)'); return; }
+    const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(file); });
+    setUploadingKey(file.name);
+    try {
+      const resp = await apiCall(`${apiUrl}/api/upload`, { method: 'POST', body: JSON.stringify({ filename: file.name, mime: file.type || 'application/octet-stream', data: b64 }) });
+      const j = await resp.json().catch(() => ({}));
+      if (!resp.ok) { alert(j.error || 'Upload failed — create Storage bucket "attachments" in Supabase'); return; }
+      onUrl(j.url);
+    } finally { setUploadingKey(null); }
+  };
 
   // Public-site copy is data too: a cms/home block in MongoDB, edited inline by Super Admin.
   // The fallback below only covers a cold start (before the block is saved) — the DB is the source of truth.
@@ -1920,7 +1933,8 @@ export default function Home() {
                       {assignTopics.map(tt => <option key={tt.id} value={tt.id}>{tt.topic}</option>)}
                     </select>
                     <input placeholder="or free topic" value={newAssignTopicText} onChange={e => setNewAssignTopicText(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
-                    <input placeholder="Attachment URL (doc/pdf link)" value={newAssignAttachment} onChange={e => setNewAssignAttachment(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.mp3,.mp4,.zip" onChange={e=>{const f=e.target.files?.[0]; if(f) uploadFile(f, u=>setNewAssignAttachment(u)); e.target.value='';}} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px', fontSize: '12px' }} />
+                    <input placeholder="Attachment URL" value={newAssignAttachment} onChange={e => setNewAssignAttachment(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />{uploadingKey && <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>uploading…</span>}
                     <textarea placeholder="Description / Instructions" value={newAssignDesc} onChange={e => setNewAssignDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Create Assignment</button>
                   </form>
@@ -2004,7 +2018,7 @@ export default function Home() {
                                 {!mySub ? (
                                   <><span style={{ fontSize: '12px', color: 'var(--text-faint)', background: 'var(--bg)', padding: '4px 8px', borderRadius: '99px' }}>Not started</span><button onClick={()=>handleStartAssignment(a)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Start</button></>
                                 ) : mySub.status === 'started' ? (
-                                  <><span style={{ background: '#b45309', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '11.5px' }}>Started</span><input placeholder="Attachment URL (optional)" value={submitAttachments[a.id] || ''} onChange={e=>setSubmitAttachments(prev=>({ ...prev, [a.id]: e.target.value }))} style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px', maxWidth: '280px' }} /><button onClick={()=>handleSubmitAssignment(a)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Submit{lateFlag ? '' : ''}</button>{mySub.submitted_at && lateFlag ? <span style={{ fontSize: '11px', color: '#991b1b' }}>will be marked late</span> : null}</>
+                                  <><span style={{ background: '#b45309', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '11.5px' }}>Started</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.mp3,.mp4,.zip" onChange={e=>{const f=e.target.files?.[0]; if(f) uploadFile(f, u=>setSubmitAttachments(prev=>({ ...prev, [a.id]: u }))); e.target.value='';}} style={{ fontSize: '12px', maxWidth: '180px' }} /><input placeholder="Attachment URL (optional)" value={submitAttachments[a.id] || ''} onChange={e=>setSubmitAttachments(prev=>({ ...prev, [a.id]: e.target.value }))} style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px', maxWidth: '220px' }} /><button onClick={()=>handleSubmitAssignment(a)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Submit{lateFlag ? '' : ''}</button>{mySub.submitted_at && lateFlag ? <span style={{ fontSize: '11px', color: '#991b1b' }}>will be marked late</span> : null}</>
                                 ) : mySub.status === 'submitted' ? (
                                   <><span style={{ background: '#15803d', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '11.5px' }}>Submitted{lateFlag ? ' · late' : ' · on time'}</span><span style={{ fontSize: '11.5px', color: 'var(--text-soft)' }}>{mySub.submitted_at ? new Date(mySub.submitted_at).toLocaleDateString() : ''}</span>{mySub.attachment_url ? <a href={mySub.attachment_url} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: 'var(--primary)' }}>📎 your file</a> : null}<span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>· awaiting grade</span></>
                                 ) : (
@@ -2198,7 +2212,8 @@ export default function Home() {
                       {dbData.courses.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
                     </select>
                     <input placeholder="Topic / subject (free text)" value={newProjTopic} onChange={e => setNewProjTopic(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                    <input placeholder="Attachment URL (optional)" value={newProjAttachment} onChange={e => setNewProjAttachment(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.mp3,.mp4,.zip" onChange={e=>{const f=e.target.files?.[0]; if(f) uploadFile(f, u=>setNewProjAttachment(u)); e.target.value='';}} style={{ fontSize: '12px', flex: '1 1 160px' }} />
+                    <input placeholder="Attachment URL" value={newProjAttachment} onChange={e => setNewProjAttachment(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
                     <textarea placeholder="Description" value={newProjDesc} onChange={e => setNewProjDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Add Project</button>
                   </form>
@@ -2271,7 +2286,8 @@ export default function Home() {
                       <option value="external">External</option>
                       <option value="institutional">Institutional</option>
                     </select>
-                    <input placeholder="File URL (scan link)" value={newCertFile} onChange={e => setNewCertFile(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e=>{const f=e.target.files?.[0]; if(f) uploadFile(f, u=>setNewCertFile(u)); e.target.value='';}} style={{ fontSize: '12px', flex: '1 1 160px' }} />
+                    <input placeholder="File URL" value={newCertFile} onChange={e => setNewCertFile(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />{uploadingKey && <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>uploading…</span>}
                     <textarea placeholder="Description" value={newCertDesc} onChange={e => setNewCertDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Add Certificate</button>
                   </form>

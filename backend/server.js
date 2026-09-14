@@ -82,7 +82,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '16mb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/api/health', (req, res) => res.json({ ok: true, cms: mongoose.connection.readyState === 1 ? 'up' : 'down' }));
@@ -109,6 +109,30 @@ app.post('/api/public/enquiries', async (req, res) => {
     const { data, error } = await supabase.from('enquiries').insert([{ name, contact, type, message, status: 'new' }]).select();
     if (error) throw error;
     res.status(201).json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Storage upload — auth required; base64 JSON, ~15 MB limit. Uses Supabase Storage
+// bucket "attachments" (create in dashboard or via SQL). No new dep; signed URLs swap later.
+const UPLOAD_BUCKET = process.env.STORAGE_BUCKET || 'attachments';
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const ALLOWED_MIME = new Set(['application/pdf','image/jpeg','image/png','image/webp','audio/mpeg','audio/mp4','video/mp4','application/zip']);
+app.post('/api/upload', authMiddleware, async (req, res) => {
+  try {
+    const { filename, mime, data } = req.body || {};
+    if (!filename || !mime || !data) return res.status(400).json({ error: 'filename, mime and base64 data required' });
+    if (!ALLOWED_MIME.has(String(mime))) return res.status(400).json({ error: 'Unsupported file type' });
+    const buf = Buffer.from(String(data), 'base64');
+    if (buf.length > MAX_UPLOAD_BYTES) return res.status(413).json({ error: 'File too large (max 15 MB)' });
+    const safe = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'file';
+    const key = `${req.auth.profile.id}/${Date.now()}-${safe}`;
+    const { error } = await supabase.storage.from(UPLOAD_BUCKET).upload(key, buf, { contentType: String(mime), upsert: false });
+    if (error) {
+      if (/not found|bucket/i.test(error.message)) return res.status(503).json({ error: `Storage bucket "${UPLOAD_BUCKET}" missing — create it in Supabase Storage.` });
+      throw error;
+    }
+    const { data: pub } = supabase.storage.from(UPLOAD_BUCKET).getPublicUrl(key);
+    res.status(201).json({ url: pub.publicUrl, path: key });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
