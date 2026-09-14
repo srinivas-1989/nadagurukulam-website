@@ -356,7 +356,9 @@ async function checkTimetableConflict(candidate) {
   const cStart = toMin(candidate.start_time);
   const cEnd = toMin(candidate.end_time);
   for (const s of existing) {
-    if (s.batch_id !== candidate.batch_id && s.room !== candidate.room) continue;
+    const sameBatch = s.batch_id === candidate.batch_id;
+    const sameRoom = candidate.room && s.room && String(s.room).trim() && String(candidate.room).trim() && String(s.room).trim() === String(candidate.room).trim();
+    if (!sameBatch && !sameRoom) continue;
     const sStart = toMin(s.start_time);
     const sEnd = toMin(s.end_time);
     if (cStart < sEnd && sStart < cEnd) return s;

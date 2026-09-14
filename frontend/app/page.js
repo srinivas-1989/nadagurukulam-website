@@ -248,6 +248,10 @@ export default function Home() {
       setCourseType(dbData.course_types[0].name);
     }
   }, [dbData.course_types]);
+  useEffect(() => {
+    if (dbData.batches.length && !timetableBatch) setTimetableBatch(dbData.batches[0].id);
+    if (dbData.batches.length && timetableBatch && !dbData.batches.some(b => b.id === timetableBatch)) setTimetableBatch(dbData.batches[0].id);
+  }, [dbData.batches]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (endpoint, id) => {
     if (!confirm('Are you sure you want to delete this record?')) return;
@@ -582,6 +586,12 @@ export default function Home() {
   const [newBatchLevel, setNewBatchLevel] = useState('');
   const [newBatchFaculty, setNewBatchFaculty] = useState('');
   const [newBatchCapacity, setNewBatchCapacity] = useState(20);
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [editBatchName, setEditBatchName] = useState('');
+  const [editBatchDisc, setEditBatchDisc] = useState('');
+  const [editBatchLevel, setEditBatchLevel] = useState('');
+  const [editBatchFaculty, setEditBatchFaculty] = useState('');
+  const [editBatchCapacity, setEditBatchCapacity] = useState(20);
 
   const handleAddBatch = async (e) => {
     e.preventDefault();
@@ -592,25 +602,49 @@ export default function Home() {
     });
     setNewBatchName(''); setNewBatchLevel(''); setNewBatchFaculty(''); setNewBatchCapacity(20); fetchData();
   };
+  const handleUpdateBatch = async (id) => {
+    const res = await apiCall(`${apiUrl}/api/batches/${id}`, { method: 'PUT', body: JSON.stringify({ name: editBatchName.trim(), discipline_id: editBatchDisc || null, level: editBatchLevel.trim(), faculty_id: editBatchFaculty || null, capacity: Number(editBatchCapacity) || 20 }) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Update failed'); return; }
+    setEditingBatch(null); fetchData();
+  };
 
-  // Timetable — recurring weekly slots per batch, with conflict detection:
-  // a new slot that overlaps an existing one for the same batch OR the same room asks first.
+  // Timetable — recurring weekly slots per batch, with conflict detection.
+  // Matches XLS: period no. → timing row → per-day cells of "SUBJECT [FAC] / room".
   const slotsOverlap = (a, b) => a.start < b.end && b.start < a.end;
   const [newSlotBatch, setNewSlotBatch] = useState('');
   const [newSlotDay, setNewSlotDay] = useState('Monday');
   const [newSlotStart, setNewSlotStart] = useState('');
   const [newSlotEnd, setNewSlotEnd] = useState('');
   const [newSlotRoom, setNewSlotRoom] = useState('');
+  const [newSlotSubject, setNewSlotSubject] = useState('');
+  const [newSlotPeriod, setNewSlotPeriod] = useState('');
+  const [editingSlot, setEditingSlot] = useState(null);
+  const [editSlotDay, setEditSlotDay] = useState('Monday');
+  const [editSlotStart, setEditSlotStart] = useState('');
+  const [editSlotEnd, setEditSlotEnd] = useState('');
+  const [editSlotRoom, setEditSlotRoom] = useState('');
+  const [editSlotSubject, setEditSlotSubject] = useState('');
+  const [editSlotPeriod, setEditSlotPeriod] = useState('');
+  const [editSlotBatch, setEditSlotBatch] = useState('');
+  // XLS-aligned grid state: which batch's weekly grid to render (default: first batch)
+  const [timetableBatch, setTimetableBatch] = useState('');
+  // When batches load and none picked, pick the first
+  // (done via effect below alongside existing fetchData flow)
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const toMinTT = (t) => { const [h, m] = String(t).split(':').map(Number); return h*60+(m||0); };
+  const fmtTT = (t) => String(t||'').slice(0,5);
 
   const handleAddSlot = async (e) => {
     e.preventDefault();
-    if (!newSlotBatch || !newSlotStart || !newSlotEnd || !newSlotRoom) return;
-    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: newSlotStart, end_time: newSlotEnd, room: newSlotRoom };
-    const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+    if (!newSlotBatch || !newSlotStart || !newSlotEnd) return;
+    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: newSlotStart, end_time: newSlotEnd, room: newSlotRoom.trim() || null, subject: newSlotSubject.trim() || null, period_number: newSlotPeriod ? Number(newSlotPeriod) : null };
+    const sameBatch = (a,b) => a===b;
+    const sameRoom = (a,b) => a && b && String(a).trim() && String(b).trim() && String(a).trim()===String(b).trim();
+    const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
     const clash = dbData.timetable.find(s =>
       s.day_of_week === candidate.day_of_week &&
-      (s.batch_id === candidate.batch_id || s.room === candidate.room) &&
+      (sameBatch(s.batch_id, candidate.batch_id) || sameRoom(s.room, candidate.room)) &&
       slotsOverlap({ start: toMin(newSlotStart), end: toMin(newSlotEnd) }, { start: toMin(s.start_time), end: toMin(s.end_time) })
     );
     if (clash) {
@@ -618,12 +652,15 @@ export default function Home() {
       const ok = confirm(`Conflicts with an existing slot (${clash.day_of_week} ${clash.start_time}–${clash.end_time}, ${batchName === dbData.batches.find(b => b.id === candidate.batch_id)?.name ? 'same batch' : 'room ' + clash.room}). Add anyway?`);
       if (!ok) return;
     }
-    const slotRes = await apiCall(`${apiUrl}/api/timetable`, {
-      method: 'POST',
-      body: JSON.stringify(candidate)
-    });
-    if (!slotRes.ok) { const e = await slotRes.json().catch(() => ({})); alert(e.error || 'Failed to add slot'); return; }
-    setNewSlotStart(''); setNewSlotEnd(''); setNewSlotRoom(''); fetchData();
+    const slotRes = await apiCall(`${apiUrl}/api/timetable`, { method: 'POST', body: JSON.stringify(candidate) });
+    if (!slotRes.ok) { const x = await slotRes.json().catch(() => ({})); alert(x.error || 'Failed to add slot'); return; }
+    setNewSlotStart(''); setNewSlotEnd(''); setNewSlotRoom(''); setNewSlotSubject(''); setNewSlotPeriod(''); fetchData();
+  };
+  const handleUpdateSlot = async (id) => {
+    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: editSlotStart, end_time: editSlotEnd, room: editSlotRoom.trim() || null, subject: editSlotSubject.trim() || null, period_number: editSlotPeriod ? Number(editSlotPeriod) : null };
+    const res = await apiCall(`${apiUrl}/api/timetable/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Update failed'); return; }
+    setEditingSlot(null); fetchData();
   };
 
   // ── Class completion loop — one entry per slot per date, student confirmations, analytics ──
@@ -1248,7 +1285,7 @@ export default function Home() {
                       <input type="email" placeholder="Official email *" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
                       <input type="text" placeholder="Contact number" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
                       <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '150px' }}>
-                        {roles.map(r => <option key={r.key} value={r.key}>{r.name} {r.category ? `(${r.category})` : ''}</option>)}
+                        {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                       </select>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -1288,7 +1325,7 @@ export default function Home() {
                                 <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
                                 <input value={editUserPhone} onChange={e => setEditUserPhone(e.target.value)} placeholder="Phone" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />
                                 <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', minWidth: '150px' }}>
-                                  {roles.map(r => <option key={r.key} value={r.key}>{r.name} ({r.category || 'staff'})</option>)}
+                                  {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                                 </select>
                               </div>
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
@@ -2380,6 +2417,17 @@ export default function Home() {
                       </thead>
                       <tbody>
                         {dbData.batches.map(b => {
+                          if (editingBatch === b.id) return (
+                            <tr key={b.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                              <td style={{ padding: '8px' }}><input value={editBatchName} onChange={e => setEditBatchName(e.target.value)} placeholder="Batch name" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                              <td style={{ padding: '8px' }}><select value={editBatchDisc} onChange={e => setEditBatchDisc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }}><option value="">—</option>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
+                              <td style={{ padding: '8px' }}><input value={editBatchLevel} onChange={e => setEditBatchLevel(e.target.value)} placeholder="Level" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                              <td style={{ padding: '8px' }}><select value={editBatchFaculty} onChange={e => setEditBatchFaculty(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }}><option value="">—</option>{dbData.users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></td>
+                              <td style={{ padding: '8px' }}><input type="number" min="1" value={editBatchCapacity} onChange={e => setEditBatchCapacity(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /></td>
+                              <td style={{ padding: '8px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '12px', background: b.status === 'active' ? 'var(--primary)' : 'var(--text-faint)', color: '#fff' }}>{b.status}</span></td>
+                              <td style={{ padding: '8px', display: 'flex', gap: '6px' }}><button onClick={() => handleUpdateBatch(b.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button><button onClick={() => setEditingBatch(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button></td>
+                            </tr>
+                          );
                           const disc = dbData.curriculum.find(d => d.id === b.discipline_id);
                           const fac = dbData.users.find(u => u.id === b.faculty_id);
                           return (
@@ -2390,7 +2438,8 @@ export default function Home() {
                               <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{fac?.name || '—'}</td>
                               <td style={{ padding: '12px' }}>{b.capacity ?? '—'}</td>
                               <td style={{ padding: '12px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '12px', background: b.status === 'active' ? 'var(--primary)' : 'var(--text-faint)', color: '#fff' }}>{b.status}</span></td>
-                              <td style={{ padding: '12px' }}>
+                              <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {canAdmin('batches') && <button onClick={() => { setEditingBatch(b.id); setEditBatchName(b.name || ''); setEditBatchDisc(b.discipline_id || ''); setEditBatchLevel(b.level || ''); setEditBatchFaculty(b.faculty_id || ''); setEditBatchCapacity(b.capacity ?? 20); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                                 {isFull('batches') && <button onClick={() => handleDelete('batches', b.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                               </td>
                             </tr>
@@ -2403,24 +2452,95 @@ export default function Home() {
               </div>
             )}
 
-            {/* TIMETABLE MODULE (conflict detection on same batch or same room) */}
+            {/* TIMETABLE MODULE — XLS grid: period no. → timing → class per day */}
             {activeModule === 'timetable' && (
               <div>
                 {canCreate('timetable') && (
-                  <form onSubmit={handleAddSlot} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <select value={newSlotBatch} onChange={e => setNewSlotBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }}>
-                      <option value="">Select Batch...</option>
+                  <form onSubmit={handleAddSlot} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <select value={newSlotBatch} onChange={e => setNewSlotBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }}>
+                      <option value="">Batch *</option>
                       {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                     <select value={newSlotDay} onChange={e => setNewSlotDay(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
                       {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
-                    <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>From <input type="time" value={newSlotStart} onChange={e => setNewSlotStart(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} /></label>
-                    <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>to <input type="time" value={newSlotEnd} onChange={e => setNewSlotEnd(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} /></label>
-                    <input placeholder="Room (e.g. Hall 1)" value={newSlotRoom} onChange={e => setNewSlotRoom(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '130px' }} />
+                    <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>From <input type="time" value={newSlotStart} onChange={e => setNewSlotStart(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
+                    <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>To <input type="time" value={newSlotEnd} onChange={e => setNewSlotEnd(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
+                    <input type="number" min="1" max="12" placeholder="Period (e.g. 1)" value={newSlotPeriod} onChange={e => setNewSlotPeriod(e.target.value)} title="Period number" style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '110px' }} />
+                    <input placeholder="Class / Topic (e.g. Practical 1, Theory)" value={newSlotSubject} onChange={e => setNewSlotSubject(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    <input placeholder="Room (optional)" value={newSlotRoom} onChange={e => setNewSlotRoom(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '130px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add Slot</button>
                   </form>
                 )}
+
+                {/* Batch picker for the weekly grid */}
+                {dbData.batches.length > 0 && (
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: '13px', color: 'var(--text-soft)', fontWeight: 600 }}>Grid for batch</label>
+                    <select value={timetableBatch} onChange={e => setTimetableBatch(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '200px' }}>
+                      {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>XLS view — period → timing → class, one row per day</span>
+                  </div>
+                )}
+
+                {/* XLS-style weekly grid */}
+                {(() => {
+                  const batchId = timetableBatch || (dbData.batches[0]?.id || '');
+                  const batchSlots = batchId ? dbData.timetable.filter(s => s.batch_id === batchId) : [];
+                  if (!batchId || batchSlots.length === 0) {
+                    return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>{!batchId ? 'Create a batch and add slots to see the weekly grid.' : 'No slots for this batch yet — add the first period above.'}</div>;
+                  }
+                  const sorted = [...batchSlots].sort((a,b) => {
+                    const pa = a.period_number ?? 999, pb = b.period_number ?? 999;
+                    if (pa !== pb) return pa - pb;
+                    return toMinTT(a.start_time) - toMinTT(b.start_time);
+                  });
+                  const periodMap = new Map();
+                  sorted.forEach(s => {
+                    const key = s.period_number != null ? `p${s.period_number}` : s.start_time;
+                    if (!periodMap.has(key)) periodMap.set(key, { key, period_number: s.period_number, start: s.start_time, end: s.end_time });
+                  });
+                  const periods = [...periodMap.values()];
+                  const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                  const hasSunday = batchSlots.some(s => s.day_of_week === 'Sunday');
+                  const gridDays = hasSunday ? [...dayOrder, 'Sunday'] : dayOrder;
+                  const findSlot = (day, col) => batchSlots.find(s => s.day_of_week === day && (s.period_number != null ? `p${s.period_number}` === col.key : s.start_time === col.key));
+                  return (
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'auto', marginBottom: '16px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: `${120 + periods.length * 130}px` }}>
+                        <thead>
+                          <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+                            <th style={{ padding: '10px 8px', borderRight: '1px solid var(--border)', minWidth: '90px', textAlign: 'left' }}>DAY</th>
+                            {periods.map(p => <th key={p.key} style={{ padding: '10px 6px', borderRight: '1px solid var(--border)', minWidth: '120px', fontWeight: 700, color: 'var(--primary-deep)' }}>{p.period_number != null ? p.period_number : '•'}</th>)}
+                          </tr>
+                          <tr style={{ background: 'var(--bg-saffron)', borderBottom: '2px solid var(--border)', textAlign: 'center', fontSize: '11.5px', color: 'var(--text-soft)' }}>
+                            <th style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', fontWeight: 600, textAlign: 'left' }}></th>
+                            {periods.map(p => <th key={p.key} style={{ padding: '6px 4px', borderRight: '1px solid var(--border)', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmtTT(p.start)} – {fmtTT(p.end)}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gridDays.map(day => (
+                            <tr key={day} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '10px 8px', fontWeight: 700, background: 'var(--bg)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{day.slice(0, 3).toUpperCase()}</td>
+                              {periods.map(col => {
+                                const slot = findSlot(day, col);
+                                return (
+                                  <td key={col.key} style={{ padding: '8px 6px', borderRight: '1px solid var(--border)', textAlign: 'center', verticalAlign: 'middle', background: slot ? 'var(--surface)' : 'var(--bg-saffron)', opacity: slot ? 1 : 0.7 }}>
+                                    {slot ? <><div style={{ fontWeight: 600, color: 'var(--primary-deep)', fontSize: '13px', lineHeight: 1.25 }}>{slot.subject || '—'}</div>{slot.room ? <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{slot.room}</div> : null}</> : <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>—</span>}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-faint)', borderTop: '1px solid var(--border)' }}>Period → time → class. Edit periods in the list below. BREAK / LUNCH are gaps between periods — add them as needed by leaving a period empty or adding a free slot.</div>
+                    </div>
+                  );
+                })()}
+
+                {/* Editable slot list (period + subject + room, inline edit) */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
                   {dbData.timetable.length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No slots yet — add the first weekly class slot above.</div>
@@ -2428,20 +2548,34 @@ export default function Home() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                       <thead>
                         <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                          <th style={{ padding: '12px' }}>Day</th><th style={{ padding: '12px' }}>Time</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Room</th><th style={{ padding: '12px' }}>Actions</th>
+                          <th style={{ padding: '12px' }}>Day</th><th style={{ padding: '12px' }}>Period</th><th style={{ padding: '12px' }}>Time</th><th style={{ padding: '12px' }}>Class / Topic</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Room</th><th style={{ padding: '12px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(day =>
-                          dbData.timetable.filter(s => s.day_of_week === day).map(s => {
+                        {DAYS.map(day =>
+                          dbData.timetable.filter(s => s.day_of_week === day).sort((a,b) => (a.period_number ?? 999) - (b.period_number ?? 999) || toMinTT(a.start_time) - toMinTT(b.start_time)).map(s => {
+                            if (editingSlot === s.id) return (
+                              <tr key={s.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                                <td style={{ padding: '8px' }}><select value={editSlotDay} onChange={e => setEditSlotDay(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></td>
+                                <td style={{ padding: '8px' }}><input type="number" min="1" max="12" value={editSlotPeriod} onChange={e => setEditSlotPeriod(e.target.value)} placeholder="—" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /></td>
+                                <td style={{ padding: '8px', whiteSpace: 'nowrap' }}><input type="time" value={editSlotStart} onChange={e => setEditSlotStart(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} /> – <input type="time" value={editSlotEnd} onChange={e => setEditSlotEnd(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} /></td>
+                                <td style={{ padding: '8px' }}><input value={editSlotSubject} onChange={e => setEditSlotSubject(e.target.value)} placeholder="Class / Topic" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                                <td style={{ padding: '8px' }}><select value={editSlotBatch} onChange={e => setEditSlotBatch(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></td>
+                                <td style={{ padding: '8px' }}><input value={editSlotRoom} onChange={e => setEditSlotRoom(e.target.value)} placeholder="optional" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100px' }} /></td>
+                                <td style={{ padding: '8px', display: 'flex', gap: '6px' }}><button onClick={() => handleUpdateSlot(s.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button><button onClick={() => setEditingSlot(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button></td>
+                              </tr>
+                            );
                             const batch = dbData.batches.find(b => b.id === s.batch_id);
                             return (
                               <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                 <td style={{ padding: '12px', fontWeight: 600 }}>{day}</td>
-                                <td style={{ padding: '12px' }}>{s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}</td>
+                                <td style={{ padding: '12px', textAlign: 'center', fontWeight: s.period_number ? 600 : 400 }}>{s.period_number ?? '—'}</td>
+                                <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{fmtTT(s.start_time)} – {fmtTT(s.end_time)}</td>
+                                <td style={{ padding: '12px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.subject || <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>—</span>}</td>
                                 <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
-                                <td style={{ padding: '12px' }}>{s.room}</td>
-                                <td style={{ padding: '12px' }}>
+                                <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{s.room || <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
+                                <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                  {canAdmin('timetable') && <button onClick={() => { setEditingSlot(s.id); setEditSlotDay(s.day_of_week); setEditSlotStart(s.start_time?.slice(0,5) || ''); setEditSlotEnd(s.end_time?.slice(0,5) || ''); setEditSlotRoom(s.room || ''); setEditSlotSubject(s.subject || ''); setEditSlotPeriod(s.period_number != null ? String(s.period_number) : ''); setEditSlotBatch(s.batch_id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                                   {canAdmin('timetable') && <button onClick={() => handleDelete('timetable', s.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                                 </td>
                               </tr>
