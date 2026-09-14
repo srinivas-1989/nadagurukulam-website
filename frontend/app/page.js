@@ -21,6 +21,8 @@ export default function Home() {
     { key: 'jobs', name: 'Jobs', desc: 'Faculty & Staff postings, applicant tracking.' },
     { key: 'enquiries', name: 'Enquiries', desc: 'Admissions & general enquiries inbox.' },
     { key: 'activities', name: 'Activities', desc: 'Competitions, performances, achievements.' },
+    { key: 'projects', name: 'Projects', desc: 'Student portfolio — works beyond curriculum.' },
+    { key: 'certificates', name: 'Certificates', desc: 'Institutional + external achievements.' },
     { key: 'roles', name: 'Roles & Permissions', desc: 'Create roles and set what each can do in every module.' }
   ];
 
@@ -83,7 +85,7 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], course_types: [], examination_types: [],
-    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], role_permissions: [], assignment_submissions: [],
+    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
     class_entries: [], class_confirmations: []
   });
   const [roles, setRoles] = useState([]);
@@ -195,7 +197,7 @@ export default function Home() {
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['liveclasses', 'live_sessions'],
-        ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'],
+        ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
         ['role_permissions', 'role_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
@@ -495,6 +497,57 @@ export default function Home() {
       body: JSON.stringify({ batch_id: newActivityBatch, title: newActivityTitle, category: newActivityCategory, date: newActivityDate, description: newActivityDesc })
     });
     setNewActivityBatch(''); setNewActivityTitle(''); setNewActivityCategory('Performance'); setNewActivityDate(''); setNewActivityDesc(''); fetchData();
+  };
+
+  // Projects — student portfolio (beyond curriculum)
+  const [newProjBatch, setNewProjBatch] = useState('');
+  const [newProjTitle, setNewProjTitle] = useState('');
+  const [newProjDesc, setNewProjDesc] = useState('');
+  const [newProjCourse, setNewProjCourse] = useState('');
+  const [newProjTopic, setNewProjTopic] = useState('');
+  const [newProjAttachment, setNewProjAttachment] = useState('');
+  const [editingProject, setEditingProject] = useState(null);
+  const [editProj, setEditProj] = useState({});
+  const handleAddProject = async (e) => {
+    e.preventDefault();
+    if (!newProjBatch || !newProjTitle) return;
+    const res = await apiCall(`${apiUrl}/api/projects`, { method: 'POST', body: JSON.stringify({ batch_id: newProjBatch, title: newProjTitle, description: newProjDesc || null, course_id: newProjCourse || null, topic_text: newProjTopic.trim() || null, attachment_url: newProjAttachment.trim() || null, student_id: myProfile?.id || undefined }) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Failed to create project'); return; }
+    setNewProjTitle(''); setNewProjDesc(''); setNewProjCourse(''); setNewProjTopic(''); setNewProjAttachment(''); fetchData();
+  };
+  const handleSaveProject = async () => {
+    if (!editingProject) return;
+    const res = await apiCall(`${apiUrl}/api/projects/${editingProject}`, { method: 'PUT', body: JSON.stringify(editProj) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Save failed'); return; }
+    setEditingProject(null); setEditProj({}); fetchData();
+  };
+
+  // Certificates — per-student (scan upload + institutional)
+  const [newCertTitle, setNewCertTitle] = useState('');
+  const [newCertIssuer, setNewCertIssuer] = useState('');
+  const [newCertDate, setNewCertDate] = useState('');
+  const [newCertType, setNewCertType] = useState('external');
+  const [newCertFile, setNewCertFile] = useState('');
+  const [newCertDesc, setNewCertDesc] = useState('');
+  const [editingCert, setEditingCert] = useState(null);
+  const [editCert, setEditCert] = useState({});
+  const handleAddCertificate = async (e) => {
+    e.preventDefault();
+    if (!newCertTitle) return;
+    const res = await apiCall(`${apiUrl}/api/certificates`, { method: 'POST', body: JSON.stringify({ title: newCertTitle, issuer: newCertIssuer || null, issue_date: newCertDate || null, certificate_type: newCertType, file_url: newCertFile.trim() || null, description: newCertDesc || null, student_id: myProfile?.id || undefined }) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Failed to add certificate'); return; }
+    setNewCertTitle(''); setNewCertIssuer(''); setNewCertDate(''); setNewCertFile(''); setNewCertDesc(''); fetchData();
+  };
+  const handleSaveCert = async () => {
+    if (!editingCert) return;
+    const res = await apiCall(`${apiUrl}/api/certificates/${editingCert}`, { method: 'PUT', body: JSON.stringify(editCert) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Save failed'); return; }
+    setEditingCert(null); setEditCert({}); fetchData();
+  };
+  const handleVerifyCert = async (c) => {
+    const res = await apiCall(`${apiUrl}/api/certificates/${c.id}`, { method: 'PUT', body: JSON.stringify({ verified: !c.verified }) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Verify failed'); return; }
+    fetchData();
   };
 
   // Batches — cohorts: roster anchor for timetable, live classes, assignments, feedback.
@@ -2057,6 +2110,156 @@ export default function Home() {
                               <td style={{ padding: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.description}</td>
                               <td style={{ padding: '12px' }}>
                                 {canAdmin('activities') && <button onClick={() => handleDelete('activities', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PROJECTS MODULE — student portfolio */}
+            {activeModule === 'projects' && (
+              <div>
+                {canCreate('projects') && (
+                  <form onSubmit={handleAddProject} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <select value={newProjBatch} onChange={e => setNewProjBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
+                      <option value="">Select Batch…</option>
+                      {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <input placeholder="Project title" value={newProjTitle} onChange={e => setNewProjTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 250px' }} />
+                    <select value={newProjCourse} onChange={e => setNewProjCourse(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }}>
+                      <option value="">Course (optional)</option>
+                      {dbData.courses.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                    </select>
+                    <input placeholder="Topic / subject (free text)" value={newProjTopic} onChange={e => setNewProjTopic(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    <input placeholder="Attachment URL (optional)" value={newProjAttachment} onChange={e => setNewProjAttachment(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <textarea placeholder="Description" value={newProjDesc} onChange={e => setNewProjDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Add Project</button>
+                  </form>
+                )}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
+                  {(dbData.projects || []).length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No projects yet — students' own works beyond curriculum appear here.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                          <th style={{ padding: '12px' }}>Title</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Student</th><th style={{ padding: '12px' }}>Course / Topic</th><th style={{ padding: '12px' }}>Attachment</th><th style={{ padding: '12px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(dbData.projects || []).map(p => {
+                          const batch = dbData.batches.find(b => b.id === p.batch_id);
+                          const student = dbData.users.find(u => u.id === p.student_id);
+                          const course = dbData.courses.find(c => c.id === p.course_id);
+                          const isOwner = myProfile && String(p.student_id) === String(myProfile.id);
+                          const canEdit = isOwner || canAdmin('projects');
+                          if (editingProject === p.id) {
+                            return (
+                              <tr key={p.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                                <td colSpan={6} style={{ padding: '12px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                    <input value={editProj.title ?? p.title} onChange={e => setEditProj(s => ({ ...s, title: e.target.value }))} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                                    <input value={editProj.topic_text ?? p.topic_text ?? ''} onChange={e => setEditProj(s => ({ ...s, topic_text: e.target.value }))} placeholder="Topic" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }} />
+                                    <input value={editProj.attachment_url ?? p.attachment_url ?? ''} onChange={e => setEditProj(s => ({ ...s, attachment_url: e.target.value }))} placeholder="Attachment URL" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                                  </div>
+                                  <textarea value={editProj.description ?? p.description ?? ''} onChange={e => setEditProj(s => ({ ...s, description: e.target.value }))} placeholder="Description" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', minHeight: '60px', marginBottom: '8px' }} />
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button onClick={handleSaveProject} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                                    <button onClick={() => { setEditingProject(null); setEditProj({}); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return (
+                            <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '12px', fontWeight: 600 }}>{p.title}<div style={{ fontSize: '12px', color: 'var(--text-soft)', fontWeight: 400, whiteSpace: 'pre-wrap' }}>{p.description ? p.description.slice(0, 120) : ''}</div></td>
+                              <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
+                              <td style={{ padding: '12px' }}>{student?.name || p.student_id.slice(0, 6)} <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>{student?.roll_no || ''}</span></td>
+                              <td style={{ padding: '12px', fontSize: '12.5px', color: 'var(--text-soft)' }}>{course ? course.code + ' · ' + course.name : ''}{p.topic_text ? (course ? ' › ' : '') + p.topic_text : ''}{!course && !p.topic_text ? '—' : ''}</td>
+                              <td style={{ padding: '12px' }}>{p.attachment_url ? <a href={p.attachment_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontSize: '12px' }}>📎 file</a> : '—'}</td>
+                              <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {canEdit && <button onClick={() => { setEditingProject(p.id); setEditProj({ title: p.title, description: p.description || '', topic_text: p.topic_text || '', attachment_url: p.attachment_url || '' }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                                {canEdit && <button onClick={() => handleDelete('projects', p.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* CERTIFICATES MODULE — institutional + external uploads */}
+            {activeModule === 'certificates' && (
+              <div>
+                {canCreate('certificates') && (
+                  <form onSubmit={handleAddCertificate} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <input placeholder="Certificate title *" value={newCertTitle} onChange={e => setNewCertTitle(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 250px' }} />
+                    <input placeholder="Issuer (e.g. NDG / External org)" value={newCertIssuer} onChange={e => setNewCertIssuer(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    <input type="date" value={newCertDate} onChange={e => setNewCertDate(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                    <select value={newCertType} onChange={e => setNewCertType(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <option value="external">External</option>
+                      <option value="institutional">Institutional</option>
+                    </select>
+                    <input placeholder="File URL (scan link)" value={newCertFile} onChange={e => setNewCertFile(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <textarea placeholder="Description" value={newCertDesc} onChange={e => setNewCertDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Add Certificate</button>
+                  </form>
+                )}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
+                  {(dbData.certificates || []).length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No certificates yet — upload institutional or external achievements here.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                          <th style={{ padding: '12px' }}>Title</th><th style={{ padding: '12px' }}>Student</th><th style={{ padding: '12px' }}>Issuer</th><th style={{ padding: '12px' }}>Date</th><th style={{ padding: '12px' }}>Type</th><th style={{ padding: '12px' }}>File</th><th style={{ padding: '12px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(dbData.certificates || []).map(c => {
+                          const student = dbData.users.find(u => u.id === c.student_id);
+                          const isOwner = myProfile && String(c.student_id) === String(myProfile.id);
+                          const canEdit = isOwner || canAdmin('certificates');
+                          if (editingCert === c.id) {
+                            return (
+                              <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                                <td colSpan={7} style={{ padding: '12px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                    <input value={editCert.title ?? c.title} onChange={e => setEditCert(s => ({ ...s, title: e.target.value }))} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                                    <input value={editCert.issuer ?? c.issuer ?? ''} onChange={e => setEditCert(s => ({ ...s, issuer: e.target.value }))} placeholder="Issuer" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }} />
+                                    <input type="date" value={editCert.issue_date ?? c.issue_date ?? ''} onChange={e => setEditCert(s => ({ ...s, issue_date: e.target.value }))} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+                                    <input value={editCert.file_url ?? c.file_url ?? ''} onChange={e => setEditCert(s => ({ ...s, file_url: e.target.value }))} placeholder="File URL" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                                  </div>
+                                  <textarea value={editCert.description ?? c.description ?? ''} onChange={e => setEditCert(s => ({ ...s, description: e.target.value }))} placeholder="Description" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', minHeight: '60px', marginBottom: '8px' }} />
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button onClick={handleSaveCert} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                                    <button onClick={() => { setEditingCert(null); setEditCert({}); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return (
+                            <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '12px', fontWeight: 600 }}>{c.title} {c.verified ? <span style={{ marginLeft: '6px', background: '#15803d', color: '#fff', padding: '1px 6px', borderRadius: '99px', fontSize: '10px' }}>verified</span> : null}<div style={{ fontSize: '12px', color: 'var(--text-soft)', fontWeight: 400 }}>{c.description ? c.description.slice(0, 100) : ''}</div></td>
+                              <td style={{ padding: '12px' }}>{student?.name || c.student_id.slice(0, 6)}</td>
+                              <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{c.issuer || '—'}</td>
+                              <td style={{ padding: '12px' }}>{c.issue_date || '—'}</td>
+                              <td style={{ padding: '12px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', background: c.certificate_type === 'institutional' ? 'var(--primary)' : 'var(--accent)', color: '#fff' }}>{c.certificate_type}</span></td>
+                              <td style={{ padding: '12px' }}>{c.file_url ? <a href={c.file_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontSize: '12px' }}>📎 view</a> : '—'}</td>
+                              <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {canAdmin('certificates') && <button onClick={() => handleVerifyCert(c)} style={{ background: c.verified ? 'var(--text-faint)' : 'var(--primary)', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>{c.verified ? 'Unverify' : 'Verify'}</button>}
+                                {canEdit && <button onClick={() => { setEditingCert(c.id); setEditCert({ title: c.title, issuer: c.issuer || '', issue_date: c.issue_date || '', file_url: c.file_url || '', description: c.description || '' }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                                {canEdit && <button onClick={() => handleDelete('certificates', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                               </td>
                             </tr>
                           );

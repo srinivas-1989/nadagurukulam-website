@@ -159,7 +159,8 @@ const API_TO_MODULE = {
   course_types: 'curriculum', examination_types: 'curriculum',
   roles: 'roles', role_permissions: 'roles',
   class_entries: 'timetable', class_confirmations: 'timetable',
-  assignment_submissions: 'assignments'
+  assignment_submissions: 'assignments',
+  projects: 'projects', certificates: 'certificates'
 };
 // Reverse: table name → module_key (crud is instantiated with table names)
 const TABLE_TO_MODULE = {
@@ -168,7 +169,8 @@ const TABLE_TO_MODULE = {
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   course_types: 'curriculum', examination_types: 'curriculum',
   class_entries: 'timetable', class_confirmations: 'timetable',
-  assignment_submissions: 'assignments'
+  assignment_submissions: 'assignments',
+  projects: 'projects', certificates: 'certificates'
 };
 
 // ── Row-level scoping helpers ──────────────────────────────────────────────
@@ -188,7 +190,7 @@ async function getOwnedBatchIds(profileId) {
   return [...ids];
 }
 
-const OWN_BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities', 'class_entries', 'class_confirmations', 'assignment_submissions']);
+const OWN_BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects']);
 
 function applyListScope(query, table, level, profile, ownedBatchIds) {
   if (table === 'assignment_submissions') {
@@ -197,6 +199,18 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
       if (!ownedBatchIds || ownedBatchIds.length === 0) return query.in('batch_id', ['00000000-0000-0000-0000-000000000000']);
       return query.in('batch_id', ownedBatchIds);
     }
+    return query.eq('student_id', profile.id);
+  }
+  if (table === 'projects') {
+    if (level === 'Manage' || level === 'Full') return query;
+    if (level === 'Own') {
+      if (!ownedBatchIds || ownedBatchIds.length === 0) return query.in('batch_id', ['00000000-0000-0000-0000-000000000000']);
+      return query.in('batch_id', ownedBatchIds);
+    }
+    return query.eq('student_id', profile.id);
+  }
+  if (table === 'certificates') {
+    if (level === 'Manage' || level === 'Full') return query;
     return query.eq('student_id', profile.id);
   }
   if (level === 'View' || level === 'Submits' || level === 'Manage' || level === 'Full') return query;
@@ -228,7 +242,14 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
 }
 
 async function checkRowOwnership(table, level, profile, rowId) {
-  if (table === 'assignment_submissions') {
+  if (table === 'certificates') {
+    const { data: row } = await supabase.from(table).select('student_id').eq('id', rowId).single();
+    if (!row) return true;
+    if (String(row.student_id) === String(profile.id)) return true;
+    if ((LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage']) return true;
+    return false;
+  }
+  if (table === 'assignment_submissions' || table === 'projects') {
     const { data: row } = await supabase.from(table).select('student_id, batch_id').eq('id', rowId).single();
     if (!row) return true;
     if (String(row.student_id) === String(profile.id)) return true;
@@ -323,7 +344,9 @@ const crud = (table, orderCol = 'created_at') => ({
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
       const isSelfSubmission = table === 'assignment_submissions' && String(req.body.student_id) === String(req.auth?.profile?.id);
-      if (table === 'assignment_submissions' && isSelfSubmission) {
+      const isSelfProject = table === 'projects' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
+      const isSelfCert = table === 'certificates' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
+      if ((table === 'assignment_submissions' && isSelfSubmission) || (table === 'projects' && isSelfProject) || (table === 'certificates' && isSelfCert)) {
         if (!level) return res.status(403).json({ error: 'You do not have View access for this module.' });
       } else if (!level || !canAccess(level, 'create')) {
         return res.status(403).json({ error: 'You do not have Create access for this module.' });
@@ -399,6 +422,24 @@ const crud = (table, orderCol = 'created_at') => ({
         if (!req.body.assignment_id || !req.body.batch_id || !req.body.student_id) return res.status(400).json({ error: 'assignment_id, batch_id, student_id required' });
         if (String(req.body.student_id) !== String(req.auth.profile.id) && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Cannot create submission for another student' });
       }
+      if (table === 'projects') {
+        if (!req.body.batch_id || !req.body.title) return res.status(400).json({ error: 'batch_id and title are required' });
+        if (!req.body.student_id) req.body.student_id = req.auth.profile.id;
+        if (String(req.body.student_id) !== String(req.auth.profile.id) && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Cannot create project for another student' });
+        if (req.body.course_id === '') req.body.course_id = null;
+        if (req.body.verified !== undefined) delete req.body.verified;
+        if (req.body.verified_by !== undefined) delete req.body.verified_by;
+      }
+      if (table === 'certificates') {
+        if (!req.body.title) return res.status(400).json({ error: 'title is required' });
+        if (!req.body.student_id) req.body.student_id = req.auth.profile.id;
+        if (String(req.body.student_id) !== String(req.auth.profile.id) && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Cannot create certificate for another student' });
+        if (req.body.certificate_type && !['institutional','external'].includes(req.body.certificate_type)) return res.status(400).json({ error: 'Invalid certificate_type' });
+        if (req.body.issue_date === '') req.body.issue_date = null;
+        if (req.body.file_url === '') req.body.file_url = null;
+        if (req.body.verified !== undefined && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) delete req.body.verified;
+        if (req.body.verified_by !== undefined) delete req.body.verified_by;
+      }
       // ── courses: auto-derive teaching_hours ────────────────────────────
       let payload = { ...req.body };
       if (table === 'courses' && payload.teaching_periods !== undefined && payload.teaching_periods !== '' && payload.teaching_periods !== null) {
@@ -430,6 +471,39 @@ const crud = (table, orderCol = 'created_at') => ({
         if (ud.status === 'graded' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Only teachers can grade.' });
         if (isOwner && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage'] && ud.status && !['started','submitted'].includes(ud.status)) return res.status(403).json({ error: 'Invalid transition' });
         if (isOwner && ud.status === 'submitted' && !ud.submitted_at) ud.submitted_at = new Date().toISOString();
+        if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        return res.json(data[0]);
+      }
+      if (table === 'projects') {
+        const { data: cur } = await supabase.from('projects').select('student_id').eq('id', req.params.id).single();
+        if (!cur) return res.status(404).json({ error: 'Not found' });
+        const isOwner = String(cur.student_id) === String(req.auth.profile.id);
+        const isManage = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        if (!isOwner && !isManage) return res.status(403).json({ error: 'You do not own this record.' });
+        if (!isOwner && !canAccess(level, 'update')) return res.status(403).json({ error: 'You do not have Manage access for this module.' });
+        let ud = { ...req.body };
+        if (!isManage) { delete ud.student_id; delete ud.batch_id; delete ud.verified; delete ud.verified_by; }
+        if (ud.course_id === '') ud.course_id = null;
+        if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        return res.json(data[0]);
+      }
+      if (table === 'certificates') {
+        const { data: cur } = await supabase.from('certificates').select('student_id').eq('id', req.params.id).single();
+        if (!cur) return res.status(404).json({ error: 'Not found' });
+        const isOwner = String(cur.student_id) === String(req.auth.profile.id);
+        const isManage = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        if (!isOwner && !isManage) return res.status(403).json({ error: 'You do not own this record.' });
+        if (!isOwner && !canAccess(level, 'update')) return res.status(403).json({ error: 'You do not have Manage access for this module.' });
+        let ud = { ...req.body };
+        if (!isManage) { delete ud.verified; delete ud.verified_by; delete ud.student_id; }
+        else if (ud.verified && !ud.verified_by) ud.verified_by = req.auth.profile.id;
+        if (ud.issue_date === '') ud.issue_date = null;
+        if (ud.file_url === '') ud.file_url = null;
+        if (ud.certificate_type && !['institutional','external'].includes(ud.certificate_type) && !isManage) delete ud.certificate_type;
         if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
         const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
         if (error) throw error;
@@ -487,6 +561,16 @@ const crud = (table, orderCol = 'created_at') => ({
     try {
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+      if (table === 'projects' || table === 'certificates') {
+        const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
+        if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
+        const isManage = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        const ownerDeleteOk = level && !isManage; // View/Self/Submits/Own can delete own row
+        if (!isManage && !ownerDeleteOk) return res.status(403).json({ error: 'You do not have Manage access for this module.' });
+        const { error } = await supabase.from(table).delete().eq('id', req.params.id);
+        if (error) throw error;
+        return res.status(204).send();
+      }
       if (!level || !canAccess(level, 'delete')) {
         return res.status(403).json({ error: 'You do not have Full access for this module.' });
       }
@@ -644,11 +728,11 @@ const rolesDelete = async (req, res) => {
 };
 
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
-const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions']);
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', course_types: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', course_types: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'course_types', 'examination_types', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'course_types', 'examination_types', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);

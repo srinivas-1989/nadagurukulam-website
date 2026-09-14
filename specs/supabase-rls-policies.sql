@@ -556,3 +556,72 @@ create policy "Submissions deletable by teacher"
   on public.assignment_submissions for delete
   to authenticated
   using (batch_id = any(public.my_batch_ids()) or public.has_permission('assignments', array['Manage','Full']));
+
+-- ============================================================================
+-- PROJECTS — student portfolio (projects module)
+-- ============================================================================
+drop policy if exists "Projects readable by owner or batch" on public.projects;
+create policy "Projects readable by owner or batch"
+  on public.projects for select
+  to authenticated
+  using (
+    student_id = public.my_user_id()
+    or batch_id = any(public.my_batch_ids())
+    or public.has_permission('projects', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Projects insertable by owner or manager" on public.projects;
+create policy "Projects insertable by owner or manager"
+  on public.projects for insert
+  to authenticated
+  with check (
+    student_id = public.my_user_id()
+    or public.has_permission('projects', array['Manage','Full'])
+  );
+
+drop policy if exists "Projects updatable by owner or manager" on public.projects;
+create policy "Projects updatable by owner or manager"
+  on public.projects for update
+  to authenticated
+  using (student_id = public.my_user_id() or batch_id = any(public.my_batch_ids()) or public.has_permission('projects', array['Manage','Full']))
+  with check (student_id = public.my_user_id() or batch_id = any(public.my_batch_ids()) or public.has_permission('projects', array['Manage','Full']));
+
+drop policy if exists "Projects deletable by owner or manager" on public.projects;
+create policy "Projects deletable by owner or manager"
+  on public.projects for delete
+  to authenticated
+  using (student_id = public.my_user_id() or batch_id = any(public.my_batch_ids()) or public.has_permission('projects', array['Manage','Full']));
+
+-- ============================================================================
+-- CERTIFICATES — per-student (certificates module)
+-- ============================================================================
+drop policy if exists "Certificates readable by owner or manager" on public.certificates;
+create policy "Certificates readable by owner or manager"
+  on public.certificates for select
+  to authenticated
+  using (
+    student_id = public.my_user_id()
+    or public.has_permission('certificates', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Certificates insertable by owner or manager" on public.certificates;
+create policy "Certificates insertable by owner or manager"
+  on public.certificates for insert
+  to authenticated
+  with check (
+    student_id = public.my_user_id()
+    or public.has_permission('certificates', array['Manage','Full'])
+  );
+
+drop policy if exists "Certificates updatable by owner or manager" on public.certificates;
+create policy "Certificates updatable by owner or manager"
+  on public.certificates for update
+  to authenticated
+  using (student_id = public.my_user_id() or public.has_permission('certificates', array['Manage','Full']))
+  with check (student_id = public.my_user_id() or public.has_permission('certificates', array['Manage','Full']));
+
+drop policy if exists "Certificates deletable by owner or manager" on public.certificates;
+create policy "Certificates deletable by owner or manager"
+  on public.certificates for delete
+  to authenticated
+  using (student_id = public.my_user_id() or public.has_permission('certificates', array['Manage','Full']));
