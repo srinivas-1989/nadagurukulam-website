@@ -35,7 +35,9 @@ export default function Home() {
   const [password, setPassword] = useState('');
 
   const resolveRole = (uid) =>
-    supabase.from('users').select('role_key').eq('auth_user_id', uid).single();
+    supabase.from('users').select('role_key, id').eq('auth_user_id', uid).single();
+  const loadMyProfile = (uid) =>
+    supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
 
   // Load initial session
   useEffect(() => {
@@ -46,6 +48,7 @@ export default function Home() {
           if (data) setRole(data.role_key);
           setView('admin');
         });
+        loadMyProfile(s.user.id);
       }
     });
 
@@ -56,8 +59,10 @@ export default function Home() {
           if (data) setRole(data.role_key);
           setView('admin');
         });
+        loadMyProfile(sess.user.id);
       } else {
         setRole(null);
+        setMyProfile(null);
         setView('public');
       }
     });
@@ -78,9 +83,11 @@ export default function Home() {
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], course_types: [], examination_types: [],
-    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], role_permissions: []
+    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], role_permissions: [], assignment_submissions: [],
+    class_entries: [], class_confirmations: []
   });
   const [roles, setRoles] = useState([]);
+  const [myProfile, setMyProfile] = useState(null);
 
   // Auth helper functions
   const apiCall = async (url, options = {}) => {
@@ -183,12 +190,13 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
+      if (session?.user?.id) loadMyProfile(session.user.id);
       const endpoints = [
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'],
-        ['role_permissions', 'role_permissions']
+        ['role_permissions', 'role_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
         apiCall(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])
@@ -370,15 +378,24 @@ export default function Home() {
   const [newAssignType, setNewAssignType] = useState('audio_video');
   const [newAssignDue, setNewAssignDue] = useState('');
   const [newAssignDesc, setNewAssignDesc] = useState('');
+  const [newAssignCourse, setNewAssignCourse] = useState('');
+  const [newAssignModule, setNewAssignModule] = useState('');
+  const [newAssignTopic, setNewAssignTopic] = useState('');
+  const [newAssignTopicText, setNewAssignTopicText] = useState('');
+  const [newAssignAttachment, setNewAssignAttachment] = useState('');
+  const [submitAttachments, setSubmitAttachments] = useState({});
+
+  const assignModules = newAssignCourse ? (dbData.course_modules || []).filter(m => m.course_id === newAssignCourse) : [];
+  const assignTopics = newAssignModule ? (dbData.course_module_topics || []).filter(t => t.module_id === newAssignModule) : [];
 
   const handleAddAssignment = async (e) => {
     e.preventDefault();
     if (!newAssignBatch || !newAssignTitle || !newAssignDue) return;
     await apiCall(`${apiUrl}/api/assignments`, {
       method: 'POST',
-      body: JSON.stringify({ batch_id: newAssignBatch, title: newAssignTitle, type: newAssignType, due_date: newAssignDue, description: newAssignDesc, status: 'open' })
+      body: JSON.stringify({ batch_id: newAssignBatch, title: newAssignTitle, type: newAssignType, due_date: newAssignDue, description: newAssignDesc, status: 'open', course_id: newAssignCourse || null, module_id: newAssignModule || null, topic_id: newAssignTopic || null, topic_text: newAssignTopicText.trim() || null, attachment_url: newAssignAttachment.trim() || null, created_by: myProfile?.id || null })
     });
-    setNewAssignBatch(''); setNewAssignTitle(''); setNewAssignType('audio_video'); setNewAssignDue(''); setNewAssignDesc(''); fetchData();
+    setNewAssignBatch(''); setNewAssignTitle(''); setNewAssignType('audio_video'); setNewAssignDue(''); setNewAssignDesc(''); setNewAssignCourse(''); setNewAssignModule(''); setNewAssignTopic(''); setNewAssignTopicText(''); setNewAssignAttachment(''); fetchData();
   };
 
   const handleUpdateAssignmentStatus = async (id, status) => {
@@ -386,6 +403,39 @@ export default function Home() {
       method: 'PUT',
       body: JSON.stringify({ status })
     });
+    fetchData();
+  };
+
+  const handleStartAssignment = async (assignment) => {
+    if (!myProfile?.id) { alert('Profile not loaded'); return; }
+    const res = await apiCall(`${apiUrl}/api/assignment_submissions`, {
+      method: 'POST',
+      body: JSON.stringify({ assignment_id: assignment.id, batch_id: assignment.batch_id, student_id: myProfile.id, status: 'started' })
+    });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Failed to start'); return; }
+    fetchData();
+  };
+  const handleSubmitAssignment = async (assignment) => {
+    if (!myProfile?.id) return;
+    const sub = (dbData.assignment_submissions || []).find(s => s.assignment_id === assignment.id && s.student_id === myProfile.id);
+    if (!sub) { alert('Start assignment first'); return; }
+    const att = (submitAttachments[assignment.id] || '').trim() || sub.attachment_url || null;
+    const res = await apiCall(`${apiUrl}/api/assignment_submissions/${sub.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'submitted', submitted_at: new Date().toISOString(), attachment_url: att })
+    });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Failed to submit'); return; }
+    fetchData();
+  };
+  const handleGradeSubmission = async (sub) => {
+    const grade = prompt('Grade (e.g. A / 85%)', sub.grade || '');
+    if (grade === null) return;
+    const feedback = prompt('Feedback', sub.feedback || '') || null;
+    const res = await apiCall(`${apiUrl}/api/assignment_submissions/${sub.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'graded', grade: grade || null, feedback })
+    });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Failed to grade'); return; }
     fetchData();
   };
 
@@ -495,6 +545,42 @@ export default function Home() {
     });
     if (!slotRes.ok) { const e = await slotRes.json().catch(() => ({})); alert(e.error || 'Failed to add slot'); return; }
     setNewSlotStart(''); setNewSlotEnd(''); setNewSlotRoom(''); fetchData();
+  };
+
+  // ── Class completion loop — one entry per slot per date, student confirmations, analytics ──
+  const [ceSlot, setCeSlot] = useState('');
+  const [ceDate, setCeDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [ceCourse, setCeCourse] = useState('');
+  const [ceModule, setCeModule] = useState('');
+  const [ceTopic, setCeTopic] = useState('');
+  const [ceTopicText, setCeTopicText] = useState('');
+  const [ceNotes, setCeNotes] = useState('');
+  const ceModules = ceCourse ? (dbData.course_modules || []).filter(m => m.course_id === ceCourse) : [];
+  const ceTopics = ceModule ? (dbData.course_module_topics || []).filter(t => t.module_id === ceModule) : [];
+
+  const handleAddClassEntry = async (e) => {
+    e.preventDefault();
+    if (!ceSlot || !ceDate) { alert('Pick a slot and date'); return; }
+    const slot = dbData.timetable.find(s => s.id === ceSlot);
+    if (!slot) { alert('Invalid slot'); return; }
+    const payload = { timetable_slot_id: ceSlot, batch_id: slot.batch_id, class_date: ceDate, course_id: ceCourse || null, module_id: ceModule || null, topic_id: ceTopic || null, topic_text: ceTopicText.trim() || null, notes: ceNotes.trim() || null, taught_by: myProfile?.id || null, status: 'submitted' };
+    if (!payload.course_id && !payload.topic_text) { alert('Pick a course/topic or enter a free topic'); return; }
+    const res = await apiCall(`${apiUrl}/api/class_entries`, { method: 'POST', body: JSON.stringify(payload) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || 'Failed to log class'); return; }
+    setCeTopic(''); setCeTopicText(''); setCeNotes(''); fetchData();
+  };
+
+  const handleConfirm = async (entry, nextStatus) => {
+    if (!myProfile?.id) { alert('Profile not loaded'); return; }
+    const existing = (dbData.class_confirmations || []).find(c => c.class_entry_id === entry.id && c.student_id === myProfile.id);
+    let comment = null;
+    if (nextStatus === 'disputed') { comment = prompt('What was different? (optional)') || null; }
+    const body = { class_entry_id: entry.id, batch_id: entry.batch_id, student_id: myProfile.id, status: nextStatus, comment };
+    let res;
+    if (existing) res = await apiCall(`${apiUrl}/api/class_confirmations/${existing.id}`, { method: 'PUT', body: JSON.stringify({ status: nextStatus, comment }) });
+    else res = await apiCall(`${apiUrl}/api/class_confirmations`, { method: 'POST', body: JSON.stringify(body) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || 'Failed'); return; }
+    fetchData();
   };
 
   // Lesson plans — draft → submitted → approved / needs_revision (Admin approves or returns).
@@ -1679,9 +1765,20 @@ export default function Home() {
               </div>
             )}
 
-            {/* ASSIGNMENTS MODULE */}
+            {/* ASSIGNMENTS MODULE — v2: course-linked, started→submitted→graded, late detection */}
             {activeModule === 'assignments' && (
               <div>
+                {(() => {
+                  const isStudent = myProfile && isStudentCat(roleCategory(myProfile.role_key));
+                  const newBadgeCount = isStudent ? dbData.assignments.filter(a => !(dbData.assignment_submissions||[]).some(s => s.assignment_id===a.id && s.student_id===myProfile.id)).length : 0;
+                  return null;
+                })()}
+                {isStudentCat(roleCategory(myProfile?.role_key)) && (() => {
+                  const subs = dbData.assignment_submissions || [];
+                  const mine = myProfile ? subs.filter(s=>s.student_id===myProfile.id) : [];
+                  const newCount = dbData.assignments.filter(a=> !mine.some(s=>s.assignment_id===a.id)).length;
+                  return newCount ? <div style={{ background: 'var(--accent-light)', border: '1px solid var(--accent)', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px', fontSize: '12.5px' }}>🔔 {newCount} new assignment{newCount>1?'s':''} — start to notify your teacher.</div> : null;
+                })()}
                 {canCreate('assignments') && (
                   <form onSubmit={handleAddAssignment} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <select value={newAssignBatch} onChange={e => setNewAssignBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
@@ -1695,6 +1792,20 @@ export default function Home() {
                       <option value="text">Text</option>
                     </select>
                     <input type="date" value={newAssignDue} onChange={e => setNewAssignDue(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                    <select value={newAssignCourse} onChange={e => { setNewAssignCourse(e.target.value); setNewAssignModule(''); setNewAssignTopic(''); }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
+                      <option value="">Course (optional)</option>
+                      {dbData.courses.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                    </select>
+                    <select value={newAssignModule} onChange={e => { setNewAssignModule(e.target.value); setNewAssignTopic(''); }} disabled={!newAssignCourse} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
+                      <option value="">Unit / Module</option>
+                      {assignModules.map(m => <option key={m.id} value={m.id}>{m.module_number}. {m.title}</option>)}
+                    </select>
+                    <select value={newAssignTopic} onChange={e => setNewAssignTopic(e.target.value)} disabled={!newAssignModule} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
+                      <option value="">Topic</option>
+                      {assignTopics.map(tt => <option key={tt.id} value={tt.id}>{tt.topic}</option>)}
+                    </select>
+                    <input placeholder="or free topic" value={newAssignTopicText} onChange={e => setNewAssignTopicText(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <input placeholder="Attachment URL (doc/pdf link)" value={newAssignAttachment} onChange={e => setNewAssignAttachment(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
                     <textarea placeholder="Description / Instructions" value={newAssignDesc} onChange={e => setNewAssignDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Create Assignment</button>
                   </form>
@@ -1703,38 +1814,93 @@ export default function Home() {
                   {dbData.assignments.length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No assignments created yet.</div>
                   ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                          <th style={{ padding: '12px' }}>Title</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Type</th><th style={{ padding: '12px' }}>Due Date</th><th style={{ padding: '12px' }}>Status</th><th style={{ padding: '12px' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dbData.assignments.map(a => {
-                          const batch = dbData.batches.find(b => b.id === a.batch_id);
-                          return (
-                            <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                              <td style={{ padding: '12px' }}>{a.title}</td>
-                              <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
-                              <td style={{ padding: '12px' }}>{a.type?.replace('_', ' ') || '—'}</td>
-                              <td style={{ padding: '12px' }}>{a.due_date}</td>
-                              <td style={{ padding: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {dbData.assignments.map(a => {
+                        const batch = dbData.batches.find(b => b.id === a.batch_id);
+                        const course = dbData.courses.find(c => c.id === a.course_id);
+                        const mod = dbData.course_modules.find(m => m.id === a.module_id);
+                        const top = dbData.course_module_topics.find(tt => tt.id === a.topic_id);
+                        const subs = (dbData.assignment_submissions||[]).filter(s => s.assignment_id === a.id);
+                        const mySub = myProfile ? subs.find(s => s.student_id === myProfile.id) : null;
+                        const isStudent = myProfile && isStudentCat(roleCategory(myProfile.role_key));
+                        const due = a.due_date ? new Date(a.due_date + 'T23:59:59') : null;
+                        const isOverdue = due && new Date() > due;
+                        const started = subs.filter(s=>s.status==='started').length;
+                        const submitted = subs.filter(s=>s.status==='submitted').length;
+                        const graded = subs.filter(s=>s.status==='graded').length;
+                        const late = subs.filter(s=> s.submitted_at && due && new Date(s.submitted_at) > due).length;
+                        const onTime = subs.filter(s=> s.submitted_at && due && new Date(s.submitted_at) <= due).length;
+                        // ponytail: not-submitted-before-due = started (not yet submitted) + implicitly not-started (no row) — needs enrollments for exact roster count; add when enrollments fetched
+                        const topicLabel = top?.topic || a.topic_text || mod?.title || course?.name || '—';
+                        const lateFlag = mySub?.submitted_at && due && new Date(mySub.submitted_at) > due;
+                        return (
+                          <div key={a.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                              <div style={{ flex: '1 1 280px' }}>
+                                <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '14.5px' }}>{a.title} <span style={{ fontWeight: 400, color: 'var(--text-faint)', fontSize: '11.5px' }}>{a.type?.replace('_',' ') || ''} · {batch?.name || '—'}</span></div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-soft)', marginTop: '2px' }}>{course ? <span>{course.code} · {course.name} {mod ? '› ' + mod.title : ''} {top ? '› ' + top.topic : a.topic_text ? '› ' + a.topic_text : ''}</span> : topicLabel !== '—' ? topicLabel : ''} {a.attachment_url ? <a href={a.attachment_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', marginLeft: '8px' }}>📎 attachment</a> : null}</div>
+                                {a.description ? <div style={{ fontSize: '12.5px', color: 'var(--text-soft)', marginTop: '4px', whiteSpace: 'pre-wrap' }}>{a.description}</div> : null}
+                                <div style={{ fontSize: '11.5px', color: isOverdue ? '#b45309' : 'var(--text-faint)', marginTop: '4px' }}>Due: {a.due_date} {isOverdue ? '· overdue' : ''} · Status: {a.status || 'open'}</div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                 {canCreate('assignments') ? (
-                                  <select value={a.status || 'open'} onChange={e => handleUpdateAssignmentStatus(a.id, e.target.value)} style={{ padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }}>
+                                  <select value={a.status || 'open'} onChange={e => handleUpdateAssignmentStatus(a.id, e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }}>
                                     <option value="open">Open</option>
                                     <option value="closed">Closed</option>
                                     <option value="graded">Graded</option>
                                   </select>
-                                ) : <span style={{ fontSize: '12.5px', color: 'var(--text-soft)' }}>{a.status || 'open'}</span>}
-                              </td>
-                              <td style={{ padding: '12px' }}>
-                                {canAdmin('assignments') && <button onClick={() => handleDelete('assignments', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                ) : <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{a.status || 'open'}</span>}
+                                {canAdmin('assignments') && <button onClick={() => handleDelete('assignments', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              </div>
+                            </div>
+                            {!isStudent ? (
+                              <div style={{ marginTop: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px' }}>
+                                <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', marginBottom: '6px' }}>
+                                  <b style={{ color: 'var(--text)' }}>{subs.length} submission{subs.length!==1?'s':''}</b> · <span style={{ color: '#b45309' }}>{started} started</span> · <span style={{ color: 'var(--primary)' }}>{onTime} on time</span> · <span style={{ color: '#991b1b' }}>{late} late</span> · {submitted} submitted · {graded} graded
+                                  {/* ponytail: not-submitted count needs roster (enrollments) — add when enrollments fetched */}
+                                </div>
+                                {subs.length === 0 ? <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No student activity yet — students' Start will appear here.</div> : (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                                    <thead>
+                                      <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)', color: 'var(--text-faint)' }}>
+                                        <th style={{ padding: '6px 8px' }}>Student</th><th style={{ padding: '6px 8px' }}>Status</th><th style={{ padding: '6px 8px' }}>Submitted</th><th style={{ padding: '6px 8px' }}>Grade</th><th style={{ padding: '6px 8px' }}></th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {subs.map(s => {
+                                        const u = dbData.users.find(x=>x.id===s.student_id);
+                                        const sLate = s.submitted_at && due && new Date(s.submitted_at) > due;
+                                        return (
+                                          <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <td style={{ padding: '6px 8px' }}>{u?.name || s.student_id.slice(0,6)} <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>{u?.roll_no || ''}</span></td>
+                                            <td style={{ padding: '6px 8px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', background: s.status==='graded' ? 'var(--primary)' : s.status==='submitted' ? '#15803d' : '#b45309', color: '#fff' }}>{s.status}{sLate ? ' · late' : ''}</span></td>
+                                            <td style={{ padding: '6px 8px', fontSize: '11.5px', color: 'var(--text-soft)' }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : '—'}{s.attachment_url ? <a href={s.attachment_url} target="_blank" rel="noreferrer" style={{ marginLeft: '6px', color: 'var(--primary)' }}>📎</a> : ''}</td>
+                                            <td style={{ padding: '6px 8px' }}>{s.grade ? <b style={{ color: 'var(--primary-deep)' }}>{s.grade}</b> : <span style={{ color: 'var(--text-faint)' }}>—</span>}{s.feedback ? <span style={{ color: 'var(--text-soft)', fontSize: '11px', marginLeft: '6px' }}>· {s.feedback.slice(0,40)}</span> : null}</td>
+                                            <td style={{ padding: '6px 8px' }}><button onClick={()=>handleGradeSubmission(s)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Grade</button></td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            ) : (
+                              <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {!mySub ? (
+                                  <><span style={{ fontSize: '12px', color: 'var(--text-faint)', background: 'var(--bg)', padding: '4px 8px', borderRadius: '99px' }}>Not started</span><button onClick={()=>handleStartAssignment(a)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Start</button></>
+                                ) : mySub.status === 'started' ? (
+                                  <><span style={{ background: '#b45309', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '11.5px' }}>Started</span><input placeholder="Attachment URL (optional)" value={submitAttachments[a.id] || ''} onChange={e=>setSubmitAttachments(prev=>({ ...prev, [a.id]: e.target.value }))} style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px', maxWidth: '280px' }} /><button onClick={()=>handleSubmitAssignment(a)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Submit{lateFlag ? '' : ''}</button>{mySub.submitted_at && lateFlag ? <span style={{ fontSize: '11px', color: '#991b1b' }}>will be marked late</span> : null}</>
+                                ) : mySub.status === 'submitted' ? (
+                                  <><span style={{ background: '#15803d', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '11.5px' }}>Submitted{lateFlag ? ' · late' : ' · on time'}</span><span style={{ fontSize: '11.5px', color: 'var(--text-soft)' }}>{mySub.submitted_at ? new Date(mySub.submitted_at).toLocaleDateString() : ''}</span>{mySub.attachment_url ? <a href={mySub.attachment_url} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: 'var(--primary)' }}>📎 your file</a> : null}<span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>· awaiting grade</span></>
+                                ) : (
+                                  <><span style={{ background: 'var(--primary)', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '11.5px' }}>Graded</span>{mySub.grade ? <b style={{ color: 'var(--primary-deep)' }}>{mySub.grade}</b> : null}{mySub.feedback ? <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>· {mySub.feedback}</span> : null}</>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -2005,6 +2171,144 @@ export default function Home() {
                     </table>
                   )}
                 </div>
+
+                {/* ── Class completion loop — log what was taught ── */}
+                {canCreate('timetable') && (
+                  <form onSubmit={handleAddClassEntry} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div style={{ flex: '1 1 220px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Slot</label>
+                      <select value={ceSlot} onChange={e => setCeSlot(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
+                        <option value="">Pick slot…</option>
+                        {dbData.timetable.map(s => {
+                          const b = dbData.batches.find(x => x.id === s.batch_id);
+                          return <option key={s.id} value={s.id}>{s.day_of_week} {s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)} · {b?.name || s.batch_id.slice(0, 6)} · {s.room}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Date <input type="date" value={ceDate} onChange={e => setCeDate(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
+                    <div style={{ flex: '1 1 160px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Course (curriculum)</label>
+                      <select value={ceCourse} onChange={e => { setCeCourse(e.target.value); setCeModule(''); setCeTopic(''); }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
+                        <option value="">— no course —</option>
+                        {dbData.courses.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ flex: '1 1 160px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Module</label>
+                      <select value={ceModule} onChange={e => { setCeModule(e.target.value); setCeTopic(''); }} disabled={!ceCourse} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
+                        <option value="">—</option>
+                        {ceModules.map(m => <option key={m.id} value={m.id}>{m.module_number}. {m.title}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ flex: '1 1 160px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Topic</label>
+                      <select value={ceTopic} onChange={e => setCeTopic(e.target.value)} disabled={!ceModule} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
+                        <option value="">—</option>
+                        {ceTopics.map(t => <option key={t.id} value={t.id}>{t.topic}</option>)}
+                      </select>
+                    </div>
+                    <input placeholder="or free topic" value={ceTopicText} onChange={e => setCeTopicText(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
+                    <input placeholder="notes (optional)" value={ceNotes} onChange={e => setCeNotes(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Log class</button>
+                  </form>
+                )}
+
+                {/* Entries + student confirmations */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginTop: '16px' }}>
+                  {(dbData.class_entries || []).length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px' }}>No classes logged yet — teacher logs what was taught per slot per date; students confirm.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                          <th style={{ padding: '10px 12px' }}>Date</th><th style={{ padding: '10px 12px' }}>Slot</th><th style={{ padding: '10px 12px' }}>Batch</th><th style={{ padding: '10px 12px' }}>What was taught</th><th style={{ padding: '10px 12px' }}>Taught by</th><th style={{ padding: '10px 12px' }}>Confirm</th><th style={{ padding: '10px 12px' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(dbData.class_entries || []).slice().sort((a, b) => String(b.class_date).localeCompare(String(a.class_date))).map(entry => {
+                          const slot = dbData.timetable.find(s => s.id === entry.timetable_slot_id);
+                          const batch = dbData.batches.find(b => b.id === entry.batch_id);
+                          const course = dbData.courses.find(c => c.id === entry.course_id);
+                          const mod = dbData.course_modules.find(m => m.id === entry.module_id);
+                          const top = dbData.course_module_topics.find(t => t.id === entry.topic_id);
+                          const taughtBy = dbData.users.find(u => u.id === entry.taught_by);
+                          const myConf = myProfile ? (dbData.class_confirmations || []).find(c => c.class_entry_id === entry.id && c.student_id === myProfile.id) : null;
+                          const confs = (dbData.class_confirmations || []).filter(c => c.class_entry_id === entry.id);
+                          const confirmed = confs.filter(c => c.status === 'confirmed').length;
+                          const disputed = confs.filter(c => c.status === 'disputed').length;
+                          const pending = confs.filter(c => c.status === 'pending').length;
+                          const topicLabel = top?.topic || mod?.title || course?.name || entry.topic_text || '—';
+                          const who = taughtBy?.name || '—';
+                          const isStudent = myProfile && isStudentCat(roleCategory(myProfile.role_key));
+                          return (
+                            <tr key={entry.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{entry.class_date}</td>
+                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: 'var(--text-soft)', fontSize: '12.5px' }}>{slot ? `${slot.day_of_week.slice(0, 3)} ${slot.start_time?.slice(0, 5)}–${slot.end_time?.slice(0, 5)} · ${slot.room}` : '—'}</td>
+                              <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
+                              <td style={{ padding: '10px 12px' }}><b style={{ color: 'var(--primary-deep)' }}>{topicLabel}</b>{course ? <span style={{ color: 'var(--text-faint)', fontSize: '11.5px' }}> · {course.code}</span> : null}<br /><span style={{ fontSize: '11.5px', color: 'var(--text-soft)' }}>{entry.topic_text && top ? entry.topic_text : ''}{entry.notes ? ` — ${entry.notes}` : ''}</span></td>
+                              <td style={{ padding: '10px 12px', fontSize: '12.5px', color: 'var(--text-soft)' }}>{who}</td>
+                              <td style={{ padding: '10px 12px', fontSize: '12px' }}>
+                                {isStudent ? (
+                                  myConf?.status === 'confirmed' ? <span style={{ background: 'var(--primary)', color: '#fff', padding: '2px 8px', borderRadius: '99px' }}>confirmed ✓</span>
+                                    : myConf?.status === 'disputed' ? <span style={{ background: '#b45309', color: '#fff', padding: '2px 8px', borderRadius: '99px' }}>disputed</span>
+                                      : <span style={{ display: 'flex', gap: '4px' }}><button onClick={() => handleConfirm(entry, 'confirmed')} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Confirm</button><button onClick={() => handleConfirm(entry, 'disputed')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Dispute</button></span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-faint)', fontSize: '11.5px' }} title="confirmations">{confirmed}✓ {disputed ? `· ${disputed} disputed` : ''}{pending ? ` · ${pending} pending` : ''}{disputed ? ' ⚠ mismatch' : ''}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '10px 12px' }}>
+                                {isStudent && myConf && myConf.status !== 'pending' && <button onClick={() => handleConfirm(entry, myConf.status === 'confirmed' ? 'disputed' : 'confirmed')} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>switch</button>}
+                                {canAdmin('timetable') && <button onClick={() => handleDelete('class_entries', entry.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', marginLeft: '4px' }}>Delete</button>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Analytics: taught vs confirmed, syllabus %, hours left */}
+                {(() => {
+                  const entries = dbData.class_entries || [];
+                  const confs = dbData.class_confirmations || [];
+                  const total = entries.length;
+                  const confirmedConfs = confs.filter(c => c.status === 'confirmed').length;
+                  const disputedConfs = confs.filter(c => c.status === 'disputed').length;
+                  const perCourse = {};
+                  entries.forEach(e => {
+                    const k = e.course_id || '_free';
+                    perCourse[k] = (perCourse[k] || 0) + 1;
+                  });
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '16px' }}>
+                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '14px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Classes logged</div>
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary)' }}>{total}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-soft)', marginTop: '4px' }}>{confirmedConfs} confirmed · {disputedConfs} disputed{disputedConfs ? ' ⚠ gap' : ''}</div>
+                      </div>
+                      {Object.entries(perCourse).slice(0, 6).map(([cid, cnt]) => {
+                        const course = dbData.courses.find(c => c.id === cid);
+                        const name = course ? `${course.code} ${course.name}` : 'Free topic';
+                        const totalTopics = course ? (dbData.course_module_topics || []).filter(t => { const m = dbData.course_modules.find(mm => mm.id === t.module_id); return m?.course_id === cid; }).length : 0;
+                        const taughtTopics = course ? new Set(entries.filter(e => e.course_id === cid && e.topic_id).map(e => e.topic_id)).size : 0;
+                        const pct = totalTopics ? Math.round(taughtTopics / totalTopics * 100) : 0;
+                        const hrsTotal = course?.teaching_hours ?? null;
+                        // ponytail: 1 class = 1 period = 0.75h; upgrade to slot duration when timetable stores period count
+                        const hrsUsed = Math.round(cnt * 0.75 * 100) / 100;
+                        const hrsLeft = hrsTotal !== null ? Math.round((Number(hrsTotal) - hrsUsed) * 100) / 100 : null;
+                        return (
+                          <div key={cid} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '14px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-deep)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-soft)', marginTop: '4px' }}>{cnt} class{cnt === 1 ? '' : 'es'} logged{totalTopics ? ` · ${taughtTopics}/${totalTopics} topics · ${pct}%` : ''}</div>
+                            {hrsTotal !== null && <div style={{ fontSize: '12px', color: hrsLeft !== null && hrsLeft < 0 ? 'var(--primary)' : 'var(--text-soft)', marginTop: '2px' }}>{hrsUsed}h taught{hrsLeft !== null ? ` · ${hrsLeft}h left of ${hrsTotal}h` : ''}</div>}
+                            {disputedConfs ? <div style={{ fontSize: '11px', color: '#b45309', marginTop: '4px' }}>teacher vs student mismatch — review disputed rows above</div> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

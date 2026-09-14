@@ -473,3 +473,86 @@ create policy "Curriculum managers can manage module topics"
   to authenticated
   using (public.has_permission('curriculum', array['Manage','Full']))
   with check (public.has_permission('curriculum', array['Manage','Full']));
+
+-- ============================================================================
+-- CLASS ENTRIES & CONFIRMATIONS — the completion loop (timetable module)
+-- ============================================================================
+drop policy if exists "Class entries readable by batch members" on public.class_entries;
+create policy "Class entries readable by batch members"
+  on public.class_entries for select
+  to authenticated
+  using (
+    batch_id = any(public.my_batch_ids())
+    or public.has_permission('timetable', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Timetable managers can manage class entries" on public.class_entries;
+create policy "Timetable managers can manage class entries"
+  on public.class_entries for all
+  to authenticated
+  using (public.has_permission('timetable', array['Manage','Full']) or taught_by = public.my_user_id())
+  with check (public.has_permission('timetable', array['Manage','Full']) or taught_by = public.my_user_id());
+
+drop policy if exists "Class confirmations readable by owner or batch" on public.class_confirmations;
+create policy "Class confirmations readable by owner or batch"
+  on public.class_confirmations for select
+  to authenticated
+  using (
+    student_id = public.my_user_id()
+    or exists (select 1 from public.class_entries ce where ce.id = class_entry_id and ce.batch_id = any(public.my_batch_ids()))
+    or public.has_permission('timetable', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Students can update own confirmations" on public.class_confirmations;
+create policy "Students can update own confirmations"
+  on public.class_confirmations for update
+  to authenticated
+  using (student_id = public.my_user_id() or public.has_permission('timetable', array['Manage','Full']))
+  with check (student_id = public.my_user_id() or public.has_permission('timetable', array['Manage','Full']));
+
+drop policy if exists "Students can insert own confirmations" on public.class_confirmations;
+create policy "Students can insert own confirmations"
+  on public.class_confirmations for insert
+  to authenticated
+  with check (student_id = public.my_user_id() or public.has_permission('timetable', array['Manage','Full']));
+
+drop policy if exists "Students can delete own confirmations" on public.class_confirmations;
+create policy "Students can delete own confirmations"
+  on public.class_confirmations for delete
+  to authenticated
+  using (student_id = public.my_user_id() or public.has_permission('timetable', array['Manage','Full']));
+
+-- ============================================================================
+-- ASSIGNMENT SUBMISSIONS — per-student lifecycle (assignments module)
+-- ============================================================================
+drop policy if exists "Submissions readable by batch or owner" on public.assignment_submissions;
+create policy "Submissions readable by batch or owner"
+  on public.assignment_submissions for select
+  to authenticated
+  using (
+    student_id = public.my_user_id()
+    or batch_id = any(public.my_batch_ids())
+    or public.has_permission('assignments', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Submissions insertable by owner or teacher" on public.assignment_submissions;
+create policy "Submissions insertable by owner or teacher"
+  on public.assignment_submissions for insert
+  to authenticated
+  with check (
+    student_id = public.my_user_id()
+    or public.has_permission('assignments', array['Manage','Full'])
+  );
+
+drop policy if exists "Submissions updatable by owner or teacher" on public.assignment_submissions;
+create policy "Submissions updatable by owner or teacher"
+  on public.assignment_submissions for update
+  to authenticated
+  using (student_id = public.my_user_id() or batch_id = any(public.my_batch_ids()) or public.has_permission('assignments', array['Manage','Full']))
+  with check (student_id = public.my_user_id() or batch_id = any(public.my_batch_ids()) or public.has_permission('assignments', array['Manage','Full']));
+
+drop policy if exists "Submissions deletable by teacher" on public.assignment_submissions;
+create policy "Submissions deletable by teacher"
+  on public.assignment_submissions for delete
+  to authenticated
+  using (batch_id = any(public.my_batch_ids()) or public.has_permission('assignments', array['Manage','Full']));
