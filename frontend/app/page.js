@@ -608,56 +608,102 @@ export default function Home() {
     setEditingBatch(null); fetchData();
   };
 
-  // Timetable — recurring weekly slots per batch, with conflict detection.
-  // Matches XLS: period no. → timing row → per-day cells of "SUBJECT [FAC] / room".
+  // Timetable — FIXED grid 08:15–16:00 (45m periods + breaks), XLS style.
+  // Columns always fixed: 1 2 3 | BREAK | 4 5 | LUNCH | NAP | EXTRA | STUDY — clubbed via colspan.
+  const FIXED_TT = [
+    { key:'p1', label:'1', start:'08:15', end:'09:00', kind:'period', num:1 },
+    { key:'p2', label:'2', start:'09:00', end:'09:45', kind:'period', num:2 },
+    { key:'p3', label:'3', start:'09:45', end:'10:30', kind:'period', num:3 },
+    { key:'br1', label:'BREAK', start:'10:30', end:'10:45', kind:'break' },
+    { key:'p4', label:'4', start:'10:45', end:'11:30', kind:'period', num:4 },
+    { key:'p5', label:'5', start:'11:30', end:'12:15', kind:'period', num:5 },
+    { key:'lunch', label:'LUNCH', start:'12:15', end:'13:00', kind:'break' },
+    { key:'nap', label:'NAP', start:'13:00', end:'13:25', kind:'break' },
+    { key:'extra', label:'EXTRA', start:'13:30', end:'14:30', kind:'block', num:6 },
+    { key:'study', label:'STUDY', start:'14:30', end:'16:00', kind:'block', num:7 },
+  ];
+  const FIXED_TEACH = FIXED_TT.filter(c=>c.kind!=='break');
+  const FIXED_MAP = Object.fromEntries(FIXED_TT.map(c=>[c.key,c]));
+  const TT_SEGMENTS = [['p1','p2','p3'],['p4','p5'],['extra','study']];
+  const ttSegmentOf = (k) => TT_SEGMENTS.findIndex(s=>s.includes(k));
   const slotsOverlap = (a, b) => a.start < b.end && b.start < a.end;
+  const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const toMinTT = (t) => { const [h,m]=String(t).split(':').map(Number); return h*60+(m||0); };
+  const fmtTT = (t) => String(t||'').slice(0,5);
+  const slotCoversCol = (slot, col) => {
+    const s=toMinTT(slot.start_time), e=toMinTT(slot.end_time), cs=toMinTT(col.start), ce=toMinTT(col.end);
+    return s<=cs+1 && e>=ce-1;
+  };
+  const slotToKeys = (slot) => {
+    if (!slot) return {from:'p1', to:'p1'};
+    let fromKey=null, toKey=null;
+    if (slot.period_number!=null) {
+      const fc=FIXED_TT.find(c=>c.num===slot.period_number);
+      if (fc) fromKey=fc.key;
+    }
+    if (!fromKey) {
+      const fc=FIXED_TT.find(c=>c.kind!=='break' && toMinTT(c.start)===toMinTT(slot.start_time));
+      if (fc) fromKey=fc.key;
+      else { const m=FIXED_TEACH.find(c=>slotCoversCol(slot,c)); if (m) fromKey=m.key; }
+    }
+    if (!fromKey) fromKey='p1';
+    const tc=FIXED_TT.find(c=>c.kind!=='break' && toMinTT(c.end)===toMinTT(slot.end_time));
+    if (tc) toKey=tc.key;
+    else { let last=null; FIXED_TT.forEach(c=>{ if(c.kind!=='break'&&slotCoversCol(slot,c)) last=c.key; }); if(last) toKey=last; }
+    if (!toKey) toKey=fromKey;
+    const fi=FIXED_TT.findIndex(c=>c.key===fromKey), ti=FIXED_TT.findIndex(c=>c.key===toKey);
+    if (ti<fi) toKey=fromKey;
+    return {from:fromKey, to:toKey};
+  };
   const [newSlotBatch, setNewSlotBatch] = useState('');
   const [newSlotDay, setNewSlotDay] = useState('Monday');
-  const [newSlotStart, setNewSlotStart] = useState('');
-  const [newSlotEnd, setNewSlotEnd] = useState('');
+  const [newSlotFrom, setNewSlotFrom] = useState('p1');
+  const [newSlotTo, setNewSlotTo] = useState('p1');
   const [newSlotRoom, setNewSlotRoom] = useState('');
   const [newSlotSubject, setNewSlotSubject] = useState('');
-  const [newSlotPeriod, setNewSlotPeriod] = useState('');
   const [editingSlot, setEditingSlot] = useState(null);
   const [editSlotDay, setEditSlotDay] = useState('Monday');
-  const [editSlotStart, setEditSlotStart] = useState('');
-  const [editSlotEnd, setEditSlotEnd] = useState('');
+  const [editSlotFrom, setEditSlotFrom] = useState('p1');
+  const [editSlotTo, setEditSlotTo] = useState('p1');
   const [editSlotRoom, setEditSlotRoom] = useState('');
   const [editSlotSubject, setEditSlotSubject] = useState('');
-  const [editSlotPeriod, setEditSlotPeriod] = useState('');
   const [editSlotBatch, setEditSlotBatch] = useState('');
-  // XLS-aligned grid state: which batch's weekly grid to render (default: first batch)
   const [timetableBatch, setTimetableBatch] = useState('');
-  // When batches load and none picked, pick the first
-  // (done via effect below alongside existing fetchData flow)
-  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-  const toMinTT = (t) => { const [h, m] = String(t).split(':').map(Number); return h*60+(m||0); };
-  const fmtTT = (t) => String(t||'').slice(0,5);
 
   const handleAddSlot = async (e) => {
     e.preventDefault();
-    if (!newSlotBatch || !newSlotStart || !newSlotEnd) return;
-    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: newSlotStart, end_time: newSlotEnd, room: newSlotRoom.trim() || null, subject: newSlotSubject.trim() || null, period_number: newSlotPeriod ? Number(newSlotPeriod) : null };
+    if (!newSlotBatch) return;
+    if (!newSlotSubject.trim()) { alert('Enter Class / Topic'); return; }
+    const fc = FIXED_MAP[newSlotFrom], tc = FIXED_MAP[newSlotTo];
+    if (!fc || !tc) return;
+    const fi = FIXED_TT.findIndex(c=>c.key===newSlotFrom), ti = FIXED_TT.findIndex(c=>c.key===newSlotTo);
+    if (ti < fi) { alert('Invalid period range'); return; }
+    if (ttSegmentOf(newSlotFrom) !== ttSegmentOf(newSlotTo)) { alert('Club only within same block: 1-3, or 4-5, or Extra+Study'); return; }
+    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: fc.start, end_time: tc.end, room: newSlotRoom.trim() || null, subject: newSlotSubject.trim() || null, period_number: fc.num || null };
     const sameBatch = (a,b) => a===b;
     const sameRoom = (a,b) => a && b && String(a).trim() && String(b).trim() && String(a).trim()===String(b).trim();
     const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
     const clash = dbData.timetable.find(s =>
       s.day_of_week === candidate.day_of_week &&
       (sameBatch(s.batch_id, candidate.batch_id) || sameRoom(s.room, candidate.room)) &&
-      slotsOverlap({ start: toMin(newSlotStart), end: toMin(newSlotEnd) }, { start: toMin(s.start_time), end: toMin(s.end_time) })
+      slotsOverlap({ start: toMin(candidate.start_time), end: toMin(candidate.end_time) }, { start: toMin(s.start_time), end: toMin(s.end_time) })
     );
     if (clash) {
       const batchName = dbData.batches.find(b => b.id === clash.batch_id)?.name || 'a batch';
-      const ok = confirm(`Conflicts with an existing slot (${clash.day_of_week} ${clash.start_time}–${clash.end_time}, ${batchName === dbData.batches.find(b => b.id === candidate.batch_id)?.name ? 'same batch' : 'room ' + clash.room}). Add anyway?`);
+      const ok = confirm(`Conflicts with ${clash.day_of_week} ${clash.start_time}–${clash.end_time} (${batchName === dbData.batches.find(b=>b.id===candidate.batch_id)?.name ? 'same batch' : 'room ' + clash.room}). Add anyway?`);
       if (!ok) return;
     }
     const slotRes = await apiCall(`${apiUrl}/api/timetable`, { method: 'POST', body: JSON.stringify(candidate) });
     if (!slotRes.ok) { const x = await slotRes.json().catch(() => ({})); alert(x.error || 'Failed to add slot'); return; }
-    setNewSlotStart(''); setNewSlotEnd(''); setNewSlotRoom(''); setNewSlotSubject(''); setNewSlotPeriod(''); fetchData();
+    setNewSlotRoom(''); setNewSlotSubject(''); fetchData();
   };
   const handleUpdateSlot = async (id) => {
-    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: editSlotStart, end_time: editSlotEnd, room: editSlotRoom.trim() || null, subject: editSlotSubject.trim() || null, period_number: editSlotPeriod ? Number(editSlotPeriod) : null };
+    const fc = FIXED_MAP[editSlotFrom], tc = FIXED_MAP[editSlotTo];
+    if (!fc || !tc) { alert('Pick period range'); return; }
+    const fi = FIXED_TT.findIndex(c=>c.key===editSlotFrom), ti = FIXED_TT.findIndex(c=>c.key===editSlotTo);
+    if (ti < fi) { alert('Invalid period range'); return; }
+    if (ttSegmentOf(editSlotFrom) !== ttSegmentOf(editSlotTo)) { alert('Club only within same block: 1-3, or 4-5, or Extra+Study'); return; }
+    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: fc.start, end_time: tc.end, room: editSlotRoom.trim() || null, subject: editSlotSubject.trim() || null, period_number: fc.num || null };
     const res = await apiCall(`${apiUrl}/api/timetable/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Update failed'); return; }
     setEditingSlot(null); fetchData();
@@ -1234,6 +1280,24 @@ export default function Home() {
                 </span>
               </button>
             ))}
+            {perm('timetable') && myProfile && dbData.timetable.length > 0 && (() => {
+              const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+              const todaySlots = dbData.timetable.filter(s => s.day_of_week === dayName).sort((a,b)=>toMinTT(a.start_time)-toMinTT(b.start_time));
+              if (todaySlots.length===0) return null;
+              return (
+                <div style={{ marginTop: '18px', padding: '12px', background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px' }}>My Timetable — {dayName.slice(0,3)}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {todaySlots.slice(0,5).map(s => {
+                      const k = slotToKeys(s);
+                      const lab = k.from===k.to ? FIXED_MAP[k.from]?.label : `${FIXED_MAP[k.from]?.label}→${FIXED_MAP[k.to]?.label}`;
+                      return <div key={s.id} style={{ fontSize: '12.5px', lineHeight: 1.35 }}><span style={{ fontWeight: 700, color: 'var(--primary-deep)' }}>{lab}</span> <span style={{ color: 'var(--text-faint)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</span><br /><span style={{ color: 'var(--text)' }}>{s.subject || '—'}</span>{s.room ? <span style={{ color: 'var(--text-faint)' }}> · {s.room}</span> : null}</div>;
+                    })}
+                  </div>
+                  <button onClick={() => setActiveModule('timetable')} style={{ marginTop: '8px', background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '11.5px', color: 'var(--primary)' }}>Open full timetable →</button>
+                </div>
+              );
+            })()}
           </nav>
 
           {/* Main Content Area */}
@@ -2452,7 +2516,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* TIMETABLE MODULE — XLS grid: period no. → timing → class per day */}
+            {/* TIMETABLE — fixed 08:15–16:00 grid: day × period with clubbed colspan + per-user in sidebar */}
             {activeModule === 'timetable' && (
               <div>
                 {canCreate('timetable') && (
@@ -2462,16 +2526,24 @@ export default function Home() {
                       {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                     <select value={newSlotDay} onChange={e => setNewSlotDay(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                      {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                      {DAYS.slice(0,6).map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
-                    <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>From <input type="time" value={newSlotStart} onChange={e => setNewSlotStart(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
-                    <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>To <input type="time" value={newSlotEnd} onChange={e => setNewSlotEnd(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
-                    <input type="number" min="1" max="12" placeholder="Period (e.g. 1)" value={newSlotPeriod} onChange={e => setNewSlotPeriod(e.target.value)} title="Period number" style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '110px' }} />
-                    <input placeholder="Class / Topic (e.g. Practical 1, Theory)" value={newSlotSubject} onChange={e => setNewSlotSubject(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Period from
+                      <select value={newSlotFrom} onChange={e => { setNewSlotFrom(e.target.value); const fi=FIXED_TT.findIndex(c=>c.key===e.target.value), ti=FIXED_TT.findIndex(c=>c.key===newSlotTo); if(ti<fi) setNewSlotTo(e.target.value); }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block', minWidth: '120px' }}>
+                        {FIXED_TEACH.map(c => <option key={c.key} value={c.key}>{c.label} · {c.start}–{c.end}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>to
+                      <select value={newSlotTo} onChange={e => setNewSlotTo(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block', minWidth: '120px' }}>
+                        {FIXED_TEACH.filter(c => FIXED_TT.findIndex(x=>x.key===c.key) >= FIXED_TT.findIndex(x=>x.key===newSlotFrom) && ttSegmentOf(c.key)===ttSegmentOf(newSlotFrom)).map(c => <option key={c.key} value={c.key}>{c.label} · {c.end}</option>)}
+                      </select>
+                    </label>
+                    <input placeholder="Class / Topic * (e.g. Practical 1, Theory)" value={newSlotSubject} onChange={e => setNewSlotSubject(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
                     <input placeholder="Room (optional)" value={newSlotRoom} onChange={e => setNewSlotRoom(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '130px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add Slot</button>
                   </form>
                 )}
+                <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '10px', lineHeight: 1.5 }}>Fixed columns: <b>1</b> 08:15–09:00 · <b>2</b> 09:00–09:45 · <b>3</b> 09:45–10:30 · <b>BREAK</b> 10:30–10:45 · <b>4</b> 10:45–11:30 · <b>5</b> 11:30–12:15 · <b>LUNCH</b> 12:15–13:00 · <b>NAP</b> 13:00–13:25 · <b>EXTRA</b> 13:30–14:30 · <b>STUDY</b> 14:30–16:00 — club within 1-3, 4-5, or Extra+Study (spans columns).</div>
 
                 {/* Batch picker for the weekly grid */}
                 {dbData.batches.length > 0 && (
@@ -2480,67 +2552,83 @@ export default function Home() {
                     <select value={timetableBatch} onChange={e => setTimetableBatch(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '200px' }}>
                       {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>XLS view — period → timing → class, one row per day</span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>Fixed grid — header period, sub-header timing, cell class (clubbed via colspan)</span>
                   </div>
                 )}
 
-                {/* XLS-style weekly grid */}
+                {/* Fixed weekly grid — 10 cols, breaks shaded, clubbed slots colspan */}
                 {(() => {
                   const batchId = timetableBatch || (dbData.batches[0]?.id || '');
                   const batchSlots = batchId ? dbData.timetable.filter(s => s.batch_id === batchId) : [];
-                  if (!batchId || batchSlots.length === 0) {
-                    return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>{!batchId ? 'Create a batch and add slots to see the weekly grid.' : 'No slots for this batch yet — add the first period above.'}</div>;
-                  }
-                  const sorted = [...batchSlots].sort((a,b) => {
-                    const pa = a.period_number ?? 999, pb = b.period_number ?? 999;
-                    if (pa !== pb) return pa - pb;
-                    return toMinTT(a.start_time) - toMinTT(b.start_time);
-                  });
-                  const periodMap = new Map();
-                  sorted.forEach(s => {
-                    const key = s.period_number != null ? `p${s.period_number}` : s.start_time;
-                    if (!periodMap.has(key)) periodMap.set(key, { key, period_number: s.period_number, start: s.start_time, end: s.end_time });
-                  });
-                  const periods = [...periodMap.values()];
-                  const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-                  const hasSunday = batchSlots.some(s => s.day_of_week === 'Sunday');
-                  const gridDays = hasSunday ? [...dayOrder, 'Sunday'] : dayOrder;
-                  const findSlot = (day, col) => batchSlots.find(s => s.day_of_week === day && (s.period_number != null ? `p${s.period_number}` === col.key : s.start_time === col.key));
+                  if (!batchId) return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>Create a batch and add slots to see the weekly grid.</div>;
+                  if (batchSlots.length === 0) return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>No slots for this batch yet — add the first period above (pick From/To to club periods).</div>;
+                  const gridDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                  const daySlots = (day) => batchSlots.filter(s=>s.day_of_week===day);
+                  const coveredForDay = (day) => {
+                    const m=new Set();
+                    daySlots(day).forEach(s=>{
+                      const {from,to}=slotToKeys(s);
+                      const fi=FIXED_TT.findIndex(c=>c.key===from), ti=FIXED_TT.findIndex(c=>c.key===to);
+                      for(let i=fi;i<=ti;i++){ const k=FIXED_TT[i]?.key; if(k&&k!==from) m.add(k); }
+                    });
+                    return m;
+                  };
+                  const starterForDay = (day, colKey) => {
+                    return daySlots(day).find(s=>{
+                      const {from}=slotToKeys(s);
+                      return from===colKey;
+                    }) || null;
+                  };
                   return (
                     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'auto', marginBottom: '16px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: `${120 + periods.length * 130}px` }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '980px' }}>
                         <thead>
                           <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
-                            <th style={{ padding: '10px 8px', borderRight: '1px solid var(--border)', minWidth: '90px', textAlign: 'left' }}>DAY</th>
-                            {periods.map(p => <th key={p.key} style={{ padding: '10px 6px', borderRight: '1px solid var(--border)', minWidth: '120px', fontWeight: 700, color: 'var(--primary-deep)' }}>{p.period_number != null ? p.period_number : '•'}</th>)}
+                            <th style={{ padding: '10px 8px', borderRight: '1px solid var(--border)', minWidth: '84px', textAlign: 'left' }}>DAY</th>
+                            {FIXED_TT.map(col => (
+                              <th key={col.key} style={{ padding: '8px 4px', borderRight: '1px solid var(--border)', minWidth: col.kind==='break' ? '82px' : '96px', fontWeight: col.kind==='break' ? 600 : 700, color: col.kind==='break' ? 'var(--text-faint)' : 'var(--primary-deep)', background: col.kind==='break' ? 'var(--bg-saffron)' : 'var(--bg)', fontSize: col.kind==='break' ? '11px' : '13px' }}>{col.label}</th>
+                            ))}
                           </tr>
-                          <tr style={{ background: 'var(--bg-saffron)', borderBottom: '2px solid var(--border)', textAlign: 'center', fontSize: '11.5px', color: 'var(--text-soft)' }}>
-                            <th style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', fontWeight: 600, textAlign: 'left' }}></th>
-                            {periods.map(p => <th key={p.key} style={{ padding: '6px 4px', borderRight: '1px solid var(--border)', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmtTT(p.start)} – {fmtTT(p.end)}</th>)}
+                          <tr style={{ background: 'var(--bg-saffron)', borderBottom: '2px solid var(--border)', textAlign: 'center', fontSize: '11px', color: 'var(--text-soft)' }}>
+                            <th style={{ padding: '5px 8px', borderRight: '1px solid var(--border)', fontWeight: 600, textAlign: 'left' }}></th>
+                            {FIXED_TT.map(col => <th key={col.key} style={{ padding: '5px 2px', borderRight: '1px solid var(--border)', fontWeight: 500, whiteSpace: 'nowrap', background: col.kind==='break' ? 'var(--bg-saffron)' : '#fff' }}>{col.start}–{col.end.slice(0,5)}</th>)}
                           </tr>
                         </thead>
                         <tbody>
-                          {gridDays.map(day => (
-                            <tr key={day} style={{ borderBottom: '1px solid var(--border)' }}>
-                              <td style={{ padding: '10px 8px', fontWeight: 700, background: 'var(--bg)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{day.slice(0, 3).toUpperCase()}</td>
-                              {periods.map(col => {
-                                const slot = findSlot(day, col);
-                                return (
-                                  <td key={col.key} style={{ padding: '8px 6px', borderRight: '1px solid var(--border)', textAlign: 'center', verticalAlign: 'middle', background: slot ? 'var(--surface)' : 'var(--bg-saffron)', opacity: slot ? 1 : 0.7 }}>
-                                    {slot ? <><div style={{ fontWeight: 600, color: 'var(--primary-deep)', fontSize: '13px', lineHeight: 1.25 }}>{slot.subject || '—'}</div>{slot.room ? <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{slot.room}</div> : null}</> : <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>—</span>}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
+                          {gridDays.map(day => {
+                            const covered=coveredForDay(day);
+                            return (
+                              <tr key={day} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '10px 8px', fontWeight: 700, background: 'var(--bg)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{day.slice(0, 3).toUpperCase()}</td>
+                                {FIXED_TT.map(col => {
+                                  if (covered.has(col.key)) return null;
+                                  if (col.kind==='break') {
+                                    return <td key={col.key} style={{ padding: '10px 4px', borderRight: '1px solid var(--border)', textAlign: 'center', background: 'var(--bg-saffron)', color: 'var(--text-faint)', fontSize: '10px', fontWeight: 600, letterSpacing: '0.04em' }}>{col.label}</td>;
+                                  }
+                                  const slot=starterForDay(day, col.key);
+                                  if (!slot) return <td key={col.key} style={{ padding: '8px 4px', borderRight: '1px solid var(--border)', textAlign: 'center', verticalAlign: 'middle', background: 'var(--surface)', color: 'var(--text-faint)', fontSize: '12px' }}>—</td>;
+                                  const {from,to}=slotToKeys(slot);
+                                  const fi=FIXED_TT.findIndex(c=>c.key===from), ti=FIXED_TT.findIndex(c=>c.key===to);
+                                  const span=Math.max(1, ti-fi+1);
+                                  return (
+                                    <td key={col.key} colSpan={span} style={{ padding: '8px 6px', borderRight: '1px solid var(--border)', textAlign: 'center', verticalAlign: 'middle', background: 'var(--surface)' }}>
+                                      <div style={{ fontWeight: 600, color: 'var(--primary-deep)', fontSize: '13px', lineHeight: 1.25 }}>{slot.subject || '—'}</div>
+                                      {slot.room ? <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{slot.room}</div> : null}
+                                      {span>1 ? <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>({span} periods)</div> : null}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
-                      <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-faint)', borderTop: '1px solid var(--border)' }}>Period → time → class. Edit periods in the list below. BREAK / LUNCH are gaps between periods — add them as needed by leaving a period empty or adding a free slot.</div>
+                      <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-faint)', borderTop: '1px solid var(--border)' }}>Fixed PERIOD → timing → class. Club periods via From/To (within 1-3, 4-5, Extra+Study) — grid spans columns. BREAK/LUNCH/NAP always fixed columns.</div>
                     </div>
                   );
                 })()}
 
-                {/* Editable slot list (period + subject + room, inline edit) */}
+                {/* Editable slot list — Now From/To period selects, derived times */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
                   {dbData.timetable.length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No slots yet — add the first weekly class slot above.</div>
@@ -2548,17 +2636,21 @@ export default function Home() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                       <thead>
                         <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                          <th style={{ padding: '12px' }}>Day</th><th style={{ padding: '12px' }}>Period</th><th style={{ padding: '12px' }}>Time</th><th style={{ padding: '12px' }}>Class / Topic</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Room</th><th style={{ padding: '12px' }}>Actions</th>
+                          <th style={{ padding: '12px' }}>Day</th><th style={{ padding: '12px' }}>Periods</th><th style={{ padding: '12px' }}>Time</th><th style={{ padding: '12px' }}>Class / Topic</th><th style={{ padding: '12px' }}>Batch</th><th style={{ padding: '12px' }}>Room</th><th style={{ padding: '12px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {DAYS.map(day =>
-                          dbData.timetable.filter(s => s.day_of_week === day).sort((a,b) => (a.period_number ?? 999) - (b.period_number ?? 999) || toMinTT(a.start_time) - toMinTT(b.start_time)).map(s => {
+                        {DAYS.slice(0,6).map(day =>
+                          dbData.timetable.filter(s => s.day_of_week === day).sort((a,b) => toMinTT(a.start_time) - toMinTT(b.start_time)).map(s => {
                             if (editingSlot === s.id) return (
                               <tr key={s.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
-                                <td style={{ padding: '8px' }}><select value={editSlotDay} onChange={e => setEditSlotDay(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></td>
-                                <td style={{ padding: '8px' }}><input type="number" min="1" max="12" value={editSlotPeriod} onChange={e => setEditSlotPeriod(e.target.value)} placeholder="—" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /></td>
-                                <td style={{ padding: '8px', whiteSpace: 'nowrap' }}><input type="time" value={editSlotStart} onChange={e => setEditSlotStart(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} /> – <input type="time" value={editSlotEnd} onChange={e => setEditSlotEnd(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} /></td>
+                                <td style={{ padding: '8px' }}><select value={editSlotDay} onChange={e => setEditSlotDay(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{DAYS.slice(0,6).map(d => <option key={d} value={d}>{d}</option>)}</select></td>
+                                <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>
+                                  <select value={editSlotFrom} onChange={e => { setEditSlotFrom(e.target.value); const fi=FIXED_TT.findIndex(c=>c.key===e.target.value), ti=FIXED_TT.findIndex(c=>c.key===editSlotTo); if(ti<fi) setEditSlotTo(e.target.value); }} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{FIXED_TEACH.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+                                  {' → '}
+                                  <select value={editSlotTo} onChange={e => setEditSlotTo(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{FIXED_TEACH.filter(c => FIXED_TT.findIndex(x=>x.key===c.key) >= FIXED_TT.findIndex(x=>x.key===editSlotFrom) && ttSegmentOf(c.key)===ttSegmentOf(editSlotFrom)).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+                                </td>
+                                <td style={{ padding: '8px', whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-soft)' }}>{FIXED_MAP[editSlotFrom]?.start || ''}–{FIXED_MAP[editSlotTo]?.end || ''}</td>
                                 <td style={{ padding: '8px' }}><input value={editSlotSubject} onChange={e => setEditSlotSubject(e.target.value)} placeholder="Class / Topic" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
                                 <td style={{ padding: '8px' }}><select value={editSlotBatch} onChange={e => setEditSlotBatch(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></td>
                                 <td style={{ padding: '8px' }}><input value={editSlotRoom} onChange={e => setEditSlotRoom(e.target.value)} placeholder="optional" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100px' }} /></td>
@@ -2566,16 +2658,19 @@ export default function Home() {
                               </tr>
                             );
                             const batch = dbData.batches.find(b => b.id === s.batch_id);
+                            const {from,to}=slotToKeys(s);
+                            const fc=FIXED_MAP[from], tc=FIXED_MAP[to];
+                            const perLabel = from===to ? (fc?.label||from) : `${fc?.label||from}→${tc?.label||to}`;
                             return (
                               <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                 <td style={{ padding: '12px', fontWeight: 600 }}>{day}</td>
-                                <td style={{ padding: '12px', textAlign: 'center', fontWeight: s.period_number ? 600 : 400 }}>{s.period_number ?? '—'}</td>
-                                <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{fmtTT(s.start_time)} – {fmtTT(s.end_time)}</td>
+                                <td style={{ padding: '12px', textAlign: 'center', fontWeight: 600 }}>{perLabel}</td>
+                                <td style={{ padding: '12px', whiteSpace: 'nowrap', fontSize: '12.5px', color: 'var(--text-soft)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</td>
                                 <td style={{ padding: '12px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.subject || <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>—</span>}</td>
                                 <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
                                 <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{s.room || <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                                 <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {canAdmin('timetable') && <button onClick={() => { setEditingSlot(s.id); setEditSlotDay(s.day_of_week); setEditSlotStart(s.start_time?.slice(0,5) || ''); setEditSlotEnd(s.end_time?.slice(0,5) || ''); setEditSlotRoom(s.room || ''); setEditSlotSubject(s.subject || ''); setEditSlotPeriod(s.period_number != null ? String(s.period_number) : ''); setEditSlotBatch(s.batch_id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                                  {canAdmin('timetable') && <button onClick={() => { const k=slotToKeys(s); setEditingSlot(s.id); setEditSlotDay(s.day_of_week); setEditSlotFrom(k.from); setEditSlotTo(k.to); setEditSlotRoom(s.room || ''); setEditSlotSubject(s.subject || ''); setEditSlotBatch(s.batch_id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                                   {canAdmin('timetable') && <button onClick={() => handleDelete('timetable', s.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                                 </td>
                               </tr>
