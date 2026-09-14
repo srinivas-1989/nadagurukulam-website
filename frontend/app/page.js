@@ -661,25 +661,35 @@ export default function Home() {
   const [newSlotTo, setNewSlotTo] = useState('p1');
   const [newSlotRoom, setNewSlotRoom] = useState('');
   const [newSlotSubject, setNewSlotSubject] = useState('');
+  const [newSlotSubjects, setNewSlotSubjects] = useState([]);
+  const [newSlotInput, setNewSlotInput] = useState('');
   const [editingSlot, setEditingSlot] = useState(null);
   const [editSlotDay, setEditSlotDay] = useState('Monday');
   const [editSlotFrom, setEditSlotFrom] = useState('p1');
   const [editSlotTo, setEditSlotTo] = useState('p1');
   const [editSlotRoom, setEditSlotRoom] = useState('');
   const [editSlotSubject, setEditSlotSubject] = useState('');
+  const [editSlotSubjects, setEditSlotSubjects] = useState([]);
+  const [editSlotInput, setEditSlotInput] = useState('');
   const [editSlotBatch, setEditSlotBatch] = useState('');
   const [timetableBatch, setTimetableBatch] = useState('');
+  const slotDisplaySubjects = (s) => {
+    if (s?.subjects && Array.isArray(s.subjects) && s.subjects.length) return s.subjects.join(' / ');
+    if (s?.subject) return s.subject;
+    return '—';
+  };
 
   const handleAddSlot = async (e) => {
     e.preventDefault();
     if (!newSlotBatch) return;
-    if (!newSlotSubject.trim()) { alert('Enter Class / Topic'); return; }
+    const subjectsArr = newSlotSubjects.length ? newSlotSubjects : (newSlotSubject.trim() ? [newSlotSubject.trim()] : []);
+    if (!subjectsArr.length) { alert('Enter Class / Topic'); return; }
     const fc = FIXED_MAP[newSlotFrom], tc = FIXED_MAP[newSlotTo];
     if (!fc || !tc) return;
     const fi = FIXED_TT.findIndex(c=>c.key===newSlotFrom), ti = FIXED_TT.findIndex(c=>c.key===newSlotTo);
     if (ti < fi) { alert('Invalid period range'); return; }
     if (ttSegmentOf(newSlotFrom) !== ttSegmentOf(newSlotTo)) { alert('Club only within same block: 1-3, or 4-5, or Extra+Study'); return; }
-    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: fc.start, end_time: tc.end, room: newSlotRoom.trim() || null, subject: newSlotSubject.trim() || null, period_number: fc.num || null };
+    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: fc.start, end_time: tc.end, room: newSlotRoom.trim() || null, subject: subjectsArr[0], subjects: subjectsArr, period_number: fc.num || null };
     const sameBatch = (a,b) => a===b;
     const sameRoom = (a,b) => a && b && String(a).trim() && String(b).trim() && String(a).trim()===String(b).trim();
     const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
@@ -695,7 +705,7 @@ export default function Home() {
     }
     const slotRes = await apiCall(`${apiUrl}/api/timetable`, { method: 'POST', body: JSON.stringify(candidate) });
     if (!slotRes.ok) { const x = await slotRes.json().catch(() => ({})); alert(x.error || 'Failed to add slot'); return; }
-    setNewSlotRoom(''); setNewSlotSubject(''); fetchData();
+    setNewSlotRoom(''); setNewSlotSubject(''); setNewSlotSubjects([]); setNewSlotInput(''); fetchData();
   };
   const handleUpdateSlot = async (id) => {
     const fc = FIXED_MAP[editSlotFrom], tc = FIXED_MAP[editSlotTo];
@@ -703,7 +713,8 @@ export default function Home() {
     const fi = FIXED_TT.findIndex(c=>c.key===editSlotFrom), ti = FIXED_TT.findIndex(c=>c.key===editSlotTo);
     if (ti < fi) { alert('Invalid period range'); return; }
     if (ttSegmentOf(editSlotFrom) !== ttSegmentOf(editSlotTo)) { alert('Club only within same block: 1-3, or 4-5, or Extra+Study'); return; }
-    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: fc.start, end_time: tc.end, room: editSlotRoom.trim() || null, subject: editSlotSubject.trim() || null, period_number: fc.num || null };
+    const subjectsArr = editSlotSubjects.length ? editSlotSubjects : (editSlotSubject.trim() ? [editSlotSubject.trim()] : []);
+    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: fc.start, end_time: tc.end, room: editSlotRoom.trim() || null, subject: subjectsArr[0] || null, subjects: subjectsArr, period_number: fc.num || null };
     const res = await apiCall(`${apiUrl}/api/timetable/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Update failed'); return; }
     setEditingSlot(null); fetchData();
@@ -717,19 +728,36 @@ export default function Home() {
   const [ceTopic, setCeTopic] = useState('');
   const [ceTopicText, setCeTopicText] = useState('');
   const [ceNotes, setCeNotes] = useState('');
+  const [ceConducted, setCeConducted] = useState(true);
+  const [ceL, setCeL] = useState(0);
+  const [ceTh, setCeTh] = useState(1);
+  const [ceP, setCeP] = useState(0);
+  const [ceRemarks, setCeRemarks] = useState('');
+  const [cePeriodLabel, setCePeriodLabel] = useState('');
+  const [ceWeekStart, setCeWeekStart] = useState(()=>{ const d=new Date(); const day=d.getDay(); const diff=d.getDate()-day+(day===0?-6:1); const m=new Date(d.setDate(diff)); return m.toISOString().slice(0,10); });
   const ceModules = ceCourse ? (dbData.course_modules || []).filter(m => m.course_id === ceCourse) : [];
   const ceTopics = ceModule ? (dbData.course_module_topics || []).filter(t => t.module_id === ceModule) : [];
+  const ceSlotPeriodLabel = (slot) => {
+    if (!slot) return '';
+    const k = slotToKeys(slot);
+    const fc = FIXED_MAP[k.from], tc = FIXED_MAP[k.to];
+    if (!fc || !tc) return slot.subject || '';
+    if (k.from===k.to) return fc.num ? String(fc.num) : fc.label;
+    return `${fc.label}→${tc.label}`;
+  };
 
   const handleAddClassEntry = async (e) => {
     e.preventDefault();
     if (!ceSlot || !ceDate) { alert('Pick a slot and date'); return; }
     const slot = dbData.timetable.find(s => s.id === ceSlot);
     if (!slot) { alert('Invalid slot'); return; }
-    const payload = { timetable_slot_id: ceSlot, batch_id: slot.batch_id, class_date: ceDate, course_id: ceCourse || null, module_id: ceModule || null, topic_id: ceTopic || null, topic_text: ceTopicText.trim() || null, notes: ceNotes.trim() || null, taught_by: myProfile?.id || null, status: 'submitted' };
-    if (!payload.course_id && !payload.topic_text) { alert('Pick a course/topic or enter a free topic'); return; }
+    const derivedLabel = cePeriodLabel.trim() || ceSlotPeriodLabel(slot);
+    const payload = { timetable_slot_id: ceSlot, batch_id: slot.batch_id, class_date: ceDate, course_id: ceCourse || null, module_id: ceModule || null, topic_id: ceTopic || null, topic_text: ceTopicText.trim() || null, notes: ceNotes.trim() || null, taught_by: myProfile?.id || null, status: 'submitted', is_conducted: ceConducted, l_count: Number(ceL)||0, th_count: Number(ceTh)||0, p_count: Number(ceP)||0, remarks: ceRemarks.trim() || null, period_label: derivedLabel || null };
+    if (payload.is_conducted && !payload.course_id && !payload.topic_text) { alert('Pick a course/topic or enter a free topic'); return; }
+    if (!payload.is_conducted && !payload.remarks) { alert('Add reason in Remarks when class not conducted'); return; }
     const res = await apiCall(`${apiUrl}/api/class_entries`, { method: 'POST', body: JSON.stringify(payload) });
     if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || 'Failed to log class'); return; }
-    setCeTopic(''); setCeTopicText(''); setCeNotes(''); fetchData();
+    setCeTopic(''); setCeTopicText(''); setCeNotes(''); setCeRemarks(''); setCePeriodLabel(''); fetchData();
   };
 
   const handleConfirm = async (entry, nextStatus) => {
@@ -743,6 +771,75 @@ export default function Home() {
     else res = await apiCall(`${apiUrl}/api/class_confirmations`, { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || 'Failed'); return; }
     fetchData();
+  };
+
+  const downloadWeeklyXlsx = async () => {
+    try {
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Dept. of Performing Arts.');
+      ws.properties.defaultRowHeight = 13.75;
+      ws.columns = [
+        { width: 5.16 }, { width: 15.16 }, { width: 15.16 }, { width: 17.66 }, { width: 23.33 },
+        { width: 83.66 }, { width: 6 }, { width: 13 }, { width: 13 }, { width: 45.66 },
+      ];
+      const facultyName = myProfile?.name || 'Faculty';
+      const start = ceWeekStart ? new Date(ceWeekStart + 'T00:00:00') : new Date();
+      const end = new Date(start); end.setDate(start.getDate()+5);
+      const fmt = (d) => d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+      const weekLabel = `${fmt(start)} to ${fmt(end)}`;
+      ws.mergeCells('A1:E1'); ws.getCell('A1').value = 'Dept. of Performing Arts.';
+      ws.mergeCells('G1:I1'); ws.getCell('G1').value = `Week: ${weekLabel}`;
+      ws.mergeCells('A2:E2'); ws.getCell('A2').value = 'Name of Faculty';
+      ws.mergeCells('G2:I2'); ws.getCell('G2').value = facultyName;
+      ws.mergeCells('A3:F3'); ws.getCell('A3').value = 'Total';
+      ws.getCell('A1').font = { bold: true, size: 11 }; ws.getCell('G1').font = { size: 10, italic: true };
+      ws.getCell('A2').font = { bold: true, size: 10 }; ws.getCell('G2').font = { bold: true, size: 10 };
+      ws.getCell('A3').font = { bold: true }; ws.getCell('A3').alignment = { horizontal: 'center' };
+      const headerStyle = { font: { bold: true, size: 10 }, alignment: { horizontal: 'center', vertical: 'middle', wrapText: true }, border: { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} } };
+      ws.getCell('A4').value='S.No.'; ws.getCell('B4').value='Date'; ws.getCell('C4').value='Day'; ws.getCell('D4').value='Time'; ws.getCell('E4').value='Period No.'; ws.getCell('F4').value='Topic'; ws.getCell('G4').value='L'; ws.getCell('H4').value='Th'; ws.getCell('I4').value='P'; ws.getCell('J4').value='Remarks';
+      ['A4','B4','C4','D4','E4','F4','G4','H4','I4','J4'].forEach(a=>{ const c=ws.getCell(a); Object.assign(c, headerStyle); c.fill={ type:'pattern', pattern:'solid', fgColor:{ argb:'FFFDF3E0' } }; });
+      ws.getRow(4).height = 18;
+      ws.getCell('G3').value = { formula: 'SUM(G5:G202)' }; ws.getCell('H3').value = { formula: 'SUM(H5:H202)' }; ws.getCell('I3').value = { formula: 'SUM(I5:I202)' };
+      ['G3','H3','I3'].forEach(a=>{ ws.getCell(a).border={ top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} }; ws.getCell(a).alignment={ horizontal:'center' }; });
+      const fromStr = ceWeekStart; const toDate = new Date(start); toDate.setDate(start.getDate()+6);
+      const toStr = toDate.toISOString().slice(0,10);
+      const isSuper = role==='super_admin';
+      let rows = (dbData.class_entries||[]).filter(r=> r.class_date >= fromStr && r.class_date <= toStr);
+      if (!isSuper && myProfile?.id) rows = rows.filter(r=> String(r.taught_by)===String(myProfile.id));
+      rows.sort((a,b)=> String(a.class_date).localeCompare(String(b.class_date)));
+      rows.forEach((entry, idx)=>{
+        const n = idx+5;
+        const slot = dbData.timetable.find(s=> s.id===entry.timetable_slot_id);
+        const day = slot?.day_of_week || (entry.class_date ? new Date(entry.class_date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long'}) : '');
+        const time = slot ? `${slot.start_time?.slice(0,5)} to ${slot.end_time?.slice(0,5)}` : '';
+        const period = entry.period_label || (slot ? ceSlotPeriodLabel(slot) : '');
+        const topic = dbData.course_module_topics.find(t=>t.id===entry.topic_id)?.topic || dbData.course_modules.find(m=>m.id===entry.module_id)?.title || dbData.courses.find(c=>c.id===entry.course_id)?.name || entry.topic_text || (entry.is_conducted===false ? 'Class not conducted' : '—');
+        const dt = entry.class_date ? new Date(entry.class_date+'T00:00:00') : null;
+        const row = ws.getRow(n);
+        row.getCell(1).value = idx+1;
+        row.getCell(2).value = dt; row.getCell(2).numFmt = 'dd-mmm-yyyy';
+        row.getCell(3).value = day;
+        row.getCell(4).value = time;
+        row.getCell(5).value = period;
+        row.getCell(6).value = topic; row.getCell(6).alignment = { wrapText: true, vertical: 'middle' };
+        row.getCell(7).value = Number(entry.l_count ?? 0);
+        row.getCell(8).value = Number(entry.th_count ?? 0);
+        row.getCell(9).value = Number(entry.p_count ?? 0);
+        row.getCell(10).value = entry.remarks || entry.notes || (entry.is_conducted===false ? 'Not conducted' : '');
+        for(let c=1;c<=10;c++){ const cell=row.getCell(c); cell.border={ top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} }; cell.font={ size:10 }; if(c<=5||c>=7) cell.alignment={ horizontal:'center', vertical:'middle' }; }
+        row.height = 16;
+      });
+      if (rows.length===0){
+        const row=ws.getRow(5); row.getCell(1).value=1; row.getCell(6).value='No classes logged in this week'; for(let c=1;c<=10;c++) row.getCell(c).border={ top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+      }
+      ws.getCell('K1').value='Legend'; ws.getCell('K1').font={ bold:true, size:9 }; ws.getCell('L1').value='Th. = Theory'; ws.getCell('L2').value='T = Tutorial'; ws.getCell('L3').value='Pr. = Practical'; ws.getCell('L4').value='L = Lecture';
+      ['L1','L2','L3','L4'].forEach(a=> ws.getCell(a).font={ size:9 });
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=`Teaching-log-Weekly-${facultyName.replace(/\s+/g,'-')}-${fromStr}_to_${toStr}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    } catch(e){ alert('Download failed: '+(e.message||e)); }
   };
 
   // Lesson plans — draft → submitted → approved / needs_revision (Admin approves or returns).
@@ -1301,7 +1398,7 @@ export default function Home() {
           </nav>
 
           {/* Main Content Area */}
-          <main style={{ padding: '36px', maxWidth: '940px', width: '100%' }}>
+          <main style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
               <h2 style={{ fontSize: '24px', color: 'var(--primary-deep)' }}>
                 {MODULES.find(m => m.key === activeModule)?.name}
@@ -2538,7 +2635,18 @@ export default function Home() {
                         {FIXED_TEACH.filter(c => FIXED_TT.findIndex(x=>x.key===c.key) >= FIXED_TT.findIndex(x=>x.key===newSlotFrom) && ttSegmentOf(c.key)===ttSegmentOf(newSlotFrom)).map(c => <option key={c.key} value={c.key}>{c.label} · {c.end}</option>)}
                       </select>
                     </label>
-                    <input placeholder="Class / Topic * (e.g. Practical 1, Theory)" value={newSlotSubject} onChange={e => setNewSlotSubject(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    {role==='super_admin' ? (
+                      <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', minHeight: newSlotSubjects.length ? 'auto' : 0 }}>{newSlotSubjects.map((s,i)=><span key={i} style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '99px', fontSize: '12px', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>{s}<button type="button" onClick={()=>setNewSlotSubjects(a=>a.filter((_,j)=>j!==i))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '12px' }}>×</button></span>)}</div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input placeholder="Class / Topic * — Enter to add chip (e.g. Sarali / Janta)" value={newSlotInput} onChange={e=>setNewSlotInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=newSlotInput.trim(); if(v){ setNewSlotSubjects(a=>[...a, v]); setNewSlotInput(''); } } }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: 1 }} />
+                          <button type="button" onClick={()=>{ const v=newSlotInput.trim(); if(v){ setNewSlotSubjects(a=>[...a, v]); setNewSlotInput(''); } }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Add</button>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Super Admin: add multiple subjects in one slot — staff see only their batch.</div>
+                      </div>
+                    ) : (
+                      <input placeholder="Class / Topic * (e.g. Practical 1, Theory)" value={newSlotSubject} onChange={e => setNewSlotSubject(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    )}
                     <input placeholder="Room (optional)" value={newSlotRoom} onChange={e => setNewSlotRoom(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '130px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add Slot</button>
                   </form>
@@ -2580,8 +2688,9 @@ export default function Home() {
                     }) || null;
                   };
                   return (
-                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'auto', marginBottom: '16px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '980px' }}>
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '16px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'fixed' }}>
+                        <colgroup><col style={{ width: '84px' }} />{FIXED_TT.map(c=><col key={c.key} style={{ width: c.kind==='break' ? '6.5%' : '9.35%' }} />)}</colgroup>
                         <thead>
                           <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
                             <th style={{ padding: '10px 8px', borderRight: '1px solid var(--border)', minWidth: '84px', textAlign: 'left' }}>DAY</th>
@@ -2612,7 +2721,7 @@ export default function Home() {
                                   const span=Math.max(1, ti-fi+1);
                                   return (
                                     <td key={col.key} colSpan={span} style={{ padding: '8px 6px', borderRight: '1px solid var(--border)', textAlign: 'center', verticalAlign: 'middle', background: 'var(--surface)' }}>
-                                      <div style={{ fontWeight: 600, color: 'var(--primary-deep)', fontSize: '13px', lineHeight: 1.25 }}>{slot.subject || '—'}</div>
+                                      <div style={{ fontWeight: 600, color: 'var(--primary-deep)', fontSize: '13px', lineHeight: 1.25 }}>{slotDisplaySubjects(slot)}</div>
                                       {slot.room ? <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '2px' }}>{slot.room}</div> : null}
                                       {span>1 ? <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>({span} periods)</div> : null}
                                     </td>
@@ -2651,7 +2760,12 @@ export default function Home() {
                                   <select value={editSlotTo} onChange={e => setEditSlotTo(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{FIXED_TEACH.filter(c => FIXED_TT.findIndex(x=>x.key===c.key) >= FIXED_TT.findIndex(x=>x.key===editSlotFrom) && ttSegmentOf(c.key)===ttSegmentOf(editSlotFrom)).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
                                 </td>
                                 <td style={{ padding: '8px', whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--text-soft)' }}>{FIXED_MAP[editSlotFrom]?.start || ''}–{FIXED_MAP[editSlotTo]?.end || ''}</td>
-                                <td style={{ padding: '8px' }}><input value={editSlotSubject} onChange={e => setEditSlotSubject(e.target.value)} placeholder="Class / Topic" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                                <td style={{ padding: '8px' }}>{role==='super_admin' ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>{editSlotSubjects.map((s,i)=><span key={i} style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: '99px', fontSize: '11px' }}>{s}<button type="button" onClick={()=>setEditSlotSubjects(a=>a.filter((_,j)=>j!==i))} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '4px' }}>×</button></span>)}</div>
+                                    <div style={{ display: 'flex', gap: '4px' }}><input value={editSlotInput} onChange={e=>setEditSlotInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=editSlotInput.trim(); if(v){ setEditSlotSubjects(a=>[...a,v]); setEditSlotInput(''); } } }} placeholder="Add" style={{ padding: '4px', border: '1px solid var(--border)', borderRadius: '4px', flex: 1, fontSize: '12px' }} /><button type="button" onClick={()=>{ const v=editSlotInput.trim(); if(v){ setEditSlotSubjects(a=>[...a,v]); setEditSlotInput(''); } }} style={{ padding: '4px 8px', fontSize: '11px', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}>+</button></div>
+                                  </div>
+                                ) : <input value={editSlotSubject} onChange={e => setEditSlotSubject(e.target.value)} placeholder="Class / Topic" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} />}</td>
                                 <td style={{ padding: '8px' }}><select value={editSlotBatch} onChange={e => setEditSlotBatch(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>{dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></td>
                                 <td style={{ padding: '8px' }}><input value={editSlotRoom} onChange={e => setEditSlotRoom(e.target.value)} placeholder="optional" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100px' }} /></td>
                                 <td style={{ padding: '8px', display: 'flex', gap: '6px' }}><button onClick={() => handleUpdateSlot(s.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button><button onClick={() => setEditingSlot(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button></td>
@@ -2666,11 +2780,11 @@ export default function Home() {
                                 <td style={{ padding: '12px', fontWeight: 600 }}>{day}</td>
                                 <td style={{ padding: '12px', textAlign: 'center', fontWeight: 600 }}>{perLabel}</td>
                                 <td style={{ padding: '12px', whiteSpace: 'nowrap', fontSize: '12.5px', color: 'var(--text-soft)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</td>
-                                <td style={{ padding: '12px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.subject || <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>—</span>}</td>
+                                <td style={{ padding: '12px', fontWeight: 600, color: 'var(--primary-deep)' }}>{slotDisplaySubjects(s) !== '—' ? slotDisplaySubjects(s) : <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>—</span>}</td>
                                 <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
                                 <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{s.room || <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                                 <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {canAdmin('timetable') && <button onClick={() => { const k=slotToKeys(s); setEditingSlot(s.id); setEditSlotDay(s.day_of_week); setEditSlotFrom(k.from); setEditSlotTo(k.to); setEditSlotRoom(s.room || ''); setEditSlotSubject(s.subject || ''); setEditSlotBatch(s.batch_id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                                  {canAdmin('timetable') && <button onClick={() => { const k=slotToKeys(s); setEditingSlot(s.id); setEditSlotDay(s.day_of_week); setEditSlotFrom(k.from); setEditSlotTo(k.to); setEditSlotRoom(s.room || ''); const arr = Array.isArray(s.subjects) ? s.subjects : (s.subject ? [s.subject] : []); setEditSlotSubject(arr[0]||''); setEditSlotSubjects(arr); setEditSlotInput(''); setEditSlotBatch(s.batch_id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                                   {canAdmin('timetable') && <button onClick={() => handleDelete('timetable', s.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                                 </td>
                               </tr>
@@ -2682,20 +2796,29 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* ── Class completion loop — log what was taught ── */}
+                {/* ── Class completion loop — log what was taught (+ done/not, L/Th/P, remarks, weekly XLSX) ── */}
                 {canCreate('timetable') && (
                   <form onSubmit={handleAddClassEntry} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <div style={{ flex: '1 1 220px' }}>
                       <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Slot</label>
-                      <select value={ceSlot} onChange={e => setCeSlot(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
+                      <select value={ceSlot} onChange={e => { setCeSlot(e.target.value); const s=dbData.timetable.find(x=>x.id===e.target.value); setCePeriodLabel(s?ceSlotPeriodLabel(s):''); }} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
                         <option value="">Pick slot…</option>
                         {dbData.timetable.map(s => {
                           const b = dbData.batches.find(x => x.id === s.batch_id);
-                          return <option key={s.id} value={s.id}>{s.day_of_week} {s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)} · {b?.name || s.batch_id.slice(0, 6)} · {s.room}</option>;
+                          return <option key={s.id} value={s.id}>{s.day_of_week} {s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)} · {b?.name || s.batch_id.slice(0, 6)} · {s.room} · {slotDisplaySubjects(s)}</option>;
                         })}
                       </select>
                     </div>
                     <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Date <input type="date" value={ceDate} onChange={e => setCeDate(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'flex', flexDirection: 'column', gap: '4px' }}>Conducted
+                      <select value={ceConducted ? '1' : '0'} onChange={e=>setCeConducted(e.target.value==='1')} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                        <option value="1">Done</option><option value="0">Not done</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>L <input type="number" min="0" value={ceL} onChange={e=>setCeL(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '60px', display: 'block' }} /></label>
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Th <input type="number" min="0" value={ceTh} onChange={e=>setCeTh(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '60px', display: 'block' }} /></label>
+                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>P <input type="number" min="0" value={ceP} onChange={e=>setCeP(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '60px', display: 'block' }} /></label>
+                    <input placeholder="Period label (e.g. all periods (1st Sem))" value={cePeriodLabel} onChange={e=>setCePeriodLabel(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
                     <div style={{ flex: '1 1 160px' }}>
                       <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Course (curriculum)</label>
                       <select value={ceCourse} onChange={e => { setCeCourse(e.target.value); setCeModule(''); setCeTopic(''); }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
@@ -2718,10 +2841,18 @@ export default function Home() {
                       </select>
                     </div>
                     <input placeholder="or free topic" value={ceTopicText} onChange={e => setCeTopicText(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
+                    <input placeholder="Remarks (On Leave / Holiday …)" value={ceRemarks} onChange={e => setCeRemarks(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
                     <input placeholder="notes (optional)" value={ceNotes} onChange={e => setCeNotes(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Log class</button>
                   </form>
                 )}
+                {/* Weekly XLSX download — linked to timetable */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px', background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: '10px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-deep)' }}>Weekly teaching log</span>
+                  <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Week start (Mon) <input type="date" value={ceWeekStart} onChange={e=>setCeWeekStart(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', display: 'block' }} /></label>
+                  <button type="button" onClick={downloadWeeklyXlsx} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Download XLSX</button>
+                  <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>A1:O202 layout, SUM totals, thin borders — linked to Fixed timetable. Super Admin exports all faculty; staff exports own.</span>
+                </div>
 
                 {/* Entries + student confirmations */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginTop: '16px' }}>

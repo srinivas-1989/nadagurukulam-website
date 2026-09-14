@@ -503,6 +503,34 @@ const crud = (table, orderCol = 'created_at') => ({
         if (typeof payload.outcomes_json === 'string') { try { payload.outcomes_json = JSON.parse(payload.outcomes_json); } catch {} }
         if (payload.examination_type_id === '') payload.examination_type_id = null;
       }
+      if (table === 'timetable_slots') {
+        if (payload.subjects !== undefined) {
+          let arr = payload.subjects;
+          if (typeof arr === 'string') arr = arr.split(/[,/]+/).map(s=>s.trim()).filter(Boolean);
+          if (!Array.isArray(arr)) arr = [];
+          arr = arr.map(s=>String(s).trim()).filter(Boolean);
+          payload.subjects = arr;
+          if (arr.length && !payload.subject) payload.subject = arr[0];
+        }
+        if (payload.course_ids !== undefined) {
+          let arr = payload.course_ids;
+          if (typeof arr === 'string') arr = arr.split(',').map(s=>s.trim()).filter(Boolean);
+          if (!Array.isArray(arr)) arr = [];
+          payload.course_ids = arr;
+          if (payload.course_ids.length===0) payload.course_ids = '{}';
+        }
+      }
+      if (table === 'class_entries') {
+        if (payload.is_conducted !== undefined) payload.is_conducted = !!payload.is_conducted;
+        ['l_count','th_count','p_count'].forEach(k=>{ if(payload[k]!==undefined && payload[k]!=='' && payload[k]!==null) payload[k]=Math.max(0, Number(payload[k])||0); });
+        if (payload.period_label === '') payload.period_label = null;
+        if (payload.remarks === '') payload.remarks = null;
+        if (payload.topic_text === '') payload.topic_text = null;
+        if (payload.notes === '') payload.notes = null;
+        if (!payload.period_label && payload.timetable_slot_id) {
+          // filled client-side; keep null if missing
+        }
+      }
       const { data, error } = await supabase.from(table).insert([payload]).select();
       if (error) throw error;
       res.status(201).json(data[0]);
@@ -598,6 +626,26 @@ const crud = (table, orderCol = 'created_at') => ({
         if (typeof updateData.objectives_json === 'string') { try { updateData.objectives_json = JSON.parse(updateData.objectives_json); } catch {} }
         if (typeof updateData.outcomes_json === 'string') { try { updateData.outcomes_json = JSON.parse(updateData.outcomes_json); } catch {} }
         if (updateData.examination_type_id === '') updateData.examination_type_id = null;
+      }
+      if (table === 'timetable_slots' && updateData.subjects !== undefined) {
+        let arr = updateData.subjects;
+        if (typeof arr === 'string') arr = arr.split(/[,/]+/).map(s=>s.trim()).filter(Boolean);
+        if (!Array.isArray(arr)) arr = [];
+        arr = arr.map(s=>String(s).trim()).filter(Boolean);
+        updateData.subjects = arr;
+        if (arr.length && !updateData.subject) updateData.subject = arr[0];
+        if (updateData.course_ids !== undefined) {
+          let ca = updateData.course_ids;
+          if (typeof ca === 'string') ca = ca.split(',').map(s=>s.trim()).filter(Boolean);
+          if (!Array.isArray(ca)) ca = [];
+          updateData.course_ids = ca.length ? ca : '{}';
+        }
+      }
+      if (table === 'class_entries' && updateData.is_conducted !== undefined) updateData.is_conducted = !!updateData.is_conducted;
+      if (table === 'class_entries') {
+        ['l_count','th_count','p_count'].forEach(k=>{ if(updateData[k]!==undefined && updateData[k]!=='' && updateData[k]!==null) updateData[k]=Math.max(0, Number(updateData[k])||0); });
+        if (updateData.period_label === '') updateData.period_label = null;
+        if (updateData.remarks === '') updateData.remarks = null;
       }
       if (TABLES_WITH_UPDATED_AT.has(table)) updateData.updated_at = new Date().toISOString();
       const { data, error } = await supabase.from(table).update(updateData).eq('id', req.params.id).select();
