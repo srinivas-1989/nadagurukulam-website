@@ -87,6 +87,31 @@ app.use(express.json());
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/api/health', (req, res) => res.json({ ok: true, cms: mongoose.connection.readyState === 1 ? 'up' : 'down' }));
 
+// Public feeds — no auth; only published rows. Ponytail: if disciplines need
+// draft/published later, add status col + filter here.
+app.get('/api/public/events', async (req, res) => {
+  try { const { data, error } = await supabase.from('events').select('*').eq('status', 'published').order('date', { ascending: false }); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/public/jobs', async (req, res) => {
+  try { const { data, error } = await supabase.from('jobs').select('*').eq('status', 'published').order('created_at', { ascending: false }); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/public/disciplines', async (req, res) => {
+  try { const { data, error } = await supabase.from('disciplines').select('*').order('name'); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/public/enquiries', async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    const contact = String(req.body.contact || '').trim();
+    const type = String(req.body.type || 'general').trim();
+    const message = String(req.body.message || '').trim() || null;
+    if (!name || !contact) return res.status(400).json({ error: 'name and contact are required' });
+    if (!['admission', 'general'].includes(type)) return res.status(400).json({ error: 'Invalid enquiry type' });
+    const { data, error } = await supabase.from('enquiries').insert([{ name, contact, type, message, status: 'new' }]).select();
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ============================================================================
 // AUTH MIDDLEWARE — verify Supabase JWT, resolve user role & permissions
 // ============================================================================

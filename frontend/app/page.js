@@ -133,6 +133,14 @@ export default function Home() {
   const [cmsEditing, setCmsEditing] = useState(false);
   const [cmsForm, setCmsForm] = useState(CMS_FALLBACK);
   const cms = { ...CMS_FALLBACK, ...(cmsHome || {}) };
+  const [pubDisciplines, setPubDisciplines] = useState([]);
+  const [pubEvents, setPubEvents] = useState([]);
+  const [pubJobs, setPubJobs] = useState([]);
+  const [pubEnqName, setPubEnqName] = useState('');
+  const [pubEnqContact, setPubEnqContact] = useState('');
+  const [pubEnqType, setPubEnqType] = useState('general');
+  const [pubEnqMsg, setPubEnqMsg] = useState('');
+  const [pubEnqSent, setPubEnqSent] = useState('');
 
   // Detailed Syllabus State (MongoDB curriculum_content)
   const [activeSyllabusCourse, setActiveSyllabusCourse] = useState(null);
@@ -210,7 +218,12 @@ export default function Home() {
     } catch (err) { console.error('Fetch error:', err); }
   };
 
-  useEffect(() => { loadCms(); }, []);
+  useEffect(() => {
+    loadCms();
+    fetch(`${apiUrl}/api/public/disciplines`).then(r=>r.json()).then(d=>Array.isArray(d)&&setPubDisciplines(d)).catch(()=>{});
+    fetch(`${apiUrl}/api/public/events`).then(r=>r.json()).then(d=>Array.isArray(d)&&setPubEvents(d)).catch(()=>{});
+    fetch(`${apiUrl}/api/public/jobs`).then(r=>r.json()).then(d=>Array.isArray(d)&&setPubJobs(d)).catch(()=>{});
+  }, []);
 
   useEffect(() => {
     if (view === 'admin' && session) fetchData();
@@ -995,14 +1008,63 @@ export default function Home() {
             <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>{cms.disciplinesHeading}</h3>
             <p style={{ color: 'var(--text-soft)', marginBottom: '24px' }}>{cms.disciplinesSub}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-              {dbData.curriculum.length === 0 && <p style={{ color: 'var(--text-faint)', gridColumn: '1 / -1' }}>Disciplines will appear here as they&apos;re added in the portal (Curricula module).</p>}
-              {dbData.curriculum.map(art => (
+              {(pubDisciplines.length ? pubDisciplines : dbData.curriculum).length === 0 && <p style={{ color: 'var(--text-faint)', gridColumn: '1 / -1' }}>Disciplines will appear here as they&apos;re added in the portal (Curricula module).</p>}
+              {(pubDisciplines.length ? pubDisciplines : dbData.curriculum).map(art => (
                 <div key={art.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', boxShadow: 'var(--shadow-sm)' }}>
                   <h4 style={{ fontSize: '18px', color: 'var(--primary)', marginBottom: '8px' }}>{art.name}</h4>
                   <p style={{ fontSize: '14px', color: 'var(--text-soft)', margin: 0 }}>{art.description || art.levels || '—'}</p>
                 </div>
               ))}
             </div>
+            {pubEvents.length > 0 && (
+              <section style={{ marginTop: '48px' }}>
+                <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Upcoming Events</h3>
+                <p style={{ color: 'var(--text-soft)', marginBottom: '16px' }}>Published from the portal — only what Admin has approved appears here.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+                  {pubEvents.map(ev => (
+                    <div key={ev.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '18px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{ev.title}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-faint)', marginTop: '4px' }}>{ev.date} · {ev.venue}</div>
+                      {ev.description && <p style={{ fontSize: '13.5px', color: 'var(--text-soft)', marginTop: '8px' }}>{ev.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            {pubJobs.length > 0 && (
+              <section style={{ marginTop: '48px' }}>
+                <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Careers</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {pubJobs.map(j => (
+                    <div key={j.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px 18px', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                      <div><div style={{ fontWeight: 600 }}>{j.title}</div><div style={{ fontSize: '13px', color: 'var(--text-faint)' }}>{j.department} · {j.type}</div></div>
+                      {j.description && <div style={{ fontSize: '13px', color: 'var(--text-soft)', maxWidth: '42ch' }}>{j.description.slice(0, 160)}</div>}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            <section style={{ marginTop: '48px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px' }}>
+              <h3 style={{ fontSize: '18px', color: 'var(--primary-deep)', marginBottom: '6px' }}>Enquire</h3>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-soft)', marginBottom: '14px' }}>Admissions or general — we&apos;ll get back on the contact you share.</p>
+              {pubEnqSent && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>{pubEnqSent}</div>}
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!pubEnqName.trim() || !pubEnqContact.trim()) { setPubEnqSent('Name and contact required.'); return; }
+                const r = await fetch(`${apiUrl}/api/public/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pubEnqName.trim(), contact: pubEnqContact.trim(), type: pubEnqType, message: pubEnqMsg.trim() || null }) });
+                const j = await r.json().catch(()=>({}));
+                if (!r.ok) { setPubEnqSent(j.error || 'Failed to send'); return; }
+                setPubEnqSent('Thank you — we received your enquiry.'); setPubEnqName(''); setPubEnqContact(''); setPubEnqMsg('');
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <input placeholder="Full name *" value={pubEnqName} onChange={e=>setPubEnqName(e.target.value)} style={{ flex: '1 1 160px', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }} />
+                  <input placeholder="Phone or email *" value={pubEnqContact} onChange={e=>setPubEnqContact(e.target.value)} style={{ flex: '1 1 160px', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }} />
+                  <select value={pubEnqType} onChange={e=>setPubEnqType(e.target.value)} style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }}><option value="general">General</option><option value="admission">Admission</option></select>
+                </div>
+                <textarea placeholder="Message (optional)" value={pubEnqMsg} onChange={e=>setPubEnqMsg(e.target.value)} rows={3} style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }} />
+                <button type="submit" style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Send enquiry</button>
+              </form>
+            </section>
           </main>
 
           <footer style={{ background: 'var(--surface-muted)', borderTop: '1px solid var(--border)', padding: '40px 24px', marginTop: '60px' }}>
