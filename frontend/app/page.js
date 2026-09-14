@@ -23,7 +23,8 @@ export default function Home() {
     { key: 'activities', name: 'Activities', desc: 'Competitions, performances, achievements.' },
     { key: 'projects', name: 'Projects', desc: 'Student portfolio — works beyond curriculum.' },
     { key: 'certificates', name: 'Certificates', desc: 'Institutional + external achievements.' },
-    { key: 'roles', name: 'Roles & Permissions', desc: 'Create roles and set what each can do in every module.' }
+    { key: 'roles', name: 'Roles & Permissions', desc: 'Create roles and set what each can do in every module.' },
+    { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' }
   ];
 
   const [view, setView] = useState('public'); // public | login | admin
@@ -2795,97 +2796,6 @@ export default function Home() {
                     </table>
                   )}
                 </div>
-
-                {/* ── Class completion loop — log what was taught (+ done/not, L/Th/P, remarks, weekly XLSX) ── */}
-                {canCreate('timetable') && (
-                  <form onSubmit={handleAddClassEntry} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <div style={{ flex: '1 1 220px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Slot</label>
-                      <select value={ceSlot} onChange={e => { setCeSlot(e.target.value); const s=dbData.timetable.find(x=>x.id===e.target.value); setCePeriodLabel(s?ceSlotPeriodLabel(s):''); }} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
-                        <option value="">Pick slot…</option>
-                        {dbData.timetable.map(s => {
-                          const b = dbData.batches.find(x => x.id === s.batch_id);
-                          return <option key={s.id} value={s.id}>{s.day_of_week} {s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)} · {b?.name || s.batch_id.slice(0, 6)} · {s.room} · {slotDisplaySubjects(s)}</option>;
-                        })}
-                      </select>
-                    </div>
-                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Date <input type="date" value={ceDate} onChange={e => setCeDate(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} /></label>
-                    <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'flex', flexDirection: 'column', gap: '4px' }}>Conducted
-                      <select value={ceConducted ? '1' : '0'} onChange={e=>setCeConducted(e.target.value==='1')} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                        <option value="1">Done</option><option value="0">Not done</option>
-                      </select>
-                    </label>
-                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>L <input type="number" min="0" value={ceL} onChange={e=>setCeL(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '60px', display: 'block' }} /></label>
-                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Th <input type="number" min="0" value={ceTh} onChange={e=>setCeTh(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '60px', display: 'block' }} /></label>
-                    <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>P <input type="number" min="0" value={ceP} onChange={e=>setCeP(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '60px', display: 'block' }} /></label>
-                    <input placeholder="Period label (e.g. all periods (1st Sem))" value={cePeriodLabel} onChange={e=>setCePeriodLabel(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                    <div style={{ flex: '1 1 160px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Course (curriculum)</label>
-                      <select value={ceCourse} onChange={e => { setCeCourse(e.target.value); setCeModule(''); setCeTopic(''); }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
-                        <option value="">— no course —</option>
-                        {dbData.courses.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ flex: '1 1 160px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Module</label>
-                      <select value={ceModule} onChange={e => { setCeModule(e.target.value); setCeTopic(''); }} disabled={!ceCourse} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
-                        <option value="">—</option>
-                        {ceModules.map(m => <option key={m.id} value={m.id}>{m.module_number}. {m.title}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ flex: '1 1 160px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--text-soft)', display: 'block', marginBottom: '4px' }}>Topic</label>
-                      <select value={ceTopic} onChange={e => setCeTopic(e.target.value)} disabled={!ceModule} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}>
-                        <option value="">—</option>
-                        {ceTopics.map(t => <option key={t.id} value={t.id}>{t.topic}</option>)}
-                      </select>
-                    </div>
-                    <input placeholder="or free topic" value={ceTopicText} onChange={e => setCeTopicText(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                    <input placeholder="Remarks (On Leave / Holiday …)" value={ceRemarks} onChange={e => setCeRemarks(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                    <input placeholder="notes (optional)" value={ceNotes} onChange={e => setCeNotes(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Log class</button>
-                  </form>
-                )}
-                {/* Weekly XLSX download — linked to timetable */}
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px', background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: '10px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-deep)' }}>Weekly teaching log</span>
-                  <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Week start (Mon) <input type="date" value={ceWeekStart} onChange={e=>setCeWeekStart(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', display: 'block' }} /></label>
-                  <button type="button" onClick={downloadWeeklyXlsx} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Download XLSX</button>
-                  <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>A1:O202 layout, SUM totals, thin borders — linked to Fixed timetable. Super Admin exports all faculty; staff exports own.</span>
-                </div>
-
-                {/* Entries + student confirmations */}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginTop: '16px' }}>
-                  {(dbData.class_entries || []).length === 0 ? (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px' }}>No classes logged yet — teacher logs what was taught per slot per date; students confirm.</div>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                          <th style={{ padding: '10px 12px' }}>Date</th><th style={{ padding: '10px 12px' }}>Slot</th><th style={{ padding: '10px 12px' }}>Batch</th><th style={{ padding: '10px 12px' }}>What was taught</th><th style={{ padding: '10px 12px' }}>Taught by</th><th style={{ padding: '10px 12px' }}>Confirm</th><th style={{ padding: '10px 12px' }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(dbData.class_entries || []).slice().sort((a, b) => String(b.class_date).localeCompare(String(a.class_date))).map(entry => {
-                          const slot = dbData.timetable.find(s => s.id === entry.timetable_slot_id);
-                          const batch = dbData.batches.find(b => b.id === entry.batch_id);
-                          const course = dbData.courses.find(c => c.id === entry.course_id);
-                          const mod = dbData.course_modules.find(m => m.id === entry.module_id);
-                          const top = dbData.course_module_topics.find(t => t.id === entry.topic_id);
-                          const taughtBy = dbData.users.find(u => u.id === entry.taught_by);
-                          const myConf = myProfile ? (dbData.class_confirmations || []).find(c => c.class_entry_id === entry.id && c.student_id === myProfile.id) : null;
-                          const confs = (dbData.class_confirmations || []).filter(c => c.class_entry_id === entry.id);
-                          const confirmed = confs.filter(c => c.status === 'confirmed').length;
-                          const disputed = confs.filter(c => c.status === 'disputed').length;
-                          const pending = confs.filter(c => c.status === 'pending').length;
-                          const topicLabel = top?.topic || mod?.title || course?.name || entry.topic_text || '—';
-                          const who = taughtBy?.name || '—';
-                          const isStudent = myProfile && isStudentCat(roleCategory(myProfile.role_key));
-                          return (
-                            <tr key={entry.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{entry.class_date}</td>
-                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: 'var(--text-soft)', fontSize: '12.5px' }}>{slot ? `${slot.day_of_week.slice(0, 3)} ${slot.start_time?.slice(0, 5)}–${slot.end_time?.slice(0, 5)} · ${slot.room}` : '—'}</td>
-                              <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{batch?.name || '—'}</td>
                               <td style={{ padding: '10px 12px' }}><b style={{ color: 'var(--primary-deep)' }}>{topicLabel}</b>{course ? <span style={{ color: 'var(--text-faint)', fontSize: '11.5px' }}> · {course.code}</span> : null}<br /><span style={{ fontSize: '11.5px', color: 'var(--text-soft)' }}>{entry.topic_text && top ? entry.topic_text : ''}{entry.notes ? ` — ${entry.notes}` : ''}</span></td>
                               <td style={{ padding: '10px 12px', fontSize: '12.5px', color: 'var(--text-soft)' }}>{who}</td>
                               <td style={{ padding: '10px 12px', fontSize: '12px' }}>

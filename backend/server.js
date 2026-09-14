@@ -5,8 +5,12 @@ const { createClient } = require('@supabase/supabase-js');
 const mongoose = require('mongoose');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
-let nodemailer = null;
-try { nodemailer = require('nodemailer'); } catch {}
+const multer = require('multer');
+const mammoth = require('mammoth');
+const pdfParse = require('pdf-parse');
+const XLSX = require('xlsx');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 // ── helpers ───────────────────────────────────────────────────────────────
 function deriveHours(periods) {
@@ -207,7 +211,7 @@ const API_TO_MODULE = {
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   course_types: 'curriculum', examination_types: 'curriculum',
   roles: 'roles', role_permissions: 'roles',
-  class_entries: 'timetable', class_confirmations: 'timetable',
+  class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
 };
@@ -217,7 +221,7 @@ const TABLE_TO_MODULE = {
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   course_types: 'curriculum', examination_types: 'curriculum',
-  class_entries: 'timetable', class_confirmations: 'timetable',
+  class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
 };
