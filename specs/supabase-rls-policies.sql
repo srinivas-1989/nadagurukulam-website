@@ -435,3 +435,41 @@ create policy "Super Admin / Admin can manage attendance"
   to authenticated
   using (public.has_permission('liveclasses', array['Manage','Full']))
   with check (public.has_permission('liveclasses', array['Manage','Full']));
+
+-- ============================================================================
+-- EXPANSION: USER OTPS, EXAMINATION TYPES, COURSE MODULE TOPICS
+-- ============================================================================
+-- user_otps: no direct client access — backend uses service_role. Keep locked down.
+drop policy if exists "User can read own OTPs" on public.user_otps;
+create policy "User can read own OTPs"
+  on public.user_otps for select
+  to authenticated
+  using (user_id = public.my_user_id());
+
+-- examination_types: readable by all authenticated, manageable via curriculum:Full
+drop policy if exists "Examination types are readable by all authenticated" on public.examination_types;
+create policy "Examination types are readable by all authenticated"
+  on public.examination_types for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Curriculum managers can manage examination types" on public.examination_types;
+create policy "Curriculum managers can manage examination types"
+  on public.examination_types for all
+  to authenticated
+  using (public.has_permission('curriculum', array['Full']))
+  with check (public.has_permission('curriculum', array['Full']));
+
+-- course_module_topics: inherits curriculum gate via parent module's course
+drop policy if exists "Course module topics are readable by all authenticated" on public.course_module_topics;
+create policy "Course module topics are readable by all authenticated"
+  on public.course_module_topics for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Curriculum managers can manage module topics" on public.course_module_topics;
+create policy "Curriculum managers can manage module topics"
+  on public.course_module_topics for all
+  to authenticated
+  using (public.has_permission('curriculum', array['Manage','Full']))
+  with check (public.has_permission('curriculum', array['Manage','Full']));

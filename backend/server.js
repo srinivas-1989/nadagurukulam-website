@@ -1,8 +1,58 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const mongoose = require('mongoose');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
+let nodemailer = null;
+try { nodemailer = require('nodemailer'); } catch {}
+
+// ── helpers ───────────────────────────────────────────────────────────────
+function deriveHours(periods) {
+  const n = Number(periods);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round((n * 45 / 60) * 100) / 100;
+}
+function genTempPassword() {
+  return crypto.randomBytes(9).toString('base64url').slice(0, 12);
+}
+function genOTP() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+let mailer = null;
+function getMailer() {
+  if (mailer) return mailer;
+  if (!nodemailer || !process.env.SMTP_HOST) return null;
+  mailer = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+  });
+  return mailer;
+}
+async function sendOTPEmail(to, otp, tempPassword) {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@nadagurukulam.org';
+  const subject = tempPassword ? 'Your Nada Gurukulam account — temp password & OTP' : 'Your Nada Gurukulam OTP';
+  const html = tempPassword
+    ? `<p>Temp password: <b>${tempPassword}</b></p><p>OTP: <b>${otp}</b> (expires in 10 minutes)</p><p>Log in and change your password when prompted.</p>`
+    : `<p>OTP: <b>${otp}</b> (expires in 10 minutes)</p>`;
+  const m = getMailer();
+  if (m) {
+    try { await m.sendMail({ from, to, subject, html }); return true; } catch (e) { console.error('SMTP send failed:', e.message); return false; }
+  }
+  return false;
+}
+const otpRateMap = new Map(); // key -> timestamps[]
+function checkOtpRate(key, limit = 5, windowMs = 60000) {
+  const now = Date.now();
+  const arr = (otpRateMap.get(key) || []).filter(t => now - t < windowMs);
+  if (arr.length >= limit) return false;
+  arr.push(now);
+  otpRateMap.set(key, arr);
+  return true;
+}
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -54,12 +104,21 @@ async function authMiddleware(req, res, next) {
     // Fetch the user's role from public.users — match by auth_user_id
     const { data: profile, error: profileErr } = await supabase
       .from('users')
-      .select('role_key, id, name, email')
+      .select('role_key, id, name, email, must_change_password')
       .eq('auth_user_id', user.id)
       .single();
     if (profileErr || !profile) {
       // User exists in Supabase Auth but not in our users table — deny
       return res.status(403).json({ error: 'User not registered in portal' });
+    }
+    // Force password change gate — allow only OTP/password-change + health/cms reads
+    if (profile.must_change_password) {
+      const allow = (
+        req.path.startsWith('/api/auth/') ||
+        req.path === '/health' || req.path === '/api/health' ||
+        (req.method === 'GET' && req.path.startsWith('/api/cms'))
+      );
+      if (!allow) return res.status(403).json({ error: 'Password change required', code: 'PASSWORD_CHANGE_REQUIRED' });
     }
     req.auth = { user, profile };
     next();
@@ -96,14 +155,16 @@ const API_TO_MODULE = {
   timetable: 'timetable', liveclasses: 'liveclasses', lessonplans: 'lessonplans',
   assignments: 'assignments', feedback: 'feedback', events: 'events',
   jobs: 'jobs', enquiries: 'enquiries', activities: 'activities',
-  courses: 'curriculum', course_modules: 'curriculum', course_types: 'curriculum',
+  courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
+  course_types: 'curriculum', examination_types: 'curriculum',
   roles: 'roles', role_permissions: 'roles'
 };
 // Reverse: table name → module_key (crud is instantiated with table names)
 const TABLE_TO_MODULE = {
   disciplines: 'curriculum', timetable_slots: 'timetable',
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
-  courses: 'curriculum', course_modules: 'curriculum', course_types: 'curriculum'
+  courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
+  course_types: 'curriculum', examination_types: 'curriculum'
 };
 
 // ── Row-level scoping helpers ──────────────────────────────────────────────
@@ -241,6 +302,12 @@ const crud = (table, orderCol = 'created_at') => ({
       if (!level || !canAccess(level, 'create')) {
         return res.status(403).json({ error: 'You do not have Create access for this module.' });
       }
+      if (table === 'examination_types' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) {
+        return res.status(403).json({ error: 'Managing examination types requires Full access on Curriculum.' });
+      }
+      if (table === 'course_module_topics' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
+        return res.status(403).json({ error: 'Managing module topics requires Manage access on Curriculum.' });
+      }
       const gateErr = await checkPublishGate(table, req.body, level);
       if (gateErr) return res.status(403).json({ error: gateErr });
       if (table === 'timetable_slots') {
@@ -249,10 +316,74 @@ const crud = (table, orderCol = 'created_at') => ({
           return res.status(409).json({ error: `Timetable conflict: overlaps with slot ${clash.day_of_week} ${clash.start_time}–${clash.end_time} (room ${clash.room}).` });
         }
       }
-      const { data, error } = await supabase.from(table).insert([req.body]).select();
+      // ── users: custom create with Supabase Auth + OTP ──────────────────
+      if (table === 'users') {
+        const ALLOWED = ['name','email','phone','role_key','status','employee_id','roll_no','designation','program_id','date_of_joining','year_of_commencement'];
+        const body = {};
+        for (const k of ALLOWED) if (req.body[k] !== undefined) body[k] = req.body[k];
+        if (!body.name || !body.email || !body.role_key) {
+          return res.status(400).json({ error: 'name, email and role are required' });
+        }
+        body.email = String(body.email).trim().toLowerCase();
+        if (body.employee_id === '') body.employee_id = null;
+        if (body.roll_no === '') body.roll_no = null;
+        if (body.program_id === '') body.program_id = null;
+        if (body.date_of_joining === '') body.date_of_joining = null;
+        if (body.year_of_commencement === '' || body.year_of_commencement === null) body.year_of_commencement = null;
+        else if (body.year_of_commencement !== undefined) body.year_of_commencement = Number(body.year_of_commencement) || null;
+        if (body.phone === '') body.phone = null;
+        if (body.designation === '') body.designation = null;
+        const { data: roleRow } = await supabase.from('roles').select('category').eq('key', body.role_key).single();
+        const cat = roleRow?.category || 'staff';
+        if (cat === 'student') {
+          if (!body.roll_no || !body.program_id || !body.year_of_commencement) {
+            return res.status(400).json({ error: 'Students require Roll No, Course (program) and Year of commencement' });
+          }
+        }
+        const tempPassword = genTempPassword();
+        const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+          email: body.email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { name: body.name }
+        });
+        if (authErr) {
+          const msg = authErr.message || 'Failed to create auth user';
+          const code = /already exists|already registered/i.test(msg) ? 409 : 400;
+          return res.status(code).json({ error: msg });
+        }
+        const authUserId = authData.user.id;
+        const insertRow = { ...body, auth_user_id: authUserId, must_change_password: true };
+        const { data, error } = await supabase.from('users').insert([insertRow]).select();
+        if (error) {
+          await supabase.auth.admin.deleteUser(authUserId).catch(() => {});
+          if (error.code === '23505') return res.status(409).json({ error: 'Employee ID or Roll No already exists' });
+          return res.status(500).json({ error: error.message });
+        }
+        const otp = genOTP();
+        const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+        await supabase.from('user_otps').update({ consumed: true }).eq('user_id', data[0].id).eq('consumed', false);
+        await supabase.from('user_otps').insert([{ user_id: data[0].id, otp_code: otp, expires_at: expires }]);
+        const emailed = await sendOTPEmail(body.email, otp, tempPassword);
+        const includeTemp = !emailed || process.env.NODE_ENV !== 'production';
+        return res.status(201).json({ ...data[0], tempPassword: includeTemp ? tempPassword : undefined, otp: includeTemp && !emailed ? otp : undefined, emailSent: emailed });
+      }
+      // ── courses: auto-derive teaching_hours ────────────────────────────
+      let payload = { ...req.body };
+      if (table === 'courses' && payload.teaching_periods !== undefined && payload.teaching_periods !== '' && payload.teaching_periods !== null) {
+        const derived = deriveHours(payload.teaching_periods);
+        if (derived !== null) payload.teaching_hours = derived;
+      }
+      // Normalize jsonb arrays if sent as strings
+      if (table === 'courses') {
+        if (typeof payload.objectives_json === 'string') { try { payload.objectives_json = JSON.parse(payload.objectives_json); } catch {} }
+        if (typeof payload.outcomes_json === 'string') { try { payload.outcomes_json = JSON.parse(payload.outcomes_json); } catch {} }
+        if (payload.examination_type_id === '') payload.examination_type_id = null;
+      }
+      const { data, error } = await supabase.from(table).insert([payload]).select();
       if (error) throw error;
       res.status(201).json(data[0]);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { console.error('create', table, err.message); res.status(500).json({ error: err.message }); }
   },
   update: async (req, res) => {
     try {
@@ -261,19 +392,50 @@ const crud = (table, orderCol = 'created_at') => ({
       if (!level || !canAccess(level, 'update')) {
         return res.status(403).json({ error: 'You do not have Manage access for this module.' });
       }
+      if (table === 'examination_types' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) {
+        return res.status(403).json({ error: 'Managing examination types requires Full access on Curriculum.' });
+      }
+      if (table === 'course_module_topics' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
+        return res.status(403).json({ error: 'Managing module topics requires Manage access on Curriculum.' });
+      }
       const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
       if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
       const gateErr = await checkPublishGate(table, req.body, level);
       if (gateErr) return res.status(403).json({ error: gateErr });
       const blocked = await guard(table, req.params.id, req.body);
       if (blocked) return res.status(403).json({ error: blocked });
-      const updateData = TABLES_WITH_UPDATED_AT.has(table)
-        ? { ...req.body, updated_at: new Date().toISOString() }
-        : req.body;
+      let updateData = { ...req.body };
+      if (table === 'users') {
+        const ALLOWED_U = ['name','email','phone','role_key','status','employee_id','roll_no','designation','program_id','date_of_joining','year_of_commencement','must_change_password'];
+        const filtered = {};
+        for (const k of ALLOWED_U) if (updateData[k] !== undefined) filtered[k] = updateData[k];
+        if (filtered.employee_id === '') filtered.employee_id = null;
+        if (filtered.roll_no === '') filtered.roll_no = null;
+        if (filtered.program_id === '') filtered.program_id = null;
+        if (filtered.date_of_joining === '') filtered.date_of_joining = null;
+        if (filtered.year_of_commencement === '' || filtered.year_of_commencement === null) filtered.year_of_commencement = null;
+        else if (filtered.year_of_commencement !== undefined) filtered.year_of_commencement = Number(filtered.year_of_commencement) || null;
+        if (filtered.phone === '') filtered.phone = null;
+        if (filtered.designation === '') filtered.designation = null;
+        updateData = filtered;
+      }
+      if (table === 'courses' && updateData.teaching_periods !== undefined && updateData.teaching_periods !== '' && updateData.teaching_periods !== null) {
+        const derived = deriveHours(updateData.teaching_periods);
+        if (derived !== null) updateData.teaching_hours = derived;
+      }
+      if (table === 'courses') {
+        if (typeof updateData.objectives_json === 'string') { try { updateData.objectives_json = JSON.parse(updateData.objectives_json); } catch {} }
+        if (typeof updateData.outcomes_json === 'string') { try { updateData.outcomes_json = JSON.parse(updateData.outcomes_json); } catch {} }
+        if (updateData.examination_type_id === '') updateData.examination_type_id = null;
+      }
+      if (TABLES_WITH_UPDATED_AT.has(table)) updateData.updated_at = new Date().toISOString();
       const { data, error } = await supabase.from(table).update(updateData).eq('id', req.params.id).select();
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') return res.status(409).json({ error: 'Employee ID or Roll No already exists' });
+        throw error;
+      }
       res.json(data[0]);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { console.error('update', table, err.message); res.status(500).json({ error: err.message }); }
   },
   delete: async (req, res) => {
     try {
@@ -281,6 +443,12 @@ const crud = (table, orderCol = 'created_at') => ({
       const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
       if (!level || !canAccess(level, 'delete')) {
         return res.status(403).json({ error: 'You do not have Full access for this module.' });
+      }
+      if (table === 'examination_types' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) {
+        return res.status(403).json({ error: 'Managing examination types requires Full access on Curriculum.' });
+      }
+      if (table === 'course_module_topics' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
+        return res.status(403).json({ error: 'Managing module topics requires Manage access on Curriculum.' });
       }
       const blocked = await guard(table, req.params.id);
       if (blocked) return res.status(403).json({ error: blocked });
@@ -311,12 +479,130 @@ const guard = async (table, id, body = {}) => {
   return null;
 };
 
+// ── OTP / first-password-change (public, rate-limited) ───────────────────
+app.post('/api/auth/request-otp', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'email is required' });
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkOtpRate(`req:${ip}`, 10, 60000) || !checkOtpRate(`req:${email}`, 5, 60000)) {
+      return res.status(429).json({ error: 'Too many requests — try again shortly' });
+    }
+    const { data: user } = await supabase.from('users').select('id, email').ilike('email', email).single();
+    if (!user) return res.status(404).json({ error: 'No user with that email' });
+    await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
+    const otp = genOTP();
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const { error: insErr } = await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
+    if (insErr) throw insErr;
+    const emailed = await sendOTPEmail(user.email, otp, null);
+    const payload = { ok: true, emailSent: emailed };
+    if (!emailed || process.env.NODE_ENV !== 'production') payload.otp = otp;
+    res.json(payload);
+  } catch (err) { console.error('request-otp', err.message); res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const otp = String(req.body.otp || '').trim();
+    if (!email || !otp) return res.status(400).json({ error: 'email and otp are required' });
+    const { data: user } = await supabase.from('users').select('id').ilike('email', email).single();
+    if (!user) return res.status(404).json({ error: 'No user with that email' });
+    const { data: row } = await supabase.from('user_otps').select('id, expires_at, consumed').eq('user_id', user.id).eq('otp_code', otp).eq('consumed', false).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).single();
+    if (!row) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/auth/first-password-change', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const otp = String(req.body.otp || '').trim();
+    const newPassword = String(req.body.newPassword || '');
+    if (!email || !otp || !newPassword) return res.status(400).json({ error: 'email, otp and newPassword are required' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkOtpRate(`chg:${ip}`, 10, 60000) || !checkOtpRate(`chg:${email}`, 5, 60000)) {
+      return res.status(429).json({ error: 'Too many requests — try again shortly' });
+    }
+    const { data: user } = await supabase.from('users').select('id, auth_user_id').ilike('email', email).single();
+    if (!user) return res.status(404).json({ error: 'No user with that email' });
+    if (!user.auth_user_id) return res.status(400).json({ error: 'User has no linked auth account' });
+    const { data: row } = await supabase.from('user_otps').select('id, expires_at, consumed').eq('user_id', user.id).eq('otp_code', otp).eq('consumed', false).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).single();
+    if (!row) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    const { error: updErr } = await supabase.auth.admin.updateUserById(user.auth_user_id, { password: newPassword });
+    if (updErr) return res.status(400).json({ error: updErr.message });
+    await supabase.from('users').update({ must_change_password: false }).eq('id', user.id);
+    await supabase.from('user_otps').update({ consumed: true }).eq('id', row.id);
+    res.json({ ok: true });
+  } catch (err) { console.error('first-password-change', err.message); res.status(500).json({ error: err.message }); }
+});
+
+// ── Custom roles handlers (category-aware; super_admin category locked) ──
+const rolesList = async (req, res) => {
+  try {
+    const moduleKey = 'roles';
+    const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+    if (!level || !canAccess(level, 'list')) return res.status(403).json({ error: 'You do not have View access for this module.' });
+    const { data, error } = await supabase.from('roles').select('*').order('name');
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+const rolesCreate = async (req, res) => {
+  try {
+    const level = await getAccessLevel(req.auth.profile.role_key, 'roles');
+    if (!level || !canAccess(level, 'create')) return res.status(403).json({ error: 'You do not have Create access for this module.' });
+    const body = { ...req.body };
+    if (!body.key || !body.name) return res.status(400).json({ error: 'key and name are required' });
+    body.key = String(body.key).trim().toLowerCase().replace(/\s+/g, '_');
+    if (body.key === 'super_admin') return res.status(403).json({ error: 'Cannot create super_admin' });
+    if (!body.category) body.category = 'staff';
+    if (!['staff','student','both'].includes(body.category)) return res.status(400).json({ error: 'Invalid category' });
+    const { data, error } = await supabase.from('roles').insert([body]).select();
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+const rolesUpdate = async (req, res) => {
+  try {
+    const level = await getAccessLevel(req.auth.profile.role_key, 'roles');
+    if (!level || !canAccess(level, 'update')) return res.status(403).json({ error: 'You do not have Manage access for this module.' });
+    const blocked = await guard('roles', req.params.id, req.body);
+    if (blocked) return res.status(403).json({ error: blocked });
+    if (req.body.category !== undefined) {
+      const { data: existing } = await supabase.from('roles').select('key').eq('id', req.params.id).single();
+      if (existing?.key === 'super_admin' && req.body.category !== 'system') return res.status(403).json({ error: 'Super Admin category cannot be changed' });
+      if (existing?.key !== 'super_admin' && !['staff','student','both'].includes(req.body.category)) return res.status(400).json({ error: 'Invalid category' });
+    }
+    if (req.body.key !== undefined) {
+      const { data: existing } = await supabase.from('roles').select('key').eq('id', req.params.id).single();
+      if (existing?.key === 'super_admin' && req.body.key !== 'super_admin') return res.status(403).json({ error: 'The Super Admin role cannot be renamed.' });
+    }
+    const { data, error } = await supabase.from('roles').update(req.body).eq('id', req.params.id).select();
+    if (error) throw error;
+    res.json(data[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+const rolesDelete = async (req, res) => {
+  try {
+    const level = await getAccessLevel(req.auth.profile.role_key, 'roles');
+    if (!level || !canAccess(level, 'delete')) return res.status(403).json({ error: 'You do not have Full access for this module.' });
+    const blocked = await guard('roles', req.params.id, req.body);
+    if (blocked) return res.status(403).json({ error: blocked });
+    const { error } = await supabase.from('roles').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.status(204).send();
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', disciplines: 'name', course_types: 'name', roles: 'name', role_permissions: 'module_key' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', course_types: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_types', 'roles', 'role_permissions'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'course_types', 'examination_types', 'role_permissions'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
@@ -327,14 +613,11 @@ modules.forEach(m => {
   app.delete(`/api/${m}/:id`, authMiddleware, handler.delete);
 });
 
-// Roles endpoint — requires authentication (any authenticated user can view roles)
-app.get('/api/roles', authMiddleware, async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('roles').select('*').order('key');
-    if (error) throw error;
-    res.json(data || []);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// Roles: custom handlers (category-aware)
+app.get('/api/roles', authMiddleware, rolesList);
+app.post('/api/roles', authMiddleware, rolesCreate);
+app.put('/api/roles/:id', authMiddleware, rolesUpdate);
+app.delete('/api/roles/:id', authMiddleware, rolesDelete);
 
 // MongoDB — the flexible half of the hybrid model (CMS blocks, and later lesson plans, feedback forms, activity logs).
 // Connection is optional: Postgres/Supabase modules keep working if Mongo is unreachable.

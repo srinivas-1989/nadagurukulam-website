@@ -12,6 +12,10 @@ const FILES = [
   path.join(__dirname, '../../specs/supabase-course-types-migration.sql'),
   path.join(__dirname, '../../specs/supabase-roles-migration.sql'),
   path.join(__dirname, '../../specs/supabase-auth-user-link.sql'),
+  path.join(__dirname, '../../specs/supabase-program-structure-migration.sql'),
+  path.join(__dirname, '../../specs/supabase-users-expansion.sql'),
+  path.join(__dirname, '../../specs/supabase-examination-types.sql'),
+  path.join(__dirname, '../../specs/supabase-courses-expansion.sql'),
 ];
 
 (async () => {

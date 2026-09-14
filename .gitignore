@@ -23,6 +23,9 @@ frontend/out/
 frontend/build/
 .next/
 
+# Claude local
+.claude/
+
 # Render / Build outputs
 dist/
 build/

@@ -77,7 +77,7 @@ export default function Home() {
   // API Data State
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [],
-    events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_types: [],
+    events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], course_types: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], role_permissions: []
   });
   const [roles, setRoles] = useState([]);
@@ -85,18 +85,13 @@ export default function Home() {
   // Auth helper functions
   const apiCall = async (url, options = {}) => {
     const { data: { session: sess } } = await supabase.auth.getSession();
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-    if (sess?.access_token) {
-      headers.Authorization = `Bearer ${sess.access_token}`;
-    }
+    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    if (sess?.access_token) headers.Authorization = `Bearer ${sess.access_token}`;
     const res = await fetch(url, { ...options, headers });
-    if (res.status === 401) {
-      setSession(null);
-      setRole(null);
-      setView('login');
+    if (res.status === 401) { setSession(null); setRole(null); setView('login'); }
+    else if (res.status === 403) {
+      let j = null; try { j = await res.clone().json(); } catch {}
+      if (j?.code === 'PASSWORD_CHANGE_REQUIRED') { setOtpMode(true); setView('login'); }
     }
     return res;
   };
@@ -188,11 +183,10 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      // [api endpoint, state key] — the API route and the state key differ for live classes.
       const endpoints = [
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
-        ['course_modules', 'course_modules'], ['course_types', 'course_types'], ['liveclasses', 'live_sessions'],
+        ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'],
         ['role_permissions', 'role_permissions']
       ];
@@ -223,6 +217,8 @@ export default function Home() {
     if (!confirm('Are you sure you want to delete this record?')) return;
     const res = await apiCall(`${apiUrl}/api/${endpoint}/${id}`, { method: 'DELETE' });
     if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Delete failed'); return; }
+    if (endpoint === 'courses' && activeSyllabusCourse?.id === id) setActiveSyllabusCourse(null);
+    if (endpoint === 'curriculum' && courseDisc === id) setCourseDisc('');
     fetchData();
   };
 
@@ -235,36 +231,116 @@ export default function Home() {
     fetchData();
   };
 
-  // Form states
+  // Form states — Users (expanded)
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newUserRole, setNewUserRole] = useState('teacher');
+  const [newEmployeeId, setNewEmployeeId] = useState('');
+  const [newRollNo, setNewRollNo] = useState('');
+  const [newDesignation, setNewDesignation] = useState('');
+  const [newProgramId, setNewProgramId] = useState('');
+  const [newDateOfJoining, setNewDateOfJoining] = useState('');
+  const [newYearComm, setNewYearComm] = useState('');
+  const [userNotice, setUserNotice] = useState(null); // { tempPassword, otp, email }
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserPhone, setEditUserPhone] = useState('');
   const [editUserRoleKey, setEditUserRoleKey] = useState('');
+  const [editUserEmployeeId, setEditUserEmployeeId] = useState('');
+  const [editUserRollNo, setEditUserRollNo] = useState('');
+  const [editUserDesignation, setEditUserDesignation] = useState('');
+  const [editUserProgramId, setEditUserProgramId] = useState('');
+  const [editUserDateOfJoining, setEditUserDateOfJoining] = useState('');
+  const [editUserYearComm, setEditUserYearComm] = useState('');
+
+  const roleCategory = (key) => roles.find(r => r.key === key)?.category || 'staff';
+  const newRoleCat = roleCategory(newUserRole);
+  const editRoleCat = roleCategory(editUserRoleKey);
+  const isStudentCat = (c) => c === 'student' || c === 'both';
+  const isStaffCat = (c) => c === 'staff' || c === 'both' || c === 'system';
+
+  // First-login OTP flow
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otpMode, setOtpMode] = useState(false);
+  const [otpMsg, setOtpMsg] = useState('');
 
   const [newDiscName, setNewDiscName] = useState('');
   const [newDiscLevels, setNewDiscLevels] = useState('');
   const [newDiscDesc, setNewDiscDesc] = useState('');
+  const [newDiscStructure, setNewDiscStructure] = useState('semester');
+  const [newDiscYearCount, setNewDiscYearCount] = useState(2);
+  const [newDiscSemPerYear, setNewDiscSemPerYear] = useState(2);
   const [editingDisc, setEditingDisc] = useState(null);
   const [discEditName, setDiscEditName] = useState('');
   const [discEditLevels, setDiscEditLevels] = useState('');
   const [discEditDesc, setDiscEditDesc] = useState('');
+  const [discEditStructure, setDiscEditStructure] = useState('semester');
+  const [discEditYearCount, setDiscEditYearCount] = useState(2);
+  const [discEditSemPerYear, setDiscEditSemPerYear] = useState(2);
 
-  // Course form (MPA Syllabus format)
+  // Course form (BPA/MPA syllabus header — image BCVP310) — 21-field header
   const [courseDisc, setCourseDisc] = useState('');
   const [courseType, setCourseType] = useState('Masters');
   const [courseSem, setCourseSem] = useState('Semester I');
+  const [courseYearLabel, setCourseYearLabel] = useState('');
   const [courseCode, setCourseCode] = useState('');
   const [courseName, setCourseName] = useState('');
-  const [courseCredits, setCourseCredits] = useState(6);
-  const [courseHours, setCourseHours] = useState(90);
+  const [courseKind, setCourseKind] = useState('DSC');
+  const [courseCredits, setCourseCredits] = useState(5);
+  const [coursePeriods, setCoursePeriods] = useState(100);
+  const derivedHours = (() => { const n = Number(coursePeriods); if (!Number.isFinite(n) || n <= 0) return ''; return Math.round(n * 45 / 60 * 100) / 100; })();
+  const [courseCie, setCourseCie] = useState(50);
+  const [courseSee, setCourseSee] = useState(50);
+  const [courseCieDur, setCourseCieDur] = useState('45 Min');
+  const [courseSeeDur, setCourseSeeDur] = useState('1 hour');
+  const [courseExamTypeId, setCourseExamTypeId] = useState('');
+  const [courseExamType, setCourseExamType] = useState('Practical');
+  const [courseObjectives, setCourseObjectives] = useState('');
+  const [courseOutcomes, setCourseOutcomes] = useState([]); // [{code:'CO1', text:''}]
+  const [coursePedagogy, setCoursePedagogy] = useState('');
+  const [newExamTypeName, setNewExamTypeName] = useState('');
+  // Postgres modules (course_modules + course_module_topics)
+  const [modTitle, setModTitle] = useState('');
+  const [modHours, setModHours] = useState('');
+  const [modRbt, setModRbt] = useState('Remember');
+  const [modMethod, setModMethod] = useState('');
+  const [modTopicsText, setModTopicsText] = useState('');
+  const [modCo, setModCo] = useState([]); // ['CO1',...]
+  const [editingModId, setEditingModId] = useState(null);
 
-  // Semester list derives from the selected course type's data (semester_count) — not from code.
+  // Course list: inline edit + client filters ("Select Course" vs "Add Course")
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [editCourse, setEditCourse] = useState({});
+  const [filterDisc, setFilterDisc] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterSem, setFilterSem] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   const activeCourseType = dbData.course_types.find(t => t.name === courseType);
   const courseSemesters = Array.from({ length: activeCourseType?.semester_count || 4 }, (_, i) => `Semester ${ROMAN[i]}`);
+  const selectedDisc = dbData.curriculum.find(d => d.id === courseDisc) || null;
+  const selectedDiscStructure = selectedDisc?.structure_mode || 'semester';
+  const yearOptions = (() => {
+    const n = Number(selectedDisc?.year_count) || 2;
+    return Array.from({ length: Math.min(n, 10) }, (_, i) => `Year ${ROMAN[i]}`);
+  })();
+
+  useEffect(() => { if (!courseDisc && dbData.curriculum.length) setCourseDisc(dbData.curriculum[0].id); }, [dbData.curriculum]);
+  useEffect(() => { if (courseSemesters.length && !courseSemesters.includes(courseSem)) setCourseSem(courseSemesters[0]); }, [courseSemesters]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!selectedDisc) return;
+    const mode = selectedDisc.structure_mode || 'semester';
+    if (mode === 'yearly' || mode === 'yearly_semester') {
+      if (!courseYearLabel && yearOptions.length) setCourseYearLabel(yearOptions[0]);
+      else if (courseYearLabel && !yearOptions.includes(courseYearLabel)) setCourseYearLabel(yearOptions[0] || '');
+    } else if (courseYearLabel) setCourseYearLabel('');
+  }, [courseDisc, dbData.curriculum]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live session form state
   const [newSessionBatch, setNewSessionBatch] = useState('');
@@ -499,22 +575,26 @@ export default function Home() {
   const [editRoleName, setEditRoleName] = useState('');
   const [editRoleDesc, setEditRoleDesc] = useState('');
 
+  const [newRoleCategory, setNewRoleCategory] = useState('staff');
+  const [editRoleCategory, setEditRoleCategory] = useState('staff');
   const handleAddRole = async (e) => {
     e.preventDefault();
     const key = newRoleName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     if (!key) return;
-    await apiCall(`${apiUrl}/api/roles`, {
+    const res = await apiCall(`${apiUrl}/api/roles`, {
       method: 'POST',
-      body: JSON.stringify({ key, name: newRoleName, description: newRoleDesc })
+      body: JSON.stringify({ key, name: newRoleName, description: newRoleDesc, category: newRoleCategory })
     });
-    setNewRoleName(''); setNewRoleDesc(''); fetchData();
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return; }
+    setNewRoleName(''); setNewRoleDesc(''); setNewRoleCategory('staff'); fetchData();
   };
 
   const handleUpdateRole = async (id) => {
-    await apiCall(`${apiUrl}/api/roles/${id}`, {
+    const res = await apiCall(`${apiUrl}/api/roles/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name: editRoleName, description: editRoleDesc })
+      body: JSON.stringify({ name: editRoleName, description: editRoleDesc, category: editRoleCategory })
     });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
     setEditingRole(null); fetchData();
   };
 
@@ -545,11 +625,18 @@ export default function Home() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newName || !newEmail) return;
-    await apiCall(`${apiUrl}/api/users`, {
-      method: 'POST',
-      body: JSON.stringify({ name: newName, email: newEmail, role_key: newUserRole })
-    });
-    setNewName(''); setNewEmail(''); fetchData();
+    const cat = roleCategory(newUserRole);
+    const payload = { name: newName.trim(), email: newEmail.trim(), role_key: newUserRole, phone: newPhone.trim() || null,
+      employee_id: newEmployeeId.trim() || null, roll_no: newRollNo.trim() || null,
+      designation: newDesignation.trim() || null, program_id: newProgramId || null,
+      date_of_joining: newDateOfJoining || null, year_of_commencement: newYearComm ? Number(newYearComm) : null };
+    if (cat === 'student' && (!payload.roll_no || !payload.program_id || !payload.year_of_commencement)) { alert('Students require Roll No, Course (Program) and Year of commencement'); return; }
+    const res = await apiCall(`${apiUrl}/api/users`, { method: 'POST', body: JSON.stringify(payload) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'Create user failed'); return; }
+    if (data.tempPassword || data.otp) setUserNotice({ tempPassword: data.tempPassword, otp: data.otp, email: data.email || payload.email, emailSent: data.emailSent });
+    setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewDesignation(''); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
+    fetchData();
   };
 
   const handleAddDiscipline = async (e) => {
@@ -557,13 +644,19 @@ export default function Home() {
     if (!newDiscName) return;
     await apiCall(`${apiUrl}/api/curriculum`, {
       method: 'POST',
-      body: JSON.stringify({ name: newDiscName, levels: newDiscLevels, description: newDiscDesc })
+      body: JSON.stringify({
+        name: newDiscName, levels: newDiscLevels, description: newDiscDesc,
+        structure_mode: newDiscStructure, year_count: Number(newDiscYearCount) || 2, semesters_per_year: Number(newDiscSemPerYear) || 2,
+      })
     });
     setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); fetchData();
   };
 
   const handleUpdateUser = async (u) => {
-    const payload = { name: editUserName.trim(), email: editUserEmail.trim(), role_key: editUserRoleKey };
+    const payload = { name: editUserName.trim(), email: editUserEmail.trim(), role_key: editUserRoleKey,
+      phone: editUserPhone.trim() || null, employee_id: editUserEmployeeId.trim() || null, roll_no: editUserRollNo.trim() || null,
+      designation: editUserDesignation.trim() || null, program_id: editUserProgramId || null,
+      date_of_joining: editUserDateOfJoining || null, year_of_commencement: editUserYearComm ? Number(editUserYearComm) : null };
     if (!payload.name || !payload.email || !payload.role_key) return;
     const res = await apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
@@ -579,11 +672,72 @@ export default function Home() {
   const handleAddCourse = async (e) => {
     e.preventDefault();
     if (!courseName || !courseCode) return;
-    await apiCall(`${apiUrl}/api/courses`, {
-      method: 'POST',
-      body: JSON.stringify({ discipline_id: courseDisc || dbData.curriculum[0]?.id, course_type: courseType, semester: courseSem, code: courseCode, name: courseName, credits: courseCredits, teaching_hours: courseHours })
-    });
+    if (!courseDisc) { alert('Choose a Program first.'); return; }
+    const disc = dbData.curriculum.find(d => d.id === courseDisc);
+    const mode = disc?.structure_mode || 'semester';
+    const derived = derivedHours === '' ? null : Number(derivedHours);
+    const payload = {
+      discipline_id: courseDisc, course_type: courseType, code: courseCode, name: courseName,
+      type: courseKind, credits: Number(courseCredits) || 0, teaching_hours: derived,
+      teaching_periods: coursePeriods !== '' ? Number(coursePeriods) : null,
+      cie_marks: Number(courseCie) || 0, see_marks: Number(courseSee) || 0,
+      examination_type: courseExamType || null, examination_type_id: courseExamTypeId || null,
+      examination_hours_cie: courseCieDur || null, examination_hours_see: courseSeeDur || null,
+      cie_duration: courseCieDur || null, see_duration: courseSeeDur || null,
+      objectives_json: courseObjectives ? courseObjectives.split('\n').filter(s=>s.trim()).map(s=>s.trim()) : [],
+      outcomes_json: courseOutcomes.filter(o=>o.text.trim()).map(o=>({ code:o.code, text:o.text.trim() })),
+      pedagogy: coursePedagogy.trim() || null,
+    };
+    if (mode === 'yearly') {
+      if (!courseYearLabel) { alert('Choose a Year.'); return; }
+      payload.year_label = courseYearLabel;
+      payload.year_number = ROMAN.indexOf(courseYearLabel.replace('Year ', '')) + 1 || null;
+      payload.semester = null;
+    } else if (mode === 'yearly_semester') {
+      if (!courseYearLabel) { alert('Choose a Year.'); return; }
+      payload.year_label = courseYearLabel;
+      payload.year_number = ROMAN.indexOf(courseYearLabel.replace('Year ', '')) + 1 || null;
+      payload.semester = courseSem;
+    } else {
+      payload.semester = courseSem;
+      payload.year_label = null; payload.year_number = null;
+    }
+    const res = await apiCall(`${apiUrl}/api/courses`, { method: 'POST', body: JSON.stringify(payload) });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Add course failed'); return; }
     setCourseCode(''); setCourseName(''); fetchData();
+  };
+  const handleAddExamType = async () => {
+    const name = newExamTypeName.trim();
+    if (!name) return;
+    const res = await apiCall(`${apiUrl}/api/examination_types`, { method: 'POST', body: JSON.stringify({ name }) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); alert(e.error||'Add failed'); return; }
+    const j = await res.json().catch(()=>null);
+    if (j?.id) setCourseExamTypeId(j.id);
+    setNewExamTypeName(''); fetchData();
+  };
+  const handleAddModule = async () => {
+    if (!activeSyllabusCourse?.id || !modTitle.trim()) { alert('Enter module title'); return; }
+    const all = dbData.course_modules.filter(m=>m.course_id===activeSyllabusCourse.id);
+    const maxNum = all.reduce((m,x)=>Math.max(m, Number(x.module_number)||0), 0);
+    const r = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, module_number: maxNum+1, title: modTitle.trim(), hours: modHours ? Number(modHours): null, rbt_level: modRbt||null, methodology: modMethod.trim()||null, co_mapping: modCo.join(', ')||null }) });
+    if (!r.ok) { const e=await r.json().catch(()=>({})); alert(e.error||'Add module failed'); return; }
+    const created = await r.json().catch(()=>null);
+    const modId = created?.id;
+    if (modId && modTopicsText.trim()) {
+      const topics = modTopicsText.split('\n').map(s=>s.trim()).filter(Boolean);
+      for (let i=0;i<topics.length;i++) { await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: topics[i], sort_order: i }) }); }
+    }
+    setModTitle(''); setModHours(''); setModMethod(''); setModTopicsText(''); setModCo([]); fetchData();
+  };
+  const handleDeleteModule = async (id) => {
+    if (!confirm('Delete module?')) return;
+    await apiCall(`${apiUrl}/api/course_modules/${id}`, { method:'DELETE' }); fetchData();
+  };
+
+  const handleUpdateCourse = async (id, payload) => {
+    const res = await apiCall(`${apiUrl}/api/courses/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
+    setEditingCourse(null); fetchData();
   };
 
   // Course types are data — Super Admin/Admin add, edit (rename / change semester count) and delete them.
@@ -730,58 +884,77 @@ export default function Home() {
         </div>
       )}
 
-      {/* VIEW 2: LOGIN / AUTH */}
+      {/* VIEW 2: LOGIN / AUTH — supports first-login OTP password change */}
       {view === 'login' && !session && (
         <div style={{ maxWidth: '720px', margin: '60px auto', padding: '0 24px', flex: 1 }}>
-          <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>Sign in to Portal</h2>
-          <p style={{ color: 'var(--text-soft)', textAlign: 'center', marginBottom: '32px' }}>
-            Use your Supabase Auth credentials to access the portal.
+          <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>{otpMode ? 'Set your password' : 'Sign in to Portal'}</h2>
+          <p style={{ color: 'var(--text-soft)', textAlign: 'center', marginBottom: '24px' }}>
+            {otpMode ? 'You must change your temporary password using an OTP sent to your official email.' : 'Use your Supabase Auth credentials to access the portal.'}
           </p>
-          {authLoading ? (
+          {otpMode ? (
+            <div style={{ background: 'var(--surface)', border: '1.5px solid var(--accent)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {otpMsg && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: '8px', fontSize: '13px', color: 'var(--text-soft)' }}>{otpMsg}</div>}
+              <input type="email" placeholder="Official email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input placeholder="6-digit OTP" value={otpCode} onChange={e => setOtpCode(e.target.value)} maxLength={6} style={{ flex: 1, padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px', letterSpacing: '0.12em' }} />
+                <button type="button" onClick={async () => {
+                  if (!otpEmail) { setOtpMsg('Enter your official email first'); return; }
+                  const r = await fetch(`${apiUrl}/api/auth/request-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: otpEmail }) });
+                  const j = await r.json().catch(()=>({}));
+                  if (!r.ok) { setOtpMsg(j.error || 'Failed to send OTP'); return; }
+                  setOtpMsg(j.emailSent ? `OTP sent to ${otpEmail} (expires 10 min)` : `Dev OTP: ${j.otp} — copy and paste above (email not configured)`);
+                  if (j.otp) setOtpCode(j.otp);
+                }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>Send / Resend OTP</button>
+              </div>
+              <input type="password" placeholder="New password (min 8 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <button type="button" onClick={async () => {
+                if (!otpEmail || !otpCode) { setOtpMsg('Email and OTP required'); return; }
+                if (newPassword.length < 8) { setOtpMsg('Password must be at least 8 characters'); return; }
+                if (newPassword !== confirmPassword) { setOtpMsg('Passwords do not match'); return; }
+                const r = await fetch(`${apiUrl}/api/auth/first-password-change`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: otpEmail, otp: otpCode, newPassword }) });
+                const j = await r.json().catch(()=>({}));
+                if (!r.ok) { setOtpMsg(j.error || 'Failed to change password'); return; }
+                setOtpMsg('Password changed — signing you in…');
+                const { error } = await supabase.auth.signInWithPassword({ email: otpEmail, password: newPassword });
+                if (error) { setOtpMsg('Password changed — please sign in with your new password. ' + error.message); setOtpMode(false); return; }
+                setOtpMode(false); setOtpCode(''); setNewPassword(''); setConfirmPassword(''); setOtpMsg('');
+              }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '13px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 700, cursor: 'pointer', fontSize: '15px' }}>Verify OTP & Set Password</button>
+              <button type="button" onClick={() => { setOtpMode(false); setOtpMsg(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Back to Sign In</button>
+            </div>
+          ) : authLoading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div>
           ) : (
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setAuthLoading(true);
-              try {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                  email,
-                  password
-                });
-                if (error) {
-                  alert(error.message);
-                }
-                setEmail('');
-                setPassword('');
-              } catch (err) {
-                alert('Login failed');
-              } finally {
-                setAuthLoading(false);
-              }
-            }} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '16px' }}
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '16px' }}
-              />
-              <button
-                type="submit"
-                style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer', fontSize: '16px' }}
-              >
-                Sign In
-              </button>
-            </form>
+            <>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthLoading(true);
+                try {
+                  const loginEmail = email;
+                  const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
+                  if (error) { alert(error.message); return; }
+                  const uid = data?.user?.id;
+                  if (uid) {
+                    const { data: prof } = await supabase.from('users').select('must_change_password, email').eq('auth_user_id', uid).single();
+                    if (prof?.must_change_password) {
+                      setOtpMode(true); setOtpEmail(prof.email || loginEmail); setOtpMsg('Password change required — request OTP to continue');
+                      try {
+                        const rr = await fetch(`${apiUrl}/api/auth/request-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: prof.email || loginEmail }) });
+                        const jj = await rr.json().catch(()=>({}));
+                        if (rr.ok) setOtpMsg(jj.emailSent ? `OTP sent to ${prof.email || loginEmail}` : `Dev OTP: ${jj.otp}`);
+                        if (jj?.otp) setOtpCode(jj.otp);
+                      } catch {}
+                    }
+                  }
+                  setEmail(''); setPassword('');
+                } catch (err) { alert('Login failed'); } finally { setAuthLoading(false); }
+              }} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-xl)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '16px' }} />
+                <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '16px' }} />
+                <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer', fontSize: '16px' }}>Sign In</button>
+              </form>
+              <button type="button" onClick={() => setOtpMode(true)} style={{ display: 'block', margin: '0 auto', background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>First login? Set password with OTP</button>
+            </>
           )}
           <button onClick={() => setView('public')} style={{ display: 'block', margin: '40px auto 0', background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', textDecoration: 'underline' }}>
             ← Back to public site
@@ -841,54 +1014,95 @@ export default function Home() {
               </div>
             )}
 
-            {/* USERS MODULE */}
+            {/* USERS MODULE — expanded capture */}
             {activeModule === 'users' && (
               <div>
+                {userNotice && (
+                  <div style={{ background: 'var(--bg-saffron)', border: '1.5px solid var(--accent)', padding: '14px 16px', borderRadius: '10px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '13.5px' }}>User created — credentials{userNotice.emailSent ? ' emailed' : ''}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Email: <b>{userNotice.email}</b></div>
+                    {userNotice.tempPassword && <div style={{ fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>Temp password: <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}>{userNotice.tempPassword}</code> <button onClick={() => navigator.clipboard.writeText(userNotice.tempPassword)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Copy</button></div>}
+                    {userNotice.otp && <div style={{ fontSize: '13px' }}>OTP: <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}>{userNotice.otp}</code> <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>(expires 10 min)</span> <button onClick={() => navigator.clipboard.writeText(userNotice.otp)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginLeft: '6px' }}>Copy OTP</button></div>}
+                    {!userNotice.emailSent && <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Email not configured — share the temp password & OTP manually. Configure SMTP_HOST in backend/.env to auto-email.</div>}
+                    <button onClick={() => setUserNotice(null)} style={{ alignSelf: 'flex-start', background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginTop: '4px' }}>Dismiss</button>
+                  </div>
+                )}
                 {canCreate('users') && (
-                  <form onSubmit={handleAddUser} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <input type="text" placeholder="Full name" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
-                    <input type="email" placeholder="Email" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
-                    <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                      {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                    </select>
-                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add User</button>
+                  <form onSubmit={handleAddUser} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <input type="text" placeholder="Full name *" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} required />
+                      <input type="email" placeholder="Official email *" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
+                      <input type="text" placeholder="Contact number" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
+                      <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '150px' }}>
+                        {roles.map(r => <option key={r.key} value={r.key}>{r.name} {r.category ? `(${r.category})` : ''}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {isStaffCat(newRoleCat) && <input placeholder="Employee ID" value={newEmployeeId} onChange={e => setNewEmployeeId(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} />}
+                      {isStudentCat(newRoleCat) && <input placeholder="Roll No. / Reg No. *" value={newRollNo} onChange={e => setNewRollNo(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} required={isStudentCat(newRoleCat)} />}
+                      {isStaffCat(newRoleCat) && <input placeholder="Designation" value={newDesignation} onChange={e => setNewDesignation(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />}
+                      {isStudentCat(newRoleCat) && (
+                        <select value={newProgramId} onChange={e => setNewProgramId(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} required>
+                          <option value="">Course (Program) *</option>
+                          {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                      )}
+                      {isStaffCat(newRoleCat) && <input type="date" title="Date of joining" value={newDateOfJoining} onChange={e => setNewDateOfJoining(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />}
+                      {isStudentCat(newRoleCat) && <input type="number" min="2000" max="2100" placeholder="Year of commencement *" title="Year of commencement" value={newYearComm} onChange={e => setNewYearComm(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '170px' }} required />}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add User</button>
+                      <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>Temp password auto-generated · user must change at first login via OTP to official email</span>
+                    </div>
                   </form>
                 )}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '12px' }}>Name</th><th style={{ padding: '12px' }}>Email</th><th style={{ padding: '12px' }}>Role</th><th style={{ padding: '12px' }}>Actions</th>
+                        <th style={{ padding: '10px 12px' }}>Name</th><th style={{ padding: '10px 12px' }}>Email / Contact</th><th style={{ padding: '10px 12px' }}>Role / Identifiers</th><th style={{ padding: '10px 12px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dbData.users.map(u => (
-                        editingUser === u.id ? (
+                      {dbData.users.map(u => {
+                        const prog = dbData.curriculum.find(d => d.id === u.program_id);
+                        return editingUser === u.id ? (
                           <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
-                            <td style={{ padding: '8px' }}><input value={editUserName} onChange={e => setEditUserName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
-                            <td style={{ padding: '8px' }}><input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
-                            <td style={{ padding: '8px' }}>
-                              <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }}>
-                                {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                              </select>
-                            </td>
-                            <td style={{ padding: '8px', display: 'flex', gap: '6px' }}>
-                              <button onClick={() => handleUpdateUser(u)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
-                              <button onClick={() => setEditingUser(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                            <td colSpan={4} style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                <input value={editUserName} onChange={e => setEditUserName(e.target.value)} placeholder="Full name" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }} />
+                                <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
+                                <input value={editUserPhone} onChange={e => setEditUserPhone(e.target.value)} placeholder="Phone" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />
+                                <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', minWidth: '150px' }}>
+                                  {roles.map(r => <option key={r.key} value={r.key}>{r.name} ({r.category || 'staff'})</option>)}
+                                </select>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                {isStaffCat(editRoleCat) && <input value={editUserEmployeeId} onChange={e => setEditUserEmployeeId(e.target.value)} placeholder="Employee ID" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />}
+                                {isStudentCat(editRoleCat) && <input value={editUserRollNo} onChange={e => setEditUserRollNo(e.target.value)} placeholder="Roll No." style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />}
+                                {isStaffCat(editRoleCat) && <input value={editUserDesignation} onChange={e => setEditUserDesignation(e.target.value)} placeholder="Designation" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 150px' }} />}
+                                {isStudentCat(editRoleCat) && <select value={editUserProgramId} onChange={e => setEditUserProgramId(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }}><option value="">Program</option>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
+                                {isStaffCat(editRoleCat) && <input type="date" value={editUserDateOfJoining || ''} onChange={e => setEditUserDateOfJoining(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }} />}
+                                {isStudentCat(editRoleCat) && <input type="number" min="2000" max="2100" value={editUserYearComm || ''} onChange={e => setEditUserYearComm(e.target.value)} placeholder="Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />}
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button onClick={() => handleUpdateUser(u)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                                <button onClick={() => setEditingUser(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                              </div>
                             </td>
                           </tr>
                         ) : (
                           <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '12px' }}>{u.name}</td>
-                            <td style={{ padding: '12px', color: 'var(--text-soft)' }}>{u.email}</td>
-                            <td style={{ padding: '12px', textTransform: 'capitalize' }}>{roles.find(r => r.key === u.role_key)?.name || u.role_key}</td>
-                            <td style={{ padding: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {canAdmin('users') && <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
-                              {isFull('users') && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                            <td style={{ padding: '10px 12px' }}><div style={{ fontWeight: 600 }}>{u.name}</div><div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.designation || ''}{u.must_change_password ? <span style={{ marginLeft: '6px', background: 'var(--accent)', color: '#fff', padding: '1px 6px', borderRadius: '99px', fontSize: '10px' }}>password reset required</span> : ''}</div></td>
+                            <td style={{ padding: '10px 12px' }}><div style={{ color: 'var(--text-soft)', fontSize: '12.5px' }}>{u.email}</div><div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{u.phone || ''}</div></td>
+                            <td style={{ padding: '10px 12px' }}><div style={{ textTransform: 'capitalize' }}>{roles.find(r => r.key === u.role_key)?.name || u.role_key}</div><div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.employee_id ? `Emp: ${u.employee_id}` : ''}{u.employee_id && u.roll_no ? ' · ' : ''}{u.roll_no ? `Roll: ${u.roll_no}` : ''}</div><div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{prog ? prog.name : ''}{u.year_of_commencement ? ` · ${u.year_of_commencement}` : ''}{u.date_of_joining ? ` · Joined ${u.date_of_joining}` : ''}</div></td>
+                            <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {canAdmin('users') && <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {isFull('users') && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                             </td>
                           </tr>
-                        )
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -902,32 +1116,54 @@ export default function Home() {
                   Dynamic university syllabus structure (Programs, Semesters, and Courses matching the MPA format).
                 </p>
                 {canCreate('curriculum') && (
-                  <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '16px' }}>
                     <input placeholder="Program / Discipline name" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} required />
-                    <input placeholder="Levels (e.g. 2 Years / 4 Semesters)" value={newDiscLevels} onChange={e => setNewDiscLevels(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <input placeholder="Levels (e.g. 2 Years / 4 Semesters)" value={newDiscLevels} onChange={e => setNewDiscLevels(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
+                    <select value={newDiscStructure} onChange={e => setNewDiscStructure(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Structure">
+                      <option value="semester">Semester only</option>
+                      <option value="yearly">Yearly only</option>
+                      <option value="yearly_semester">Yearly + Semester</option>
+                    </select>
+                    {(newDiscStructure === 'yearly' || newDiscStructure === 'yearly_semester') && (
+                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '12px', color: 'var(--text-soft)' }}>Years
+                        <input type="number" min="1" max="10" value={newDiscYearCount} onChange={e => setNewDiscYearCount(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '90px' }} />
+                      </label>
+                    )}
+                    {(newDiscStructure === 'semester' || newDiscStructure === 'yearly_semester') && (
+                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '12px', color: 'var(--text-soft)' }}>Sems / Year
+                        <input type="number" min="1" max="4" value={newDiscSemPerYear} onChange={e => setNewDiscSemPerYear(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '95px' }} />
+                      </label>
+                    )}
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Program</button>
                   </form>
                 )}
 
-                {/* Programs list — every discipline from DB, fully editable; visible to anyone with curriculum View */}
+                {/* Programs list — structure defines yearly vs semester breakup (separate boxes). */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '24px' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '10px 12px' }}>Program</th><th style={{ padding: '10px 12px' }}>Levels</th><th style={{ padding: '10px 12px' }}>Description</th><th style={{ padding: '10px 12px' }}>Actions</th>
+                        <th style={{ padding: '10px 12px' }}>Program</th><th style={{ padding: '10px 12px' }}>Levels</th><th style={{ padding: '10px 12px' }}>Structure</th><th style={{ padding: '10px 12px' }}>Description</th><th style={{ padding: '10px 12px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {dbData.curriculum.length === 0 ? (
-                        <tr><td colSpan="4" style={{ padding: '18px', textAlign: 'center', color: 'var(--text-faint)' }}>No programs yet.</td></tr>
+                        <tr><td colSpan="5" style={{ padding: '18px', textAlign: 'center', color: 'var(--text-faint)' }}>No programs yet.</td></tr>
                       ) : dbData.curriculum.map(d => (
                         editingDisc === d.id ? (
                           <tr key={d.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
                             <td style={{ padding: '8px' }}><input value={discEditName} onChange={e => setDiscEditName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
                             <td style={{ padding: '8px' }}><input value={discEditLevels} onChange={e => setDiscEditLevels(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}>
+                              <select value={discEditStructure} onChange={e => setDiscEditStructure(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }}>
+                                <option value="semester">Semester only</option><option value="yearly">Yearly only</option><option value="yearly_semester">Yearly + Semester</option>
+                              </select>
+                              {(discEditStructure === 'yearly' || discEditStructure === 'yearly_semester') && <input type="number" min="1" max="10" value={discEditYearCount} onChange={e => setDiscEditYearCount(e.target.value)} placeholder="Years" title="Years" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} />}
+                              {(discEditStructure === 'semester' || discEditStructure === 'yearly_semester') && <input type="number" min="1" max="4" value={discEditSemPerYear} onChange={e => setDiscEditSemPerYear(e.target.value)} placeholder="Sems/Year" title="Sems per Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} />}
+                            </td>
                             <td style={{ padding: '8px' }}><input value={discEditDesc} onChange={e => setDiscEditDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
-                            <td style={{ padding: '8px', display: 'flex', gap: '6px' }}>
-                              <button onClick={() => handleUpdateDiscipline(d, { name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim() })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                            <td style={{ padding: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              <button onClick={() => handleUpdateDiscipline(d, { name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim(), structure_mode: discEditStructure, year_count: Number(discEditYearCount) || 2, semesters_per_year: Number(discEditSemPerYear) || 2 })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                               <button onClick={() => setEditingDisc(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                             </td>
                           </tr>
@@ -935,9 +1171,12 @@ export default function Home() {
                           <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td style={{ padding: '10px 12px', fontWeight: 600 }}>{d.name}</td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.levels || '—'}</td>
+                            <td style={{ padding: '10px 12px', color: 'var(--text-soft)', fontSize: '12.5px' }}>
+                              {d.structure_mode === 'yearly' ? `Yearly · ${d.year_count || 2} yrs` : d.structure_mode === 'yearly_semester' ? `Yearly + Sem · ${d.year_count || 2}y × ${d.semesters_per_year || 2}/yr` : `Semester · ${d.semesters_per_year || 2}/yr`}
+                            </td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.description || '—'}</td>
                             <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); setDiscEditYearCount(d.year_count || 2); setDiscEditSemPerYear(d.semesters_per_year || 2); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('curriculum', d.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                             </td>
                           </tr>
@@ -949,22 +1188,83 @@ export default function Home() {
 
                 {canCreate('curriculum') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                    {/* Add Course */}
-                    <form onSubmit={handleAddCourse} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <select value={courseDisc} onChange={e => setCourseDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                        {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                      <select value={courseType} onChange={e => setCourseType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                        {(dbData.course_types.length ? dbData.course_types : [{ name: 'Masters' }]).map(t => (
-                          <option key={t.name} value={t.name}>{t.name}</option>
+                    {/* Add Course — 21-field header: periods→hours auto, dynamic exam types, structured COs */}
+                    <form onSubmit={handleAddCourse} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                        <select value={courseDisc} onChange={e => setCourseDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', minWidth: '180px' }}>
+                          <option value="">Select Program…</option>
+                          {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                        {dbData.course_types.length === 0 ? (
+                          <span style={{ fontSize: '13px', color: 'var(--text-faint)', alignSelf: 'center' }}>No course types — add one below.</span>
+                        ) : (
+                          <select value={courseType} onChange={e => setCourseType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
+                            {dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                          </select>
+                        )}
+                        {(selectedDiscStructure === 'yearly' || selectedDiscStructure === 'yearly_semester') && (
+                          <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
+                            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                        )}
+                        {(selectedDiscStructure === 'semester' || selectedDiscStructure === 'yearly_semester') && (
+                          <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
+                            {courseSemesters.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        )}
+                        <input placeholder="Code (BCVP310) *" value={courseCode} onChange={e => setCourseCode(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '130px' }} required />
+                        <input placeholder="Course Name *" value={courseName} onChange={e => setCourseName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} required />
+                        <select value={courseKind} onChange={e => setCourseKind(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '110px' }} title="Type">
+                          <option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option>
+                        </select>
+                        <input type="number" min="0" placeholder="Credits" title="Credits" value={courseCredits} onChange={e => setCourseCredits(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '90px' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Teaching periods
+                          <input type="number" min="0" placeholder="Periods" title="Teaching Periods (45 min each)" value={coursePeriods} onChange={e => setCoursePeriods(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '110px' }} />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Teaching hours (auto)
+                          <input type="text" value={derivedHours === '' ? '' : String(derivedHours)} readOnly placeholder="auto" title="Auto: periods × 45 / 60" style={{ padding: '8px', border: '1px solid var(--border)', width: '110px', background: 'var(--bg)', color: 'var(--text-faint)' }} />
+                        </label>
+                        <span style={{ fontSize: '11px', color: 'var(--text-faint)', alignSelf: 'flex-end', paddingBottom: '8px' }}>periods × 45 min</span>
+                        <input type="number" min="0" placeholder="CIE marks" title="CIE Marks" value={courseCie} onChange={e => setCourseCie(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '100px' }} />
+                        <input placeholder="CIE duration (e.g. 45 Min)" title="CIE exam duration" value={courseCieDur} onChange={e => setCourseCieDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '150px' }} />
+                        <input type="number" min="0" placeholder="SEE marks" title="SEE Marks" value={courseSee} onChange={e => setCourseSee(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '100px' }} />
+                        <input placeholder="SEE duration (e.g. 1 hour)" title="SEE exam duration" value={courseSeeDur} onChange={e => setCourseSeeDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '150px' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <select value={courseExamTypeId} onChange={e => setCourseExamTypeId(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', minWidth: '160px' }} title="Examination Type (dynamic)">
+                          <option value="">Examination type…</option>
+                          {(dbData.examination_types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>or add:</span>
+                        <input placeholder="New exam type" value={newExamTypeName} onChange={e => setNewExamTypeName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '150px' }} />
+                        <button type="button" onClick={handleAddExamType} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>+ Add type</button>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>Course objectives (one per line)</label>
+                        <textarea value={courseObjectives} onChange={e => setCourseObjectives(e.target.value)} rows={3} placeholder="e.g. Add on to existing repertoire..." style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13.5px' }} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>Course outcomes → CO1, CO2… (used for CO mapping in modules)</label>
+                          <button type="button" onClick={() => { const n = courseOutcomes.length+1; setCourseOutcomes([...courseOutcomes, { code: `CO${n}`, text: '' }]); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add outcome</button>
+                        </div>
+                        {courseOutcomes.length === 0 ? (
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', padding: '8px', border: '1px dashed var(--border)', borderRadius: '6px' }}>No outcomes yet — click + Add outcome.</div>
+                        ) : courseOutcomes.map((o, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{ background: 'var(--primary)', color: '#fff', padding: '3px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, minWidth: '42px', textAlign: 'center' }}>{o.code}</span>
+                            <input value={o.text} onChange={e => { const c=[...courseOutcomes]; c[idx]={...c[idx], text:e.target.value}; setCourseOutcomes(c); }} placeholder={`Outcome ${o.code} text`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                            <button type="button" onClick={() => setCourseOutcomes(courseOutcomes.filter((_,i)=>i!==idx).map((x,i)=>({ ...x, code:`CO${i+1}` })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                          </div>
                         ))}
-                      </select>
-                      <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                        {courseSemesters.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                      <input placeholder="Course Code (e.g. MBNP110)" value={courseCode} onChange={e => setCourseCode(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '130px' }} required />
-                      <input placeholder="Course Name (e.g. Nritya Marga Purvanga-1)" value={courseName} onChange={e => setCourseName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
-                      <button type="submit" style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Course</button>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>Pedagogy (one per line)</label>
+                        <textarea value={coursePedagogy} onChange={e => setCoursePedagogy(e.target.value)} rows={2} placeholder="Live demo involving students..." style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13.5px' }} />
+                      </div>
+                      <button type="submit" style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Add Course</button>
                     </form>
 
                     {/* Course types are data too — add, edit and delete freely. */}
@@ -989,7 +1289,7 @@ export default function Home() {
                                 <b style={{ minWidth: '150px' }}>{t.name}</b>
                                 <span style={{ color: 'var(--text-soft)', fontSize: '13px' }}>{t.semester_count} semester{t.semester_count === 1 ? '' : 's'}</span>
                                 <button type="button" onClick={() => { setEditingCourseType(t.id); setCtEditName(t.name); setCtEditSems(t.semester_count); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
-                                <button type="button" title="Delete course type" onClick={() => handleDelete('course_types', t.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>
+                                {isFull('curriculum') && <button type="button" title="Delete course type" onClick={() => handleDelete('course_types', t.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>}
                               </div>
                             )
                           ))}
@@ -999,126 +1299,334 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Courses List */}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                {/* Select Course — filtered list (fixes "Select vs Add" and ghost after delete). */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-deep)' }}>Select Course:</span>
+                  <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
+                    <option value="">All Programs</option>
+                    {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
+                    <option value="">All Types</option>
+                    {dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                  </select>
+                  <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
+                    <option value="">All Years</option>
+                    {ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}
+                  </select>
+                  <select value={filterSem} onChange={e => setFilterSem(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
+                    <option value="">All Semesters</option>
+                    {Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  {(filterDisc || filterType || filterSem || filterYear) && <button onClick={() => { setFilterDisc(''); setFilterType(''); setFilterSem(''); setFilterYear(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '12px' }}>Clear</button>}
+                  <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || c.course_type === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear)).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
+                </div>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '820px' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '12px' }}>Code &amp; Course Name</th><th style={{ padding: '12px' }}>Semester</th><th style={{ padding: '12px' }}>Credits</th><th style={{ padding: '12px' }}>Actions</th>
+                        <th style={{ padding: '10px 8px' }}>Program</th><th style={{ padding: '10px 8px' }}>Code &amp; Course</th><th style={{ padding: '10px 8px' }}>Type</th><th style={{ padding: '10px 8px' }}>Year</th><th style={{ padding: '10px 8px' }}>Semester</th><th style={{ padding: '10px 8px' }}>Credits</th><th style={{ padding: '10px 8px' }}>Hours</th><th style={{ padding: '10px 8px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dbData.courses.length === 0 ? (
-                        <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No dynamic courses added yet.</td></tr>
-                      ) : dbData.courses.map(c => (
-                        <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '12px' }}><b>{c.code}</b> — {c.name}</td>
-                          <td style={{ padding: '12px' }}>{c.semester}</td>
-                          <td style={{ padding: '12px' }}>{c.credits} Credits</td>
-                          <td style={{ padding: '12px' }}>
-                            <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '6px' }}>Delete</button>
-                            <button onClick={() => setActiveSyllabusCourse(c)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
-                          </td>
-                        </tr>
-                      ))}
+                      {(() => {
+                        const filtered = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || c.course_type === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear));
+                        if (filtered.length === 0) return <tr><td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>{dbData.courses.length === 0 ? 'No courses yet — use Add Course above.' : 'No courses match filters.'}</td></tr>;
+                        return filtered.map(c => {
+                          const prog = dbData.curriculum.find(d => d.id === c.discipline_id);
+                          const isEditing = editingCourse === c.id;
+                          if (isEditing) {
+                            return (
+                              <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                                <td style={{ padding: '6px' }}><select value={editCourse.discipline_id || ''} onChange={e => setEditCourse({ ...editCourse, discipline_id: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', fontSize: '12px' }}>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
+                                <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px', marginLeft: '4px' }} placeholder="Name" /></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.course_type || ''} onChange={e => setEditCourse({ ...editCourse, course_type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}>{dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}</select><select value={editCourse.type || 'DSC'} onChange={e => setEditCourse({ ...editCourse, type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '70px', marginTop: '4px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.year_label || ''} onChange={e => setEditCourse({ ...editCourse, year_label: e.target.value || null, year_number: e.target.value ? ROMAN.indexOf(e.target.value.replace('Year ', '')) + 1 : null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="">—</option>{ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}</select></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => setEditCourse({ ...editCourse, semester: e.target.value || null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                                <td style={{ padding: '6px' }}><input type="number" value={editCourse.credits ?? ''} onChange={e => setEditCourse({ ...editCourse, credits: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} /></td>
+                                <td style={{ padding: '6px' }}><input type="number" value={editCourse.teaching_hours ?? ''} onChange={e => setEditCourse({ ...editCourse, teaching_hours: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} placeholder="Hrs" /></td>
+                                <td style={{ padding: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                  <button onClick={() => handleUpdateCourse(c.id, { code: editCourse.code, name: editCourse.name, discipline_id: editCourse.discipline_id, course_type: editCourse.course_type, type: editCourse.type, semester: editCourse.semester || null, year_label: editCourse.year_label || null, year_number: editCourse.year_number || null, credits: editCourse.credits === '' ? null : Number(editCourse.credits), teaching_hours: editCourse.teaching_hours === '' ? null : Number(editCourse.teaching_hours) })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                                  <button onClick={() => setEditingCourse(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return (
+                          <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 8px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{prog?.name || '—'}</td>
+                            <td style={{ padding: '10px 8px' }}><b>{c.code}</b><br /><span style={{ color: 'var(--text-soft)' }}>{c.name}</span></td>
+                            <td style={{ padding: '10px 8px' }}>{c.type || c.course_type || '—'}</td>
+                            <td style={{ padding: '10px 8px' }}>{c.year_label || '—'}</td>
+                            <td style={{ padding: '10px 8px' }}>{c.semester || '—'}</td>
+                            <td style={{ padding: '10px 8px' }}>{c.credits ?? '—'}</td>
+                            <td style={{ padding: '10px 8px', fontSize: '12.5px', color: 'var(--text-soft)' }}>{c.teaching_hours != null ? `${c.teaching_hours}${c.teaching_periods ? ` / ${c.teaching_periods}` : ''}` : '—'}</td>
+                            <td style={{ padding: '10px 8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {canAdmin('curriculum') && <button onClick={() => { setEditingCourse(c.id); setEditCourse({ ...c }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {isFull('curriculum') && <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              <button onClick={() => setActiveSyllabusCourse(c)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
+                            </td>
+                          </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>
 
-                {/* SYLLABUS DETAIL VIEW */}
-                {activeSyllabusCourse && (
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginTop: '24px', padding: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
-                      <h3 style={{ fontSize: '20px', color: 'var(--primary-deep)', margin: 0 }}>{activeSyllabusCourse.code} — {activeSyllabusCourse.name}</h3>
+                {/* SYLLABUS DETAIL — structured exactly like the BPA document (BCVP310) */}
+                {activeSyllabusCourse && (() => {
+                  const progName = dbData.curriculum.find(d => d.id === activeSyllabusCourse.discipline_id)?.name || '—';
+                  const semLabel = activeSyllabusCourse.semester ? activeSyllabusCourse.semester.replace('Semester ', '') : '—';
+                  const yearLabel = activeSyllabusCourse.year_label || null;
+                  return (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginTop: '24px', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                      <h3 style={{ fontSize: '18px', color: 'var(--primary-deep)', margin: 0 }}>{activeSyllabusCourse.code} — {activeSyllabusCourse.name}</h3>
                       <button onClick={() => setActiveSyllabusCourse(null)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-faint)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>← Back to Courses</button>
                     </div>
-                    {syllabusContent ? (
-                      <div style={{ display: 'grid', gap: '16px' }}>
-                        {syllabusContent.objectives && syllabusContent.objectives.length > 0 && (
-                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
-                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '12px' }}>Course Objectives</h4>
-                            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-soft)' }}>
-                              {syllabusContent.objectives.map((obj, idx) => <li key={idx}>{obj}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                        {syllabusContent.outcomes && syllabusContent.outcomes.length > 0 && (
-                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
-                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '12px' }}>Course Outcomes</h4>
-                            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-soft)' }}>
-                              {syllabusContent.outcomes.map((out, idx) => <li key={idx}>{out}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                        {syllabusContent.modules && syllabusContent.modules.length > 0 && (
-                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
-                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '16px' }}>Syllabus Modules</h4>
-                            {syllabusContent.modules.map((mod, mi) => (
-                              <div key={mi} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: mi < syllabusContent.modules.length - 1 ? '1px solid var(--divider)' : 'none' }}>
-                                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)', marginBottom: '8px' }}>
-                                  Module {mi + 1}: {mod.title || 'Untitled Module'}
-                                </div>
-                                {mod.topics && mod.topics.length > 0 && (
-                                  <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-soft)' }}>
-                                    {mod.topics.map((topic, ti) => <li key={ti}>{topic}</li>)}
-                                  </ul>
-                                )}
-                                {mod.hours && (
-                                  <div style={{ fontSize: '12.5px', color: 'var(--accent-deep)', marginTop: '6px' }}>
-                                    Hours allocated: {mod.hours}
-                                  </div>
-                                )}
+
+                    {/* Header table — mirrors the image header */}
+                    <div style={{ padding: '16px 20px' }}>
+                      <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', fontSize: '13.5px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Program Name</div>
+                          <div style={{ padding: '9px 12px', gridColumn: 'span 3', fontWeight: 600, color: 'var(--primary-deep)' }}>{progName}</div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Course Name</div>
+                          <div style={{ padding: '9px 12px', borderRight: '1px solid var(--border)' }}>{activeSyllabusCourse.name}</div>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Type</div>
+                          <div style={{ padding: '9px 12px' }}>{activeSyllabusCourse.type || activeSyllabusCourse.course_type || '—'}</div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Code</div>
+                          <div style={{ padding: '9px 12px', borderRight: '1px solid var(--border)', fontWeight: 600 }}>{activeSyllabusCourse.code}</div>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Semester</div>
+                          <div style={{ padding: '9px 12px' }}>{semLabel}{yearLabel ? ` · ${yearLabel}` : ''}</div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)', fontSize: '12.5px' }}>Teaching Hours / Periods</div>
+                          <div style={{ padding: '9px 12px', borderRight: '1px solid var(--border)' }}>{activeSyllabusCourse.teaching_hours ?? '—'}{activeSyllabusCourse.teaching_periods ? ` / ${activeSyllabusCourse.teaching_periods}` : ''}</div>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>CIE Marks</div>
+                          <div style={{ padding: '9px 12px' }}>{activeSyllabusCourse.cie_marks ?? 50}</div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Credits</div>
+                          <div style={{ padding: '9px 12px', borderRight: '1px solid var(--border)' }}>{activeSyllabusCourse.credits ?? '—'}</div>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>SEE Marks</div>
+                          <div style={{ padding: '9px 12px' }}>{activeSyllabusCourse.see_marks ?? 50}</div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px' }}>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)', fontSize: '12.5px' }}>Examination Type</div>
+                          <div style={{ padding: '9px 12px', borderRight: '1px solid var(--border)' }}>{activeSyllabusCourse.examination_type || '—'}</div>
+                          <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)', fontSize: '12px', lineHeight: 1.3 }}>Examination Hours<br /><span style={{ fontWeight: 400, fontSize: '11px', color: 'var(--text-soft)' }}>CIE / SEE</span></div>
+                          <div style={{ padding: '9px 12px', fontSize: '12.5px' }}>{activeSyllabusCourse.examination_hours_cie ? `CIE: ${activeSyllabusCourse.examination_hours_cie}` : '—'}{activeSyllabusCourse.examination_hours_see ? ` · SEE: ${activeSyllabusCourse.examination_hours_see}` : ''}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Syllabus body — Objectives / Outcomes / Pedagogy / Modules */}
+                    <div style={{ padding: '0 20px 20px', display: 'grid', gap: '14px' }}>
+                      {!syllabusContent ? (
+                        <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+                          No detailed syllabus yet. Click <b>Add Syllabus</b> below to create it from the document.
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ background: 'var(--primary-deep)', color: '#fff', textAlign: 'center', padding: '9px', borderRadius: '6px', fontSize: '13px', letterSpacing: '0.06em', fontWeight: 700 }}>COURSE OBJECTIVES AND OUTCOMES</div>
+
+                          {syllabusContent.objectives?.length > 0 && (
+                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>OBJECTIVES:</div>
+                              <ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>
+                                {syllabusContent.objectives.map((o, i) => <li key={i} style={{ marginBottom: '6px' }}>{o}</li>)}
+                              </ol>
+                            </div>
+                          )}
+                          {syllabusContent.outcomes?.length > 0 && (
+                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>OUTCOMES: <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}>At the end of the course, the student will be able to:</span></div>
+                              <ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>
+                                {syllabusContent.outcomes.map((o, i) => <li key={i} style={{ marginBottom: '6px' }}>{o}</li>)}
+                              </ol>
+                            </div>
+                          )}
+                          {syllabusContent.pedagogy?.length > 0 && (
+                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>Pedagogy:</div>
+                              <ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>
+                                {syllabusContent.pedagogy.map((p, i) => <li key={i}>{p}</li>)}
+                              </ol>
+                            </div>
+                          )}
+
+                          {syllabusContent.modules?.length > 0 ? syllabusContent.modules.map((mod, mi) => (
+                            <div key={mi} style={{ border: '1.5px solid var(--primary)', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ padding: '9px 14px', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: '13.5px' }}>
+                                Module {mi + 1} - {mod.title || 'Untitled'}
                               </div>
-                            ))}
+                              <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 120px', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
+                                <div style={{ padding: '8px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Hours:</div>
+                                <div style={{ padding: '8px 12px', borderRight: '1px solid var(--border)' }}>{mod.hours || '—'}</div>
+                                <div style={{ padding: '8px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>RBT Level:</div>
+                                <div style={{ padding: '8px 12px' }}>{mod.rbt_level || '—'}</div>
+                              </div>
+                              {(mod.methodology || mod.teaching_methodology) && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
+                                  <div style={{ padding: '8px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Teaching Methodology</div>
+                                  <div style={{ padding: '8px 12px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap' }}>{mod.methodology || mod.teaching_methodology}</div>
+                                </div>
+                              )}
+                              {mod.topics?.length > 0 && (
+                                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                                  <ol style={{ margin: 0, paddingLeft: '20px', color: 'var(--text)', fontSize: '13.5px', lineHeight: 1.6 }}>
+                                    {mod.topics.map((t, ti) => <li key={ti}>{t}</li>)}
+                                  </ol>
+                                </div>
+                              )}
+                              {mod.description && <div style={{ padding: '10px 14px', color: 'var(--text-soft)', fontSize: '13px', whiteSpace: 'pre-wrap', borderBottom: '1px solid var(--border)' }}>{mod.description}</div>}
+                              <div style={{ padding: '8px 14px', background: 'var(--bg-saffron)', fontSize: '12.5px' }}>
+                                <b>CO Mapping:</b> <span style={{ color: 'var(--text-soft)' }}>{mod.co_mapping || '—'}</span>
+                              </div>
+                            </div>
+                          )) : (
+                            <div style={{ padding: '14px', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-faint)', textAlign: 'center', fontSize: '13px' }}>No modules yet — add them in Edit Syllabus.</div>
+                          )}
+
+                          {syllabusContent.assessments && (
+                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>Assessment Plan</div>
+                              <pre style={{ margin: 0, padding: '12px 14px', whiteSpace: 'pre-wrap', color: 'var(--text-soft)', fontSize: '13px', fontFamily: 'inherit' }}>{syllabusContent.assessments}</pre>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Postgres modules — structured source of truth (course_modules + topics) */}
+                    {(() => {
+                      const pgModules = (dbData.course_modules || []).filter(m => m.course_id === activeSyllabusCourse.id).sort((a,b) => (a.module_number||0)-(b.module_number||0));
+                      const sumHrs = pgModules.reduce((s,m)=>s+(Number(m.hours)||0),0);
+                      const warnHours = activeSyllabusCourse.teaching_hours != null && pgModules.length > 0 && Math.abs(sumHrs - Number(activeSyllabusCourse.teaching_hours)) > 0.01;
+                      const coList = (() => { try { const j = activeSyllabusCourse.outcomes_json; if (Array.isArray(j)) return j; if (typeof j==='string') return JSON.parse(j); } catch {} return []; })();
+                      return (
+                        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--primary-deep)' }}>Modules (Postgres) — {pgModules.length} module{pgModules.length===1?'':'s'}{pgModules.length>0 ? ` · ${sumHrs} hrs` : ''}{warnHours ? <span style={{ marginLeft: '8px', background: 'var(--accent)', color: '#fff', padding: '2px 8px', borderRadius: '99px', fontSize: '11px' }}>≠ course hours {activeSyllabusCourse.teaching_hours}</span> : ''}</h4>
                           </div>
-                        )}
-                        {syllabusContent.assessments && (
-                          <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px' }}>
-                            <h4 style={{ fontSize: '16px', color: 'var(--primary-deep)', marginBottom: '12px' }}>Assessment Plan</h4>
-                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-soft)', fontSize: '13px', fontFamily: 'inherit' }}>
-                              {syllabusContent.assessments}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '40px' }}>
-                        No detailed syllabus content yet. Click &quot;Edit Syllabus&quot; below to add.
-                      </div>
-                    )}
+                          {pgModules.length === 0 ? (
+                            <div style={{ padding: '14px', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-faint)', textAlign: 'center', fontSize: '13px' }}>No Postgres modules yet — add one below.</div>
+                          ) : pgModules.map((mod) => {
+                            const topics = (dbData.course_module_topics || []).filter(t => t.module_id === mod.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+                            return (
+                              <div key={mod.id} style={{ border: '1.5px solid var(--primary)', borderRadius: '8px', overflow: 'hidden' }}>
+                                <div style={{ padding: '9px 14px', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: '13.5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>Module {mod.module_number} — {mod.title}</span>
+                                  {canAdmin('curriculum') && <button onClick={() => handleDeleteModule(mod.id)} style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Delete</button>}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 120px', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
+                                  <div style={{ padding: '8px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Hours:</div>
+                                  <div style={{ padding: '8px 12px', borderRight: '1px solid var(--border)' }}>{mod.hours ?? '—'}</div>
+                                  <div style={{ padding: '8px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>RBT Level:</div>
+                                  <div style={{ padding: '8px 12px' }}>{mod.rbt_level || '—'}</div>
+                                </div>
+                                {mod.methodology && <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', fontSize: '13px', borderBottom: '1px solid var(--border)' }}><div style={{ padding: '8px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Teaching Methodology</div><div style={{ padding: '8px 12px', color: 'var(--text-soft)', whiteSpace: 'pre-wrap' }}>{mod.methodology}</div></div>}
+                                {topics.length > 0 && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}><ol style={{ margin: 0, paddingLeft: '20px', color: 'var(--text)', fontSize: '13.5px', lineHeight: 1.6 }}>{topics.map(t => <li key={t.id}>{t.topic}</li>)}</ol></div>}
+                                <div style={{ padding: '8px 14px', background: 'var(--bg-saffron)', fontSize: '12.5px' }}><b>CO Mapping:</b> <span style={{ color: 'var(--text-soft)' }}>{mod.co_mapping || '—'}</span></div>
+                              </div>
+                            );
+                          })}
+                          {canCreate('curriculum') && (
+                            <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary-deep)' }}>Add Module (Postgres)</div>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <input placeholder="Module title *" value={modTitle} onChange={e => setModTitle(e.target.value)} style={{ flex: '1 1 220px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                <input placeholder="Hours" type="number" min="0" value={modHours} onChange={e => setModHours(e.target.value)} style={{ width: '90px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                <select value={modRbt} onChange={e => setModRbt(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
+                                  <option value="Remember">Remember</option><option value="Understand">Understand</option><option value="Apply">Apply</option><option value="Analyze">Analyze</option><option value="Evaluate">Evaluate</option><option value="Create">Create</option>
+                                </select>
+                              </div>
+                              <textarea placeholder="Teaching methodology" value={modMethod} onChange={e => setModMethod(e.target.value)} rows={2} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }} />
+                              <textarea placeholder="Topics — one per line" value={modTopicsText} onChange={e => setModTopicsText(e.target.value)} rows={3} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }} />
+                              {coList.length > 0 && (
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>CO mapping:</span>
+                                  {coList.map(o => (
+                                    <label key={o.code} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', background: modCo.includes(o.code) ? 'var(--primary)' : 'var(--surface)', color: modCo.includes(o.code) ? '#fff' : 'var(--text)', padding: '3px 8px', borderRadius: '99px', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                                      <input type="checkbox" checked={modCo.includes(o.code)} onChange={e => setModCo(e.target.checked ? [...modCo, o.code] : modCo.filter(c=>c!==o.code))} style={{ accentColor: 'var(--primary)' }} />{o.code}
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                              <button type="button" onClick={handleAddModule} style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Add Module</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {canCreate('curriculum') && (
-                      <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <button onClick={() => { setEditingSyllabus(true); setSyllabusForm({ ...syllabusForm, ...(syllabusContent || {}) }); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>
-                          {syllabusContent ? 'Edit Syllabus' : 'Add Syllabus'}
+                      <div style={{ padding: '0 20px 16px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button onClick={() => { setEditingSyllabus(true); setSyllabusForm(syllabusContent ? { ...syllabusContent } : { objectives: [], outcomes: [], pedagogy: [], modules: [], assessments: '' }); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>
+                          {syllabusContent ? 'Edit Syllabus (Mongo)' : 'Add Syllabus (Mongo)'}
                         </button>
-                        {syllabusContent && <button onClick={deleteSyllabus} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Delete</button>}
+                        {syllabusContent && <button onClick={deleteSyllabus} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Delete Mongo Syllabus</button>}
                       </div>
                     )}
                     {editingSyllabus && (
-                      <div style={{ marginTop: '24px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '20px' }}>
-                        <h4 style={{ color: 'var(--primary-deep)', marginBottom: '16px' }}>{syllabusContent ? 'Edit' : 'Add'} Detailed Syllabus</h4>
+                      <div style={{ margin: '0 20px 20px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '20px' }}>
+                        <h4 style={{ color: 'var(--primary-deep)', marginBottom: '16px' }}>{syllabusContent ? 'Edit' : 'Add'} Detailed Syllabus — matches the document structure</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px' }}>Course Objectives (one per line)</label>
-                            <textarea value={syllabusForm.objectives?.join('\n') || ''} onChange={e => setSyllabusForm({ ...syllabusForm, objectives: e.target.value.split('\n').filter(l => l.trim()) })} rows={4} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px', fontWeight: 600 }}>Course Objectives — one per line (numbered in display)</label>
+                            <textarea value={(syllabusForm.objectives || []).join('\n')} onChange={e => setSyllabusForm({ ...syllabusForm, objectives: e.target.value.split('\n').filter(l => l.trim()) })} rows={5} placeholder={"Add on to the existing repertoire of Adi Tala Varnas..." } style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px' }}>Course Outcomes (one per line)</label>
-                            <textarea value={syllabusForm.outcomes?.join('\n') || ''} onChange={e => setSyllabusForm({ ...syllabusForm, outcomes: e.target.value.split('\n').filter(l => l.trim()) })} rows={4} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px', fontWeight: 600 }}>Course Outcomes — one per line (renders as 1) 2) 3) …)</label>
+                            <textarea value={(syllabusForm.outcomes || []).join('\n')} onChange={e => setSyllabusForm({ ...syllabusForm, outcomes: e.target.value.split('\n').filter(l => l.trim()) })} rows={5} placeholder={"Sing Tana Varnas in Kalyani and Vasanta..."} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px' }}>Assessment Plan (free text)</label>
-                            <textarea value={syllabusForm.assessments || ''} onChange={e => setSyllabusForm({ ...syllabusForm, assessments: e.target.value })} rows={4} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px', fontWeight: 600 }}>Pedagogy — one per line (e.g. Live demo involving students)</label>
+                            <textarea value={(syllabusForm.pedagogy || []).join('\n')} onChange={e => setSyllabusForm({ ...syllabusForm, pedagogy: e.target.value.split('\n').filter(l => l.trim()) })} rows={4} placeholder={"Live demo involving students\nGuiding how to sing phrase by phrase"} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <label style={{ fontSize: '13px', color: 'var(--text-soft)', fontWeight: 700 }}>Modules — exactly like the image: title / hours / RBT / methodology / topics / CO mapping</label>
+                              <button type="button" onClick={() => setSyllabusForm({ ...syllabusForm, modules: [...(syllabusForm.modules || []), { title: '', hours: '', rbt_level: 'L1 to L4', methodology: '', topics: [], co_mapping: '' }] })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add Module</button>
+                            </div>
+                            {(syllabusForm.modules || []).length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-faint)', padding: '10px', border: '1px dashed var(--border)', borderRadius: '6px' }}>No modules yet. Click + Add Module and fill as per the document.</div>}
+                            {(syllabusForm.modules || []).map((mod, mi) => (
+                              <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', background: '#fff', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <b style={{ fontSize: '13px', color: 'var(--primary)' }}>Module {mi + 1}</b>
+                                  <button type="button" onClick={() => setSyllabusForm({ ...syllabusForm, modules: (syllabusForm.modules || []).filter((_, i) => i !== mi) })} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                                </div>
+                                <input placeholder="Module title — e.g. Tana Varna - Adi Tala" value={mod.title || ''} onChange={e => { const ms = [...(syllabusForm.modules || [])]; ms[mi] = { ...ms[mi], title: e.target.value }; setSyllabusForm({ ...syllabusForm, modules: ms }); }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  <input placeholder="Hours — e.g. 20" value={mod.hours || ''} onChange={e => { const ms = [...(syllabusForm.modules || [])]; ms[mi] = { ...ms[mi], hours: e.target.value }; setSyllabusForm({ ...syllabusForm, modules: ms }); }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '120px', fontSize: '13px' }} />
+                                  <input placeholder="RBT Level — e.g. L1 to L4" value={mod.rbt_level || ''} onChange={e => { const ms = [...(syllabusForm.modules || [])]; ms[mi] = { ...ms[mi], rbt_level: e.target.value }; setSyllabusForm({ ...syllabusForm, modules: ms }); }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 140px', fontSize: '13px' }} />
+                                  <input placeholder="CO Mapping — e.g. CO1" value={mod.co_mapping || ''} onChange={e => { const ms = [...(syllabusForm.modules || [])]; ms[mi] = { ...ms[mi], co_mapping: e.target.value }; setSyllabusForm({ ...syllabusForm, modules: ms }); }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px', fontSize: '13px' }} />
+                                </div>
+                                <textarea placeholder="Teaching Methodology — one per line" value={mod.methodology || mod.teaching_methodology || ''} onChange={e => { const ms = [...(syllabusForm.modules || [])]; ms[mi] = { ...ms[mi], methodology: e.target.value }; setSyllabusForm({ ...syllabusForm, modules: ms }); }} rows={2} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }} />
+                                <textarea placeholder="Topics / Content — one per line (e.g. Kalyani Varna)" value={(mod.topics || []).join('\n')} onChange={e => { const ms = [...(syllabusForm.modules || [])]; ms[mi] = { ...ms[mi], topics: e.target.value.split('\n').filter(l => l.trim()) }; setSyllabusForm({ ...syllabusForm, modules: ms }); }} rows={4} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }} />
+                              </div>
+                            ))}
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-soft)', marginBottom: '6px', fontWeight: 600 }}>Assessment Plan (free text)</label>
+                            <textarea value={syllabusForm.assessments || ''} onChange={e => setSyllabusForm({ ...syllabusForm, assessments: e.target.value })} rows={3} style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '14px' }} />
                           </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button onClick={handleSaveSyllabus} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Save</button>
-                            <button onClick={() => { setEditingSyllabus(false); setSyllabusForm({}); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={() => { setEditingSyllabus(false); setSyllabusForm(syllabusContent ? { ...syllabusContent } : {}); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
@@ -1660,9 +2168,12 @@ export default function Home() {
                 <p style={{ color: 'var(--text-soft)', marginBottom: '20px' }}>
                   Super Admin is the one fixed role. Create every other role here, and set exactly what each one can do in each module — no row means the module is hidden for that role.
                 </p>
-                <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <input placeholder="Role name (e.g. Examiner)" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                  <input placeholder="Description" value={newRoleDesc} onChange={e => setNewRoleDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
+                  <input placeholder="Description" value={newRoleDesc} onChange={e => setNewRoleDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                  <select value={newRoleCategory} onChange={e => setNewRoleCategory(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
+                    <option value="staff">Staff</option><option value="student">Student</option><option value="both">Both</option>
+                  </select>
                   <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Role</button>
                 </form>
                 {roles.map(r => {
@@ -1673,8 +2184,11 @@ export default function Home() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', flexWrap: 'wrap' }}>
                         {editingRole === r.id ? (
                           <>
-                            <input value={editRoleName} onChange={e => setEditRoleName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                            <input value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
+                            <input value={editRoleName} onChange={e => setEditRoleName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
+                            <input value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                            <select value={editRoleCategory} onChange={e => setEditRoleCategory(e.target.value)} disabled={fixed} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                              <option value="staff">Staff</option><option value="student">Student</option><option value="both">Both</option>{fixed && <option value="system">System</option>}
+                            </select>
                             <button onClick={() => handleUpdateRole(r.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
                             <button onClick={() => setEditingRole(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
                           </>
@@ -1682,10 +2196,11 @@ export default function Home() {
                           <>
                             <b style={{ color: 'var(--primary)', fontSize: '15px' }}>{r.name}</b>
                             {fixed && <span style={{ fontSize: '11px', background: 'var(--surface-muted)', padding: '2px 10px', borderRadius: '99px', color: 'var(--text-soft)' }}>fixed</span>}
-                            <span style={{ color: 'var(--text-soft)', fontSize: '13px', flex: '1 1 200px' }}>{r.description}</span>
+                            <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{r.category || 'staff'}</span>
+                            <span style={{ color: 'var(--text-soft)', fontSize: '13px', flex: '1 1 160px' }}>{r.description}</span>
                             <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{granted} module{granted === 1 ? '' : 's'}</span>
                             <button onClick={() => setOpenRole(openRole === r.key ? null : r.key)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Permissions</button>
-                            {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>}
+                            {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); setEditRoleCategory(r.category || 'staff'); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>}
                             {!fixed && <button onClick={() => handleDeleteRole(r)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>}
                           </>
                         )}
