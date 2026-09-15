@@ -919,6 +919,30 @@ function splitSyllabusChunks(raw) {
     for (let i = 1; i < cIdxs.length; i++) if (cIdxs[i] - cIdxs[i - 1] > 800) fil.push(cIdxs[i]);
     if (fil.length >= 2) return fil.map((s, i) => txt.slice(s, fil[i + 1] ?? txt.length));
   }
+  const semRe = /^\s*Semester\s+(\d+)\s*:[^\n]*/gim;
+  const sIdxs = [];
+  let sm; while ((sm = semRe.exec(txt)) !== null) {
+    if (/Module-wise/i.test(sm[0])) continue;
+    // skip "Methodology for Semester X:" — line does not start with Semester
+    const before = txt.slice(Math.max(0, sm.index - 40), sm.index);
+    if (/Methodology\s+for\s*$/i.test(before)) continue;
+    sIdxs.push(sm.index);
+  }
+  if (sIdxs.length >= 2) {
+    const fil = [sIdxs[0]];
+    for (let i = 1; i < sIdxs.length; i++) if (sIdxs[i] - sIdxs[i - 1] > 400) fil.push(sIdxs[i]);
+    if (fil.length >= 2) {
+      const preface = txt.slice(0, fil[0]);
+      const firstLine = preface.split('\n').map(s => s.trim()).find(Boolean) || '';
+      const docTitle = firstLine && firstLine.length <= 80 ? firstLine : '';
+      return fil.map((s, i) => {
+        const rawChunk = txt.slice(s, fil[i + 1] ?? txt.length);
+        if (i === 0) return preface + '\n' + rawChunk;
+        if (docTitle && !rawChunk.slice(0, 400).includes(docTitle)) return docTitle + '\n' + rawChunk;
+        return rawChunk;
+      });
+    }
+  }
   return [txt];
 }
 
@@ -946,10 +970,11 @@ function parseSyllabusText(raw) {
     return '';
   };
   const field = (label) => nextAfter(label);
-  const programName = field('Program Name') || field('Program');
-  const courseName = field('Course Name');
-  const code = field('Code');
-  const semesterRaw = field('Semester');
+  let programName = field('Program Name') || field('Program');
+  let courseName = field('Course Name');
+  let code = field('Code');
+  let semesterRaw = field('Semester');
+  let yearRaw = field('Year') || field('Year Label');
   const typeRaw = (() => {
     const v = field('Type');
     if (/^(DSC|SEC|DSE|AECC|GE|Core)$/i.test(v)) return v.toUpperCase();
@@ -965,14 +990,46 @@ function parseSyllabusText(raw) {
       if (Number.isFinite(n)) teachingHours = n;
     }
   }
-  const cieMarksRaw = field('CIE Marks') || field('CIE');
-  const seeMarksRaw = field('SEE Marks') || field('SEE');
-  const creditsRaw = field('Credits');
+  let cieMarksRaw = field('CIE Marks') || field('CIE');
+  let seeMarksRaw = field('SEE Marks') || field('SEE');
+  let creditsRaw = field('Credits');
   const examType = field('Examination Type') || field('Exam Type');
   const cieExamH = (txt.match(/CIE\s*:\s*([^\n]+)/i) || [])[1]?.trim() || '';
   const seeExamH = (txt.match(/SEE\s*:\s*([^\n]+)/i) || [])[1]?.trim() || '';
-  // Year label if present (Year I / Year 1)
-  const yearRaw = field('Year') || field('Year Label');
+  if (!programName) {
+    const first = lines.find(l => l && l.length <= 80 && !/^Semester\s+\d/i.test(l) && !/^Module\s+\d/i.test(l)) || '';
+    if (first && /^[A-Z][A-Z \-&]+$/.test(first) || /VOCAL THEORY|THEORY/i.test(first)) programName = first;
+    else if (first && first.length <= 60) programName = first;
+  }
+  if (!creditsRaw) {
+    const mt = txt.match(/Total\s*Credits\s*:\s*(\d+)/i);
+    if (mt) creditsRaw = mt[1];
+  }
+  if (teachingHours == null && teachingPeriods == null) {
+    const th = txt.match(/Total\s*Semester\s*Hours\s*:\s*(\d+)/i);
+    if (th) { teachingHours = Number(th[1]) || null; if (teachingHours) teachingPeriods = Math.round(teachingHours * 60 / 45); }
+  }
+  if (!courseName) {
+    const sm = txt.match(/Semester\s+(\d+)\s*:\s*([^\n]+)/i);
+    if (sm) {
+      const t = sm[2].trim().replace(/Module-wise.*/i, '').trim();
+      if (t && !/^Module-wise/i.test(t)) courseName = t;
+      else courseName = 'Semester ' + sm[1];
+    }
+  }
+  if (!semesterRaw) {
+    const sM = txt.match(/Semester\s+(\d+)\s*:/i);
+    if (sM) semesterRaw = sM[1];
+  }
+  if (!yearRaw) {
+    const yM = txt.match(/Year\s+(\d+)\s*:/i);
+    if (yM) yearRaw = yM[1];
+  }
+  if (!code && programName && semesterRaw) {
+    const initials = programName.split(/\s+/).map(w=>w[0]).join('').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4) || 'PAPER';
+    const semNum = String(semesterRaw).replace(/[^0-9]/g,'') || '1';
+    code = `${initials}-S${semNum}`;
+  }
   const semester = (() => {
     if (!semesterRaw) return '';
     const s = semesterRaw.trim();
@@ -995,10 +1052,8 @@ function parseSyllabusText(raw) {
   const splitSentences = (block) => {
     if (!block) return [];
     const cleaned = block.replace(/\s+/g, ' ').trim();
-    // split on " . " or line breaks already collapsed
     let items = [];
-    // try period split keeping meaning
-    const rawParts = block.split(/\n+/).map(s=>s.trim()).filter(s=> s && s.length>6 && !/^(OBJ|OUTCOMES|Pedagogy|Module|Hours|RBT|Teaching|CO Mapping|Suggested|Activity|Assessment)/i.test(s));
+    const rawParts = block.split(/\n+/).map(s=>s.trim()).filter(s=> s && s.length>6 && !/^(OBJ|OUTCOMES|Pedagogy|Methodology|Module|Hours|RBT|Teaching|CO Mapping|Suggested|Activity|Assessment)/i.test(s));
     if (rawParts.length >= 2) items = rawParts;
     else {
       items = cleaned.split(/\.\s+/).map(s=>s.trim()).filter(Boolean).map(s=> s.endsWith('.')?s:s+'.');
@@ -1011,30 +1066,59 @@ function parseSyllabusText(raw) {
     const after = txt.slice(s);
     const e = after.search(endRe);
     if (e === -1) return after;
-    // find actual end start
     const slice = txt.slice(s);
     const m = slice.match(endRe);
     if (!m) return slice;
     return slice.slice(0, m.index);
   };
   let objBlock = '';
-  {
+  let outBlock = '';
+  let pedBlock = '';
+  const hasCourseObjectives = /Course\s+Objectives?/i.test(txt);
+  if (hasCourseObjectives) {
+    const objM = txt.match(/Course\s+Objectives?\s*(?:\([^)]*\))?\s*:?\s*\n+([\s\S]*?)(?=Course\s+Outcomes?\s*(?:\([^)]*\))?\s*:?|Pedagogy\s*:?|Methodology\s*:?|Module\s+\d\s*[-–:])/i);
+    if (objM) objBlock = objM[1];
+    const outM = txt.match(/Course\s+Outcomes?\s*(?:\([^)]*\))?\s*:?\s*(?:Upon completion[^\n]*\n+)?([\s\S]*?)(?=Pedagogy\s*:?|Methodology\s*:?|Module\s+\d\s*[-–:])/i);
+    if (outM) {
+      const objPos = txt.search(/Course\s+Objectives?/i);
+      const outPos = txt.search(/Course\s+Outcomes?/i);
+      if (outPos > objPos) outBlock = outM[1];
+      else {
+        const after = txt.slice(objPos);
+        const m2 = after.match(/Course\s+Outcomes?\s*(?:\([^)]*\))?\s*:?\s*(?:Upon completion[^\n]*\n+)?([\s\S]*?)(?=Pedagogy\s*:?|Methodology\s*:?|Module\s+\d\s*[-–:])/i);
+        if (m2) outBlock = m2[1];
+      }
+    }
+    const pedM = txt.match(/(?:Pedagogy|Methodology)\s*:?\s*([\s\S]*?)(?=Module\s+\d|Semester\s+\d\s*:\s*Module|Suggested Learning|Activity Based|Assessment Details|$)/i);
+    if (pedM) pedBlock = pedM[1];
+  } else {
     const m = txt.match(/OBJ\w*CTIVES?\s*:?\s*\n+([\s\S]*?)(?=OUTCOMES?:|Pedagogy:\s|Module\s+\d)/i);
     if (m) objBlock = m[1];
+    const m2 = txt.match(/(?:^|\n)\s*OUTCOMES?\s*:?\s*(?:At the end[^\n]*\n+)?([\s\S]*?)(?=Pedagogy:\s|Module\s+\d\s*[-–])/i);
+    if (m2) outBlock = m2[1];
+    const m3 = txt.match(/Pedagogy:\s*([\s\S]*?)(?=Module\s+\d|Suggested Learning|Activity Based|Assessment Details|$)/i);
+    if (m3) pedBlock = m3[1];
+    if (!pedBlock) {
+      const pm = txt.match(/Methodology\s*:?\s*([\s\S]*?)(?=Module\s+\d|Semester\s+\d|$)/i);
+      if (pm) pedBlock = pm[1];
+    }
   }
-  let outBlock = '';
-  {
-    const m = txt.match(/(?:^|\n)\s*OUTCOMES?\s*:?\s*(?:At the end[^\n]*\n+)?([\s\S]*?)(?=Pedagogy:\s|Module\s+\d\s*[-–])/i);
-    if (m) outBlock = m[1];
+  if (!pedBlock) {
+    const pm = txt.match(/(?:Pedagogy|Methodology)\s*:?\s*([\s\S]*?)(?=Module\s+\d|Semester\s+\d|$)/i);
+    if (pm) pedBlock = pm[1];
   }
-  let pedBlock = '';
-  {
-    const m = txt.match(/Pedagogy:\s*([\s\S]*?)(?=Module\s+\d|Suggested Learning|Activity Based|Assessment Details|$)/i);
-    if (m) pedBlock = m[1];
+  let objectives = splitSentences(objBlock).slice(0, 12);
+  let outcomes = splitSentences(outBlock).slice(0, 12);
+  // Fallback for Theory: CO lines "CO1: ..." are the outcomes — split on CO prefix if splitSentences missed
+  if (!outcomes.length && outBlock && /CO\s*\d/i.test(outBlock)) {
+    outcomes = outBlock.split('\n').map(s=>s.trim()).filter(s=> /^CO\s*\d/i.test(s)).map(s=> s.replace(/^CO\s*\d\s*:?\s*/i,'').trim()).filter(s=>s.length>8).slice(0,12);
+    if (!outcomes.length) outcomes = outBlock.split(/(?=CO\s*\d)/i).map(s=>s.trim()).filter(s=>s && s.length>8).slice(0,12);
   }
-  const objectives = splitSentences(objBlock).slice(0, 12);
-  const outcomes = splitSentences(outBlock).slice(0, 12);
-  const pedagogyLines = pedBlock ? pedBlock.split('\n').map(s=>s.trim()).filter(s=> s && s.length>3 && !/^(Module|Hours|RBT|Teaching|CO Mapping)/i.test(s)).slice(0,8) : [];
+  if (!objectives.length && objBlock && objBlock.trim()) {
+    const cand = objBlock.split('\n').map(s=>s.trim()).filter(s=>s && s.length>12 && !/^(Pedagogy|Module)/i.test(s));
+    if (cand.length >= 1) objectives = cand.slice(0,12);
+  }
+  const pedagogyLines = pedBlock ? pedBlock.split('\n').map(s=>s.trim()).filter(s=> s && s.length>3 && !/^(Module|Hours|RBT|Teaching|CO Mapping|Semester\s+\d\s*:\s*Module)/i.test(s)).slice(0,8) : [];
   const pedagogy = pedagogyLines.join('\n');
 
   // Modules
