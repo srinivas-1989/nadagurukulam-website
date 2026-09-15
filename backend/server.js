@@ -881,6 +881,27 @@ const CurriculumContent = mongoose.models.CurriculumContent || mongoose.model('C
 // ── Syllabus file parse — DOCX / PDF / XLSX → structured JSON preview ──────────
 // POST /api/curriculum/parse  multipart field "file"  (Manage on curriculum)
 // Pure parse, no DB write — frontend shows editable preview then saves via CRUD.
+function splitSyllabusChunks(raw) {
+  const txt = String(raw || '');
+  const progRe = /Program\s*Name\s*:?/gi;
+  let m; const idxs = [];
+  while ((m = progRe.exec(txt)) !== null) idxs.push(m.index);
+  if (idxs.length >= 2) {
+    const fil = [idxs[0]];
+    for (let i = 1; i < idxs.length; i++) if (idxs[i] - idxs[i - 1] > 400) fil.push(idxs[i]);
+    if (fil.length >= 2) return fil.map((s, i) => txt.slice(s, fil[i + 1] ?? txt.length));
+  }
+  const courseRe = /Course\s*Name\s*:?/gi;
+  const cIdxs = []; courseRe.lastIndex = 0;
+  while ((m = courseRe.exec(txt)) !== null) cIdxs.push(m.index);
+  if (cIdxs.length >= 2) {
+    const fil = [cIdxs[0]];
+    for (let i = 1; i < cIdxs.length; i++) if (cIdxs[i] - cIdxs[i - 1] > 800) fil.push(cIdxs[i]);
+    if (fil.length >= 2) return fil.map((s, i) => txt.slice(s, fil[i + 1] ?? txt.length));
+  }
+  return [txt];
+}
+
 function parseSyllabusText(raw) {
   const txt = String(raw || '');
   const linesRaw = txt.split('\n');
@@ -1132,8 +1153,10 @@ app.post('/api/curriculum/parse', authMiddleware, (req, res, next) => {
     try { text = await bufferToText(buffer, orig, mime); }
     catch (e) { const s = e.status || 422; return res.status(s).json({ error: 'Failed to extract text: ' + (e.message || e) }); }
     if (!text || !text.trim()) return res.status(422).json({ error: 'No extractable text found in file.' });
-    const parsed = parseSyllabusText(text);
-    res.json({ filename: orig, size, parsed, rawPreview: text.slice(0, 4000) });
+    const chunks = splitSyllabusChunks(text);
+    const papers = chunks.map(c => parseSyllabusText(c));
+    const parsed = papers[0] || parseSyllabusText(text);
+    res.json({ filename: orig, size, parsed, papers, rawPreview: text.slice(0, 4000), rawPreviews: chunks.map(c => c.slice(0, 2000)) });
   } catch (e) { res.status(500).json({ error: e.message || 'Parse failed' }); }
 });
 

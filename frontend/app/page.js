@@ -345,13 +345,15 @@ export default function Home() {
   const [courseOutcomes, setCourseOutcomes] = useState([]); // [{code:'CO1', text:''}]
   const [coursePedagogy, setCoursePedagogy] = useState('');
   const [newExamTypeName, setNewExamTypeName] = useState('');
-  // Curriculum file import: DOCX/PDF/XLSX -> parsed preview -> verified save
+  // Curriculum file import: DOCX/PDF/XLSX -> parsed preview -> verified save (bulk multi-paper)
   const [syllabusFile, setSyllabusFile] = useState(null);
   const [syllabusParsing, setSyllabusParsing] = useState(false);
-  const [syllabusParsed, setSyllabusParsed] = useState(null); // {filename,size,parsed,rawPreview}
+  const [syllabusParsed, setSyllabusParsed] = useState(null); // {filename,size,parsed,papers,rawPreview}
   const [syllabusParseErr, setSyllabusParseErr] = useState('');
   const [syllabusSaving, setSyllabusSaving] = useState(false);
   const [syllabusTargetDisc, setSyllabusTargetDisc] = useState('');
+  const [syllabusDrafts, setSyllabusDrafts] = useState([]); // editable copies of papers [{...parsed,_include,_verified,_expanded}]
+  const [bulkSaving, setBulkSaving] = useState(false);
   // Postgres modules (course_modules + course_module_topics)
   const [modTitle, setModTitle] = useState('');
   const [modHours, setModHours] = useState('');
@@ -1121,7 +1123,7 @@ export default function Home() {
   const parseSyllabusFile = async () => {
     if (!syllabusFile) { alert('Pick a .docx/.pdf/.xlsx first'); return; }
     if (syllabusFile.size > 15 * 1024 * 1024) { setSyllabusParseErr('File too large (max 15 MB)'); return; }
-    setSyllabusParsing(true); setSyllabusParseErr(''); setSyllabusParsed(null);
+    setSyllabusParsing(true); setSyllabusParseErr(''); setSyllabusParsed(null); setSyllabusDrafts([]);
     try {
       const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(syllabusFile); });
       const { data: { session: sess } } = await supabase.auth.getSession();
@@ -1131,11 +1133,71 @@ export default function Home() {
       const j = await res.json().catch(()=>({}));
       if (!res.ok) { setSyllabusParseErr(j.error || 'Parse failed'); return; }
       setSyllabusParsed(j);
-      if (j.parsed?.programName) {
-        const hit = dbData.curriculum.find(d => d.name.toLowerCase() === String(j.parsed.programName).trim().toLowerCase());
+      const papers = Array.isArray(j.papers) && j.papers.length ? j.papers : (j.parsed ? [j.parsed] : []);
+      setSyllabusDrafts(papers.map((p, i) => ({ ...p, _idx: i, _include: true, _verified: false, _expanded: i === 0 })));
+      const prog = j.parsed?.programName || papers[0]?.programName;
+      if (prog) {
+        const hit = dbData.curriculum.find(d => d.name.toLowerCase() === String(prog).trim().toLowerCase());
         if (hit) setSyllabusTargetDisc(hit.id);
       }
     } catch (e) { setSyllabusParseErr(String(e.message||e)); } finally { setSyllabusParsing(false); }
+  };
+  const updateDraft = (idx, patch) => setSyllabusDrafts(ds => ds.map((d, i) => i === idx ? { ...d, ...patch } : d));
+  const saveBulkDrafts = async () => {
+    const discId = syllabusTargetDisc || courseDisc || dbData.curriculum[0]?.id;
+    if (!discId) { alert('Pick a Program first.'); return; }
+    const toSave = syllabusDrafts.filter(d => d._include);
+    if (!toSave.length) { alert('Nothing selected.'); return; }
+    const unverified = toSave.filter(d => !d._verified);
+    if (unverified.length) { if (!confirm(`${unverified.length} paper(s) not marked Verified — publish anyway?`)) return; }
+    for (const d of toSave) { if (!d.courseName || !d.code) { alert(`Paper ${d._idx + 1}: Course Name and Code required.`); return; } }
+    setBulkSaving(true);
+    const disc = dbData.curriculum.find(x => x.id === discId);
+    const mode = disc?.structure_mode || 'semester';
+    let ok = 0, fail = 0; const errs = [];
+    for (const d of toSave) {
+      const matched = (dbData.examination_types || []).find(t => t.name.toLowerCase() === String(d.examinationType || '').toLowerCase());
+      const examTypeId = matched?.id || courseExamTypeId || null;
+      const th = d.teachingHours != null ? d.teachingHours : (d.teachingPeriods != null ? Math.round(d.teachingPeriods * 45 / 60 * 100) / 100 : null);
+      const tp = d.teachingPeriods ?? (d.teachingHours != null ? Math.round(d.teachingHours * 60 / 45) : null);
+      const objectives = (d.objectives || []).filter(Boolean);
+      const outcomes = (d.outcomes || []).filter(Boolean).map((t, i) => ({ code: `CO${i + 1}`, text: t }));
+      const pedagogy = String(d.pedagogy || '').trim() || null;
+      const payload = {
+        discipline_id: discId, course_type: courseType, code: String(d.code).trim(), name: String(d.courseName).trim(),
+        type: d.type || courseKind, credits: d.credits ?? 0, teaching_hours: th, teaching_periods: tp,
+        cie_marks: d.cieMarks ?? 0, see_marks: d.seeMarks ?? 0,
+        examination_type: d.examinationType || null, examination_type_id: examTypeId,
+        examination_hours_cie: d.examinationHoursCie || null, examination_hours_see: d.examinationHoursSee || null,
+        cie_duration: d.examinationHoursCie || null, see_duration: d.examinationHoursSee || null,
+        objectives_json: objectives, outcomes_json: outcomes, pedagogy,
+        semester: d.semester || courseSem, year_label: d.yearLabel || (mode === 'yearly' || mode === 'yearly_semester' ? courseYearLabel : null),
+        year_number: d.yearLabel ? (ROMAN.indexOf(String(d.yearLabel).replace('Year ', '').trim()) + 1 || null) : null,
+      };
+      if ((mode === 'yearly' || mode === 'yearly_semester') && !payload.year_label) { errs.push(`${d.code}: Year required for this program`); fail++; continue; }
+      try {
+        const res = await apiCall(`${apiUrl}/api/courses`, { method: 'POST', body: JSON.stringify(payload) });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Create failed'); }
+        const created = await res.json().catch(() => null);
+        const courseId = created?.id;
+        const mods = d.modules || [];
+        if (courseId && mods.length) {
+          for (const mm of mods) {
+            const rr = await apiCall(`${apiUrl}/api/course_modules`, { method: 'POST', body: JSON.stringify({ course_id: courseId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
+            const mc = await rr.json().catch(() => null);
+            const modId = mc?.id;
+            if (modId && mm.topics?.length) for (let i = 0; i < mm.topics.length; i++) await apiCall(`${apiUrl}/api/course_module_topics`, { method: 'POST', body: JSON.stringify({ module_id: modId, topic: mm.topics[i], sort_order: i }) });
+          }
+        }
+        if (courseId && (objectives.length || outcomes.length || mods.length)) {
+          await apiCall(`${apiUrl}/api/curriculum-content/course_${courseId}`, { method: 'PUT', body: JSON.stringify({ objectives, outcomes: outcomes.map(o => o.text), pedagogy: pedagogy ? pedagogy.split('\n').filter(Boolean) : [], modules: mods.map(m => ({ title: m.title, hours: m.hours, rbt_level: m.rbt_level, methodology: m.methodology, co_mapping: m.co_mapping, topics: m.topics, description: '' })), assessments: '' }) }).catch(() => {});
+        }
+        ok++;
+      } catch (e) { fail++; errs.push(`${d.code || 'Paper ' + (d._idx + 1)}: ${e.message}`); }
+    }
+    setBulkSaving(false);
+    if (ok) { alert(`Published ${ok} paper(s)${fail ? `, ${fail} failed:\n` + errs.join('\n') : '.'}`); setSyllabusParsed(null); setSyllabusDrafts([]); setSyllabusFile(null); fetchData(); }
+    else alert('All failed:\n' + errs.join('\n'));
   };
   const applyParsedToCourseForm = () => {
     if (!syllabusParsed?.parsed) return;
@@ -1844,7 +1906,7 @@ export default function Home() {
                         <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Parses program, CIE/SEE, hours/periods, objectives, outcomes, pedagogy, modules → preview → save verified</span>
                       </div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <input type="file" accept=".docx,.pdf,.xlsx,.xls" onChange={e => { setSyllabusFile(e.target.files?.[0] || null); setSyllabusParsed(null); setSyllabusParseErr(''); }} style={{ flex: '1 1 200px', fontSize: '13px' }} />
+                        <input type="file" accept=".docx,.pdf,.xlsx,.xls" onChange={e => { setSyllabusFile(e.target.files?.[0] || null); setSyllabusParsed(null); setSyllabusDrafts([]); setSyllabusParseErr(''); }} style={{ flex: '1 1 200px', fontSize: '13px' }} />
                         <select value={syllabusTargetDisc} onChange={e => setSyllabusTargetDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px', fontSize: '13px' }}>
                           <option value="">Program (from file or pick)</option>
                           {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1852,25 +1914,86 @@ export default function Home() {
                         <button type="button" onClick={parseSyllabusFile} disabled={!syllabusFile || syllabusParsing} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', opacity: syllabusParsing ? 0.6 : 1 }}>{syllabusParsing ? 'Parsing…' : 'Parse & preview'}</button>
                       </div>
                       {syllabusParseErr && <div style={{ color: 'var(--primary)', fontSize: '13px', background: 'var(--bg-saffron)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}>{syllabusParseErr}</div>}
-                      {syllabusParsed?.parsed && (
+                      {syllabusDrafts.length > 0 && (
                         <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
                           <div style={{ padding: '10px 14px', background: 'var(--bg-saffron)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                            <b style={{ color: 'var(--primary-deep)' }}>{syllabusParsed.parsed.code || '—'} · {syllabusParsed.parsed.courseName || '—'}</b>
-                            <span style={{ fontSize: '11.5px', color: 'var(--text-soft)' }}>{syllabusParsed.filename} · {syllabusParsed.parsed.modules?.length || 0} modules · {(syllabusParsed.size / 1024).toFixed(1)} KB</span>
+                            <b style={{ color: 'var(--primary-deep)' }}>{syllabusDrafts.length} paper{syllabusDrafts.length===1?'':'s'} from {syllabusParsed?.filename || syllabusFile?.name || 'file'} · {(syllabusParsed?.size ?? syllabusFile?.size ?? 0)/1024 ? `${((syllabusParsed?.size ?? syllabusFile?.size ?? 0)/1024).toFixed(1)} KB` : ''}</b>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              <button type="button" onClick={() => setSyllabusDrafts(ds => ds.map(d => ({ ...d, _include: true })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Select all</button>
+                              <button type="button" onClick={() => setSyllabusDrafts(ds => ds.map(d => ({ ...d, _include: false })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>None</button>
+                              <button type="button" onClick={() => setSyllabusDrafts(ds => ds.map(d => ({ ...d, _expanded: true })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Expand all</button>
+                              <button type="button" onClick={() => setSyllabusDrafts(ds => ds.map(d => ({ ...d, _expanded: false })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Collapse</button>
+                              <button type="button" onClick={() => { setSyllabusParsed(null); setSyllabusDrafts([]); setSyllabusFile(null); setSyllabusParseErr(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Clear</button>
+                            </div>
                           </div>
-                          <div style={{ padding: '12px 14px', fontSize: '12.5px', color: 'var(--text-soft)', display: 'grid', gap: '6px' }}>
-                            <div><b>Program:</b> {syllabusParsed.parsed.programName || '—'} · <b>Type:</b> {syllabusParsed.parsed.type || '—'} · <b>Sem:</b> {syllabusParsed.parsed.semester || '—'}{syllabusParsed.parsed.yearLabel ? ` · ${syllabusParsed.parsed.yearLabel}` : ''}</div>
-                            <div><b>Hours / Periods:</b> {syllabusParsed.parsed.teachingHours ?? '—'}{syllabusParsed.parsed.teachingPeriods ? ` / ${syllabusParsed.parsed.teachingPeriods}` : ''} · <b>Credits:</b> {syllabusParsed.parsed.credits ?? '—'} · <b>CIE/SEE:</b> {syllabusParsed.parsed.cieMarks ?? '—'} / {syllabusParsed.parsed.seeMarks ?? '—'}</div>
-                            {syllabusParsed.parsed.examinationType && <div><b>Exam:</b> {syllabusParsed.parsed.examinationType}{syllabusParsed.parsed.examinationHoursCie ? ` · CIE ${syllabusParsed.parsed.examinationHoursCie}` : ''}{syllabusParsed.parsed.examinationHoursSee ? ` · SEE ${syllabusParsed.parsed.examinationHoursSee}` : ''}</div>}
-                            {syllabusParsed.parsed.objectives?.length > 0 && <div><b>Objectives ({syllabusParsed.parsed.objectives.length}):</b> {syllabusParsed.parsed.objectives.slice(0, 3).join(' · ').slice(0, 200)}{syllabusParsed.parsed.objectives.length > 3 ? ' …' : ''}</div>}
-                            {syllabusParsed.parsed.outcomes?.length > 0 && <div><b>Outcomes ({syllabusParsed.parsed.outcomes.length}):</b> {syllabusParsed.parsed.outcomes.slice(0, 3).join(' · ').slice(0, 200)}{syllabusParsed.parsed.outcomes.length > 3 ? ' …' : ''}</div>}
-                            {syllabusParsed.parsed.pedagogy && <div><b>Pedagogy:</b> {String(syllabusParsed.parsed.pedagogy).split('\n').slice(0, 2).join(' · ').slice(0, 160)}</div>}
-                            {syllabusParsed.parsed.modules?.length > 0 && <div><b>Modules:</b> {syllabusParsed.parsed.modules.map(m => `${m.module_number}. ${m.title || 'Untitled'}${m.hours ? ` (${m.hours}h)` : ''}`).join(' · ').slice(0, 240)}</div>}
+                          <div style={{ padding: '10px 14px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{syllabusDrafts.filter(d=>d._include).length} selected · {syllabusDrafts.filter(d=>d._verified).length} verified</span>
+                            <button type="button" onClick={saveBulkDrafts} disabled={bulkSaving || !syllabusDrafts.some(d=>d._include)} style={{ marginLeft: 'auto', background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, opacity: bulkSaving || !syllabusDrafts.some(d=>d._include) ? 0.6 : 1 }}>{bulkSaving ? 'Publishing…' : `Publish selected (${syllabusDrafts.filter(d=>d._include).length})`}</button>
                           </div>
-                          <div style={{ padding: '10px 14px', display: 'flex', gap: '8px', flexWrap: 'wrap', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
-                            <button type="button" onClick={applyParsedToCourseForm} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Fill Add Course form ↓</button>
-                            <button type="button" onClick={saveParsedAsCourse} disabled={syllabusSaving} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px', opacity: syllabusSaving ? 0.6 : 1 }}>{syllabusSaving ? 'Saving…' : 'Save verified → course + modules'}</button>
-                            <button type="button" onClick={() => { setSyllabusParsed(null); setSyllabusFile(null); setSyllabusParseErr(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Clear</button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: 'var(--bg)' }}>
+                            {syllabusDrafts.map((d, idx) => (
+                              <div key={idx} style={{ border: `1.5px solid ${d._verified ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '10px', overflow: 'hidden', background: '#fff', opacity: d._include ? 1 : 0.55 }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '9px 12px', background: d._verified ? 'var(--bg-saffron)' : 'var(--bg)', flexWrap: 'wrap' }}>
+                                  <input type="checkbox" checked={!!d._include} onChange={e => updateDraft(idx, { _include: e.target.checked })} title="Include in publish" />
+                                  <b style={{ color: 'var(--primary-deep)', fontSize: '13px', flex: '1 1 160px' }}>{d.code || '(no code)'} · {d.courseName || '(no name)'}</b>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-faint)', background: '#fff', border: '1px solid var(--border)', padding: '2px 7px', borderRadius: '99px' }}>{d.semester || '—'} {d.yearLabel ? `· ${d.yearLabel}` : ''} · {d.type || 'DSC'} · {d.modules?.length ?? 0} mods</span>
+                                  <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: d._verified ? 'var(--primary)' : 'var(--text-faint)', cursor: 'pointer' }}><input type="checkbox" checked={!!d._verified} onChange={e => updateDraft(idx, { _verified: e.target.checked })} /> Verified</label>
+                                  <button type="button" onClick={() => updateDraft(idx, { _expanded: !d._expanded })} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>{d._expanded ? 'Collapse' : 'Edit'}</button>
+                                  <button type="button" onClick={() => setSyllabusDrafts(ds => ds.filter((_, i) => i !== idx))} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px', color: 'var(--primary)' }}>Remove</button>
+                                </div>
+                                {d._expanded && (
+                                  <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                      <input value={d.code || ''} onChange={e => updateDraft(idx, { code: e.target.value })} placeholder="Code *" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '120px', fontSize: '13px' }} />
+                                      <input value={d.courseName || ''} onChange={e => updateDraft(idx, { courseName: e.target.value })} placeholder="Course Name *" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px', fontSize: '13px' }} />
+                                      <select value={d.type || 'DSC'} onChange={e => updateDraft(idx, { type: e.target.value })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select>
+                                      <input value={d.semester || ''} onChange={e => updateDraft(idx, { semester: e.target.value })} placeholder="Semester" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px', fontSize: '13px' }} />
+                                      <input value={d.yearLabel || ''} onChange={e => updateDraft(idx, { yearLabel: e.target.value })} placeholder="Year" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px', fontSize: '13px' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Periods <input type="number" value={d.teachingPeriods ?? ''} onChange={e => updateDraft(idx, { teachingPeriods: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '13px' }} /></label>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Hours <input type="number" value={d.teachingHours ?? ''} onChange={e => updateDraft(idx, { teachingHours: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '13px' }} /></label>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Credits <input type="number" value={d.credits ?? ''} onChange={e => updateDraft(idx, { credits: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '80px', fontSize: '13px' }} /></label>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>CIE <input type="number" value={d.cieMarks ?? ''} onChange={e => updateDraft(idx, { cieMarks: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /></label>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>SEE <input type="number" value={d.seeMarks ?? ''} onChange={e => updateDraft(idx, { seeMarks: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /></label>
+                                      <input value={d.examinationType || ''} onChange={e => updateDraft(idx, { examinationType: e.target.value })} placeholder="Exam type" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                      <input value={d.examinationHoursCie || ''} onChange={e => updateDraft(idx, { examinationHoursCie: e.target.value })} placeholder="CIE hours" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
+                                      <input value={d.examinationHoursSee || ''} onChange={e => updateDraft(idx, { examinationHoursSee: e.target.value })} placeholder="SEE hours" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Objectives (one per line)</label><textarea value={(d.objectives || []).join('\n')} onChange={e => updateDraft(idx, { objectives: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })} rows={3} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /></div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Outcomes (one per line → CO1, CO2…)</label><textarea value={(d.outcomes || []).join('\n')} onChange={e => updateDraft(idx, { outcomes: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })} rows={3} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /></div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Pedagogy (one per line)</label><textarea value={d.pedagogy || ''} onChange={e => updateDraft(idx, { pedagogy: e.target.value })} rows={2} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /></div>
+                                    {d.modules?.length > 0 && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <b style={{ fontSize: '12px', color: 'var(--primary-deep)' }}>Modules ({d.modules.length})</b>
+                                        {d.modules.map((m, mi) => (
+                                          <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg)' }}>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                              <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--primary)', color: '#fff', padding: '2px 7px', borderRadius: '99px' }}>{m.module_number}</span>
+                                              <input value={m.title || ''} onChange={e => { const mods = [...d.modules]; mods[mi] = { ...mods[mi], title: e.target.value }; updateDraft(idx, { modules: mods }); }} placeholder="Module title" style={{ flex: '1 1 180px', padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                              <input type="number" value={m.hours ?? ''} onChange={e => { const mods = [...d.modules]; mods[mi] = { ...mods[mi], hours: e.target.value === '' ? null : Number(e.target.value) }; updateDraft(idx, { modules: mods }); }} placeholder="Hrs" style={{ width: '70px', padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                              <input value={m.rbt_level || ''} onChange={e => { const mods = [...d.modules]; mods[mi] = { ...mods[mi], rbt_level: e.target.value }; updateDraft(idx, { modules: mods }); }} placeholder="RBT" style={{ width: '90px', padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                              <button type="button" onClick={() => { const mods = d.modules.filter((_, j) => j !== mi).map((x, j) => ({ ...x, module_number: j + 1 })); updateDraft(idx, { modules: mods }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                                            </div>
+                                            <textarea value={(m.topics || []).join('\n')} onChange={e => { const mods = [...d.modules]; mods[mi] = { ...mods[mi], topics: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) }; updateDraft(idx, { modules: mods }); }} rows={2} placeholder="Topics — one per line" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '12.5px' }} />
+                                          </div>
+                                        ))}
+                                        <button type="button" onClick={() => { const mods = [...(d.modules || []), { module_number: (d.modules?.length || 0) + 1, title: '', hours: null, rbt_level: '', methodology: '', co_mapping: '', topics: [] }]; updateDraft(idx, { modules: mods, _expanded: true }); }} style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add module</button>
+                                      </div>
+                                    )}
+                                    {(!d.modules || d.modules.length === 0) && (
+                                      <button type="button" onClick={() => updateDraft(idx, { modules: [{ module_number: 1, title: '', hours: null, rbt_level: '', methodology: '', co_mapping: '', topics: [] }] })} style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add module</button>
+                                    )}
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
+                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingPeriods != null) setCoursePeriods(p.teachingPeriods); else if (p.teachingHours != null) setCoursePeriods(Math.round(p.teachingHours * 60 / 45)); if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p.examinationHoursCie) setCourseCieDur(p.examinationHoursCie); if (p.examinationHoursSee) setCourseSeeDur(p.examinationHoursSee); if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives.join('\n')); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) setCoursePedagogy(p.pedagogy); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
+                                      <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: d._verified ? 'var(--primary)' : 'var(--text-faint)', cursor: 'pointer', marginLeft: 'auto' }}><input type="checkbox" checked={!!d._verified} onChange={e => updateDraft(idx, { _verified: e.target.checked })} /> Mark verified</label>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
