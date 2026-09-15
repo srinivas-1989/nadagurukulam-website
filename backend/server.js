@@ -446,10 +446,17 @@ const crud = (table, orderCol = 'created_at') => ({
         if (body.designation === '') body.designation = null;
         const { data: roleRow } = await supabase.from('roles').select('category').eq('key', body.role_key).single();
         const cat = roleRow?.category || 'staff';
+        if (body.role_key === 'super_admin') {
+          const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role_key', 'super_admin');
+          if ((count || 0) >= 1) return res.status(403).json({ error: 'Only one Super Admin is allowed.' });
+        }
         if (cat === 'student') {
           if (!body.roll_no || !body.program_id || !body.year_of_commencement) {
             return res.status(400).json({ error: 'Students require Roll No, Course (program) and Year of commencement' });
           }
+          body.employee_id = null; body.designation = null; body.date_of_joining = null;
+        } else if (cat === 'staff') {
+          body.roll_no = null; body.program_id = null; body.year_of_commencement = null;
         }
         const tempPassword = genTempPassword();
         const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
@@ -701,6 +708,7 @@ const crud = (table, orderCol = 'created_at') => ({
 
 // Super Admin is the one fixed role — the anchor of the whole permission chain.
 // Its row can't be deleted, its key can't be renamed, and its Full permissions can't be revoked.
+// Only one super_admin user may exist — it cannot be deleted or demoted, and a second cannot be created.
 const guard = async (table, id, body = {}) => {
   if (table === 'roles' && id) {
     const { data } = await supabase.from('roles').select('key').eq('id', id).single();
@@ -715,6 +723,18 @@ const guard = async (table, id, body = {}) => {
     const { data } = await supabase.from('role_permissions').select('role_key').eq('id', id).single();
     if (data?.role_key === 'super_admin')
       return 'Super Admin permissions are fixed — Full access everywhere.';
+  }
+  if (table === 'users' && id) {
+    const { data } = await supabase.from('users').select('role_key').eq('id', id).single();
+    if (data?.role_key === 'super_admin') {
+      const hasRoleChange = body && Object.prototype.hasOwnProperty.call(body, 'role_key') && body.role_key !== 'super_admin';
+      const isDelete = !body || Object.keys(body).length === 0;
+      if (isDelete) return 'The Super Admin user cannot be deleted. There must always be one Super Admin.';
+      if (hasRoleChange) return 'The Super Admin user cannot be changed to another role.';
+    } else if (body && body.role_key === 'super_admin') {
+      const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role_key', 'super_admin');
+      if ((count || 0) >= 1) return 'Only one Super Admin is allowed.';
+    }
   }
   return null;
 };

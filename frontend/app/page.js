@@ -296,11 +296,28 @@ export default function Home() {
   const [editUserDateOfJoining, setEditUserDateOfJoining] = useState('');
   const [editUserYearComm, setEditUserYearComm] = useState('');
 
-  const roleCategory = (key) => roles.find(r => r.key === key)?.category || 'staff';
+  const roleCategory = (key) => {
+    const found = roles.find(r => r.key === key);
+    if (found?.category) return found.category;
+    if (key === 'student' || key === 'students') return 'student';
+    if (key === 'super_admin') return 'system';
+    if (key === 'teacher' || key === 'teaching_faculty') return 'staff';
+    return 'staff';
+  };
   const newRoleCat = roleCategory(newUserRole);
   const editRoleCat = roleCategory(editUserRoleKey);
   const isStudentCat = (c) => c === 'student' || c === 'both';
   const isStaffCat = (c) => c === 'staff' || c === 'both' || c === 'system';
+  const hasSuperAdminUser = (dbData.users || []).some(u => u.role_key === 'super_admin');
+  useEffect(() => {
+    if (newRoleCat === 'student') { setNewEmployeeId(''); setNewDesignation(''); setNewDateOfJoining(''); }
+    else if (newRoleCat === 'staff' || newRoleCat === 'system') { setNewRollNo(''); setNewProgramId(''); setNewYearComm(''); }
+  }, [newRoleCat]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!editingUser) return;
+    if (editRoleCat === 'student') { setEditUserEmployeeId(''); setEditUserDesignation(''); setEditUserDateOfJoining(''); }
+    else if (editRoleCat === 'staff' || editRoleCat === 'system') { setEditUserRollNo(''); setEditUserProgramId(''); setEditUserYearComm(''); }
+  }, [editRoleCat, editingUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // First-login OTP flow
   const [otpEmail, setOtpEmail] = useState('');
@@ -1666,7 +1683,7 @@ export default function Home() {
                       <input type="email" placeholder="Official email *" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
                       <input type="text" placeholder="Contact number" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
                       <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '150px' }}>
-                        {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                        {roles.filter(r => !(r.key === 'super_admin' && hasSuperAdminUser)).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                       </select>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -1705,8 +1722,8 @@ export default function Home() {
                                 <input value={editUserName} onChange={e => setEditUserName(e.target.value)} placeholder="Full name" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }} />
                                 <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
                                 <input value={editUserPhone} onChange={e => setEditUserPhone(e.target.value)} placeholder="Phone" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />
-                                <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', minWidth: '150px' }}>
-                                  {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                                <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} disabled={u.role_key === 'super_admin'} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', minWidth: '150px', opacity: u.role_key === 'super_admin' ? 0.6 : 1 }} title={u.role_key === 'super_admin' ? 'Super Admin cannot be changed' : undefined}>
+                                  {roles.filter(r => !(r.key === 'super_admin' && u.role_key !== 'super_admin' && hasSuperAdminUser)).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                                 </select>
                               </div>
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
@@ -1730,7 +1747,7 @@ export default function Home() {
                             <td style={{ padding: '10px 12px' }}><div style={{ textTransform: 'capitalize' }}>{roles.find(r => r.key === u.role_key)?.name || u.role_key}</div><div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.employee_id ? `Emp: ${u.employee_id}` : ''}{u.employee_id && u.roll_no ? ' · ' : ''}{u.roll_no ? `Roll: ${u.roll_no}` : ''}</div><div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{prog ? prog.name : ''}{u.year_of_commencement ? ` · ${u.year_of_commencement}` : ''}{u.date_of_joining ? ` · Joined ${u.date_of_joining}` : ''}</div></td>
                             <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {canAdmin('users') && <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
-                              {isFull('users') && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              {isFull('users') && u.role_key !== 'super_admin' && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                             </td>
                           </tr>
                         );
