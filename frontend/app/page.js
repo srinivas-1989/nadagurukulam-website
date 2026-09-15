@@ -218,7 +218,7 @@ export default function Home() {
       const endpoints = [
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'], ['timetable_periods', 'timetable_periods'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
-        ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['liveclasses', 'live_sessions'],
+        ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['program_categories', 'program_categories'], ['course_syllabi', 'course_syllabi'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
         ['role_permissions', 'role_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
       ];
@@ -333,6 +333,9 @@ export default function Home() {
   const [newDiscStructure, setNewDiscStructure] = useState('semester');
   const [newDiscYearCount, setNewDiscYearCount] = useState(2);
   const [newDiscSemPerYear, setNewDiscSemPerYear] = useState(2);
+  const [newDiscCat, setNewDiscCat] = useState('');
+  const [newDiscPeriodMins, setNewDiscPeriodMins] = useState(45);
+  const [newDiscEffFrom, setNewDiscEffFrom] = useState('');
   const [editingDisc, setEditingDisc] = useState(null);
   const [discEditName, setDiscEditName] = useState('');
   const [discEditLevels, setDiscEditLevels] = useState('');
@@ -340,6 +343,12 @@ export default function Home() {
   const [discEditStructure, setDiscEditStructure] = useState('semester');
   const [discEditYearCount, setDiscEditYearCount] = useState(2);
   const [discEditSemPerYear, setDiscEditSemPerYear] = useState(2);
+  const [discEditCat, setDiscEditCat] = useState('');
+  const [discEditPeriodMins, setDiscEditPeriodMins] = useState(45);
+  const [discEditEffFrom, setDiscEditEffFrom] = useState('');
+  const [newProgCatName, setNewProgCatName] = useState('');
+  const [editingProgCat, setEditingProgCat] = useState(null);
+  const [progCatEditName, setProgCatEditName] = useState('');
 
   // Course form (BPA/MPA syllabus header — image BCVP310) — 21-field header
   const [courseDisc, setCourseDisc] = useState('');
@@ -351,17 +360,18 @@ export default function Home() {
   const [courseKind, setCourseKind] = useState('DSC');
   const [courseCredits, setCourseCredits] = useState(5);
   const [coursePeriods, setCoursePeriods] = useState(100);
-  const derivedHours = (() => { const n = Number(coursePeriods); if (!Number.isFinite(n) || n <= 0) return ''; return Math.round(n * 45 / 60 * 100) / 100; })();
   const [courseCie, setCourseCie] = useState(50);
   const [courseSee, setCourseSee] = useState(50);
   const [courseCieDur, setCourseCieDur] = useState('45 Min');
   const [courseSeeDur, setCourseSeeDur] = useState('1 hour');
   const [courseExamTypeId, setCourseExamTypeId] = useState('');
   const [courseExamType, setCourseExamType] = useState('Practical');
-  const [courseObjectives, setCourseObjectives] = useState('');
+  const [courseObjectives, setCourseObjectives] = useState([]); // ["text",...] via Add Course Objectives
   const [courseOutcomes, setCourseOutcomes] = useState([]); // [{code:'CO1', text:''}]
-  const [coursePedagogy, setCoursePedagogy] = useState('');
+  const [coursePedagogyList, setCoursePedagogyList] = useState([]); // ["text",...] via Add Pedagogy
+  const [coursePedagogy, setCoursePedagogy] = useState(''); // legacy textarea for bulk import fallback
   const [newExamTypeName, setNewExamTypeName] = useState('');
+  const [showAddCourse, setShowAddCourse] = useState(false);
   // Curriculum file import: DOCX/PDF/XLSX -> parsed preview -> verified save (bulk multi-paper)
   const [syllabusFile, setSyllabusFile] = useState(null);
   const [syllabusParsing, setSyllabusParsing] = useState(false);
@@ -371,14 +381,27 @@ export default function Home() {
   const [syllabusTargetDisc, setSyllabusTargetDisc] = useState('');
   const [syllabusDrafts, setSyllabusDrafts] = useState([]); // editable copies of papers [{...parsed,_include,_verified,_expanded}]
   const [bulkSaving, setBulkSaving] = useState(false);
-  // Postgres modules (course_modules + course_module_topics)
+  // Postgres modules (course_modules + course_module_topics) — per spec Add Syllabus flow
   const [modTitle, setModTitle] = useState('');
   const [modHours, setModHours] = useState('');
-  const [modRbt, setModRbt] = useState('Remember');
-  const [modMethod, setModMethod] = useState('');
-  const [modTopicsText, setModTopicsText] = useState('');
+  const [modPeriods, setModPeriods] = useState('');
+  const [modRbtList, setModRbtList] = useState([]); // ["L1","L2"...] — RBT Levels multi
+  const [modRbtDraft, setModRbtDraft] = useState('L1');
+  const [modMethodList, setModMethodList] = useState([]); // ["Lecture demo",...] filtered from pedagogy
+  const [modMethodDraft, setModMethodDraft] = useState('');
+  const [modTopics, setModTopics] = useState([]); // [{topic:"",description:""}]
+  const [modTopicsText, setModTopicsText] = useState(''); // legacy bulk fallback
   const [modCo, setModCo] = useState([]); // ['CO1',...]
+  const [modCoDetail, setModCoDetail] = useState('');
+  const [modRbt, setModRbt] = useState('Remember'); // legacy single
+  const [modMethod, setModMethod] = useState(''); // legacy single textarea
   const [editingModId, setEditingModId] = useState(null);
+  const [showAddSyllabus, setShowAddSyllabus] = useState(false);
+  const [syllModAcademicYear, setSyllModAcademicYear] = useState('2024-25');
+  const RBT_OPTS = [
+    { v: 'L1', label: 'L1 — Remember' }, { v: 'L2', label: 'L2 — Understand' }, { v: 'L3', label: 'L3 — Apply' },
+    { v: 'L4', label: 'L4 — Analyze' }, { v: 'L5', label: 'L5 — Evaluate' }, { v: 'L6', label: 'L6 — Create' },
+  ];
 
   // Course list: inline edit + client filters ("Select Course" vs "Add Course")
   const [editingCourse, setEditingCourse] = useState(null);
@@ -396,6 +419,13 @@ export default function Home() {
   const yearOptions = (() => {
     const n = Number(selectedDisc?.year_count) || 2;
     return Array.from({ length: Math.min(n, 10) }, (_, i) => `Year ${ROMAN[i]}`);
+  })();
+  const progMins = (() => { const v = Number(selectedDisc?.period_minutes); return Number.isFinite(v) && v>=10 && v<=120 ? v : 45; })();
+  const derivedHours = (() => { const n = Number(coursePeriods); if (!Number.isFinite(n) || n <= 0) return ''; return Math.round(n * progMins / 60 * 100) / 100; })();
+  const pedagogyOptions = (() => {
+    if (coursePedagogyList.length) return coursePedagogyList.filter(s=>String(s).trim());
+    const t = String(coursePedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    return t;
   })();
 
   useEffect(() => { if (!courseDisc && dbData.curriculum.length) setCourseDisc(dbData.curriculum[0].id); }, [dbData.curriculum]);
@@ -1063,15 +1093,29 @@ export default function Home() {
 
   const handleAddDiscipline = async (e) => {
     e.preventDefault();
-    if (!newDiscName) return;
-    await apiCall(`${apiUrl}/api/curriculum`, {
+    if (!newDiscName.trim()) return;
+    const res = await apiCall(`${apiUrl}/api/curriculum`, {
       method: 'POST',
       body: JSON.stringify({
-        name: newDiscName, levels: newDiscLevels, description: newDiscDesc,
+        name: newDiscName.trim(), levels: newDiscLevels.trim(), description: newDiscDesc.trim(),
         structure_mode: newDiscStructure, year_count: Number(newDiscYearCount) || 2, semesters_per_year: Number(newDiscSemPerYear) || 2,
+        category_id: newDiscCat || null, period_minutes: Number(newDiscPeriodMins) || 45, period_effective_from: newDiscEffFrom || null,
       })
     });
-    setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); fetchData();
+    if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Create failed'); return; }
+    setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); setNewDiscEffFrom(''); fetchData();
+  };
+  const handleAddProgCat = async () => {
+    const name = newProgCatName.trim(); if (!name) return;
+    const res = await apiCall(`${apiUrl}/api/program_categories`, { method:'POST', body: JSON.stringify({ name }) });
+    if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Add failed'); return; }
+    setNewProgCatName(''); fetchData();
+  };
+  const handleUpdateProgCat = async (row) => {
+    const name = progCatEditName.trim(); if (!name) return;
+    const res = await apiCall(`${apiUrl}/api/program_categories/${row.id}`, { method:'PUT', body: JSON.stringify({ name }) });
+    if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Update failed'); return; }
+    setEditingProgCat(null); fetchData();
   };
 
   const handleUpdateUser = async (u) => {
@@ -1093,22 +1137,25 @@ export default function Home() {
 
   const handleAddCourse = async (e) => {
     e.preventDefault();
-    if (!courseName || !courseCode) return;
+    if (!courseName.trim() || !courseCode.trim()) return;
     if (!courseDisc) { alert('Choose a Program first.'); return; }
     const disc = dbData.curriculum.find(d => d.id === courseDisc);
     const mode = disc?.structure_mode || 'semester';
+    const mins = (()=>{ const v=Number(disc?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45; })();
     const derived = derivedHours === '' ? null : Number(derivedHours);
+    const pedText = coursePedagogyList.length ? coursePedagogyList.filter(s=>String(s).trim()).join('\n') : (coursePedagogy.trim() || null);
+    const objArr = courseObjectives.length ? courseObjectives.filter(s=>String(s).trim()) : (courseObjectives ? String(courseObjectives).split('\n').filter(s=>s.trim()) : []);
     const payload = {
-      discipline_id: courseDisc, course_type: courseType, code: courseCode, name: courseName,
+      discipline_id: courseDisc, course_type: courseType, code: courseCode.trim(), name: courseName.trim(),
       type: courseKind, credits: Number(courseCredits) || 0, teaching_hours: derived,
       teaching_periods: coursePeriods !== '' ? Number(coursePeriods) : null,
       cie_marks: Number(courseCie) || 0, see_marks: Number(courseSee) || 0,
       examination_type: courseExamType || null, examination_type_id: courseExamTypeId || null,
       examination_hours_cie: courseCieDur || null, examination_hours_see: courseSeeDur || null,
       cie_duration: courseCieDur || null, see_duration: courseSeeDur || null,
-      objectives_json: courseObjectives ? courseObjectives.split('\n').filter(s=>s.trim()).map(s=>s.trim()) : [],
+      objectives_json: objArr,
       outcomes_json: courseOutcomes.filter(o=>o.text.trim()).map(o=>({ code:o.code, text:o.text.trim() })),
-      pedagogy: coursePedagogy.trim() || null,
+      pedagogy: pedText,
     };
     if (mode === 'yearly') {
       if (!courseYearLabel) { alert('Choose a Year.'); return; }
@@ -1126,7 +1173,7 @@ export default function Home() {
     }
     const res = await apiCall(`${apiUrl}/api/courses`, { method: 'POST', body: JSON.stringify(payload) });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Add course failed'); return; }
-    setCourseCode(''); setCourseName(''); fetchData();
+    setCourseCode(''); setCourseName(''); setCourseObjectives([]); setCourseOutcomes([]); setCoursePedagogyList([]); setCoursePedagogy(''); setShowAddCourse(false); fetchData();
   };
   const handleAddExamType = async () => {
     const name = newExamTypeName.trim();
@@ -1297,19 +1344,53 @@ export default function Home() {
       setSyllabusParsed(null); setSyllabusFile(null); setSyllabusTargetDisc(''); fetchData();
     } finally { setSyllabusSaving(false); }
   };
+  const downloadTemplate = async () => {
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      const headers = {};
+      if (sess?.access_token) headers.Authorization = `Bearer ${sess.access_token}`;
+      const res = await fetch(`${apiUrl}/api/curriculum/template`, { headers });
+      if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Template download failed'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'NadaGurukulam_Curriculum_Import_Template.xlsx'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { alert(String(e.message||e)); }
+  };
   const handleAddModule = async () => {
-    if (!activeSyllabusCourse?.id || !modTitle.trim()) { alert('Enter module title'); return; }
+    if (!activeSyllabusCourse?.id || !modTitle.trim()) { alert('Enter Module Name'); return; }
     const all = dbData.course_modules.filter(m=>m.course_id===activeSyllabusCourse.id);
     const maxNum = all.reduce((m,x)=>Math.max(m, Number(x.module_number)||0), 0);
-    const r = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, module_number: maxNum+1, title: modTitle.trim(), hours: modHours ? Number(modHours): null, rbt_level: modRbt||null, methodology: modMethod.trim()||null, co_mapping: modCo.join(', ')||null }) });
+    const disc = dbData.curriculum.find(d=>d.id===activeSyllabusCourse.discipline_id);
+    const mins = (()=>{ const v=Number(disc?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45; })();
+    let hrs = null;
+    if (modHours !== '' && modHours != null) hrs = Number(modHours);
+    else if (modPeriods !== '' && modPeriods != null) hrs = Math.round(Number(modPeriods) * mins / 60 * 100)/100;
+    let syllId = null;
+    const existingSyll = (dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
+    if (existingSyll) syllId = existingSyll.id;
+    else if (syllModAcademicYear) {
+      const rr = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, academic_year: syllModAcademicYear, status: 'draft' }) });
+      if (rr.ok) { const j=await rr.json().catch(()=>null); if (j?.id) syllId = j.id; }
+    }
+    const rbtLevels = modRbtList.length ? modRbtList : (modRbt ? [modRbt] : []);
+    const methList = modMethodList.length ? modMethodList : (modMethod ? modMethod.split('\n').map(s=>s.trim()).filter(Boolean) : []);
+    const r = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, syllabus_id: syllId, module_number: maxNum+1, title: modTitle.trim(), hours: hrs, rbt_level: rbtLevels[0]||null, rbt_levels: rbtLevels, methodology: methList.join('\n')||null, methodology_list: methList, co_mapping: modCo.join(', ')||null }) });
     if (!r.ok) { const e=await r.json().catch(()=>({})); alert(e.error||'Add module failed'); return; }
     const created = await r.json().catch(()=>null);
     const modId = created?.id;
-    if (modId && modTopicsText.trim()) {
-      const topics = modTopicsText.split('\n').map(s=>s.trim()).filter(Boolean);
-      for (let i=0;i<topics.length;i++) { await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: topics[i], sort_order: i }) }); }
+    if (modId) {
+      if (modTopics.length) {
+        for (let i=0;i<modTopics.length;i++) {
+          const t = modTopics[i];
+          if (!t.topic?.trim()) continue;
+          await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: t.topic.trim(), description: t.description?.trim()||null, sort_order: i }) });
+        }
+      } else if (modTopicsText.trim()) {
+        const topics = modTopicsText.split('\n').map(s=>s.trim()).filter(Boolean);
+        for (let i=0;i<topics.length;i++) { await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: topics[i], sort_order: i }) }); }
+      }
     }
-    setModTitle(''); setModHours(''); setModMethod(''); setModTopicsText(''); setModCo([]); fetchData();
+    setModTitle(''); setModHours(''); setModPeriods(''); setModRbtList([]); setModMethodList([]); setModMethod(''); setModTopics([]); setModTopicsText(''); setModCo([]); setModCoDetail(''); fetchData();
   };
   const handleDeleteModule = async (id) => {
     if (!confirm('Delete module?')) return;
@@ -1437,15 +1518,26 @@ export default function Home() {
           <main style={{ maxWidth: '1080px', margin: '40px auto', padding: '0 24px' }}>
             <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>{cms.disciplinesHeading}</h3>
             <p style={{ color: 'var(--text-soft)', marginBottom: '24px' }}>{cms.disciplinesSub}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-              {(pubDisciplines.length ? pubDisciplines : dbData.curriculum).length === 0 && <p style={{ color: 'var(--text-faint)', gridColumn: '1 / -1' }}>Disciplines will appear here as they&apos;re added in the portal (Curricula module).</p>}
-              {(pubDisciplines.length ? pubDisciplines : dbData.curriculum).map(art => (
-                <div key={art.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', boxShadow: 'var(--shadow-sm)' }}>
-                  <h4 style={{ fontSize: '18px', color: 'var(--primary)', marginBottom: '8px' }}>{art.name}</h4>
-                  <p style={{ fontSize: '14px', color: 'var(--text-soft)', margin: 0 }}>{art.description || art.levels || '—'}</p>
+            {(() => {
+              const all = pubDisciplines.length ? pubDisciplines : dbData.curriculum;
+              const groups = {};
+              all.forEach(a => { const k = a.category_name || 'Other'; (groups[k] = groups[k] || []).push(a); });
+              const keys = Object.keys(groups).sort();
+              if (all.length===0) return <p style={{ color: 'var(--text-faint)' }}>Disciplines will appear here as they&apos;re added in the portal (Curricula module).</p>;
+              return keys.map(cat => (
+                <div key={cat} style={{ marginBottom: '22px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary-deep)', marginBottom: '10px', letterSpacing: '0.04em' }}>{cat.toUpperCase()}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                    {groups[cat].map(art => (
+                      <div key={art.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', boxShadow: 'var(--shadow-sm)' }}>
+                        <h4 style={{ fontSize: '18px', color: 'var(--primary)', marginBottom: '8px' }}>{art.name}</h4>
+                        <p style={{ fontSize: '14px', color: 'var(--text-soft)', margin: 0 }}>{art.description || art.levels || '—'}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              ));
+            })()}
             {pubEvents.length > 0 && (
               <section style={{ marginTop: '48px' }}>
                 <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Upcoming Events</h3>
@@ -1764,166 +1856,305 @@ export default function Home() {
                 <p style={{ color: 'var(--text-soft)', marginBottom: '20px' }}>
                   Dynamic university syllabus structure (Programs, Semesters, and Courses matching the MPA format).
                 </p>
+                {/* Program categories — centrally managed (UG/PG/Diploma…) */}
                 {canCreate('curriculum') && (
-                  <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '16px' }}>
-                    <input placeholder="Program / Discipline name" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} required />
-                    <input placeholder="Levels (e.g. 2 Years / 4 Semesters)" value={newDiscLevels} onChange={e => setNewDiscLevels(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                    <select value={newDiscStructure} onChange={e => setNewDiscStructure(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Structure">
-                      <option value="semester">Semester only</option>
-                      <option value="yearly">Yearly only</option>
-                      <option value="yearly_semester">Yearly + Semester</option>
-                    </select>
-                    {(newDiscStructure === 'yearly' || newDiscStructure === 'yearly_semester') && (
-                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '12px', color: 'var(--text-soft)' }}>Years
-                        <input type="number" min="1" max="10" value={newDiscYearCount} onChange={e => setNewDiscYearCount(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '90px' }} />
-                      </label>
+                  <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '14px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <b style={{ fontSize: '13px', color: 'var(--primary-deep)' }}>Program Categories</b>
+                      <input placeholder="New category (e.g. Diploma)" value={newProgCatName} onChange={e => setNewProgCatName(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px', fontSize: '13px' }} />
+                      <button type="button" onClick={handleAddProgCat} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Add</button>
+                    </div>
+                    {(dbData.program_categories||[]).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {(dbData.program_categories||[]).map(cat => editingProgCat===cat.id ? (
+                          <span key={cat.id} style={{ display:'flex', gap:'6px', alignItems:'center', background:'#fff', border:'1px solid var(--border)', padding:'4px 8px', borderRadius:'99px' }}>
+                            <input value={progCatEditName} onChange={e=>setProgCatEditName(e.target.value)} style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'12px', width:'120px' }} />
+                            <button type="button" onClick={()=>handleUpdateProgCat(cat)} style={{ background:'var(--primary)', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'99px', cursor:'pointer', fontSize:'11px' }}>Save</button>
+                            <button type="button" onClick={()=>setEditingProgCat(null)} style={{ background:'none', border:'1px solid var(--border)', padding:'3px 10px', borderRadius:'99px', cursor:'pointer', fontSize:'11px' }}>Cancel</button>
+                          </span>
+                        ) : (
+                          <span key={cat.id} style={{ display:'flex', gap:'6px', alignItems:'center', background:'#fff', border:'1px solid var(--border)', padding:'4px 10px', borderRadius:'99px', fontSize:'12.5px' }}>
+                            {cat.name}
+                            {canAdmin('curriculum') && <button type="button" onClick={()=>{setEditingProgCat(cat.id); setProgCatEditName(cat.name);}} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', color:'var(--primary)' }}>Edit</button>}
+                            {isFull('curriculum') && <button type="button" onClick={()=>{ if(confirm(`Delete category "${cat.name}"?`)) apiCall(`${apiUrl}/api/program_categories/${cat.id}`,{method:'DELETE'}).then(r=>{ if(!r.ok) r.json().then(j=>alert(j.error||'Delete failed')).catch(()=>alert('Delete failed')); else fetchData(); }); }} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', color:'var(--primary)' }}>Delete</button>}
+                          </span>
+                        ))}
+                      </div>
                     )}
-                    {(newDiscStructure === 'semester' || newDiscStructure === 'yearly_semester') && (
-                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '12px', color: 'var(--text-soft)' }}>Sems / Year
-                        <input type="number" min="1" max="4" value={newDiscSemPerYear} onChange={e => setNewDiscSemPerYear(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '95px' }} />
+                  </div>
+                )}
+                {canCreate('curriculum') && (
+                  <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: '2 1 220px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Program Name
+                        <input placeholder="Program / Discipline name" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }} required />
                       </label>
-                    )}
-                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Program</button>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '160px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Category (UG/PG)
+                        <select value={newDiscCat} onChange={e => setNewDiscCat(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                          <option value="">— Uncategorized —</option>
+                          {(dbData.program_categories||[]).map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Structure
+                        <select value={newDiscStructure} onChange={e => setNewDiscStructure(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }} title="Structure">
+                          <option value="semester">Semester only</option>
+                          <option value="yearly">Yearly only</option>
+                          <option value="yearly_semester">Yearly + Semester</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                      {(newDiscStructure === 'yearly' || newDiscStructure === 'yearly_semester') && (
+                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Years
+                          <input type="number" min="1" max="10" value={newDiscYearCount} onChange={e => setNewDiscYearCount(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
+                        </label>
+                      )}
+                      {(newDiscStructure === 'semester' || newDiscStructure === 'yearly_semester') && (
+                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Semesters per Year
+                          <input type="number" min="1" max="4" value={newDiscSemPerYear} onChange={e => setNewDiscSemPerYear(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px' }} />
+                        </label>
+                      )}
+                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>Period duration (mins)
+                        <input type="number" min="10" max="120" value={newDiscPeriodMins} onChange={e => setNewDiscPeriodMins(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px' }} title="Minutes per period — used for hours↔periods everywhere for this program" />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>Effective from (future courses)
+                        <input type="date" value={newDiscEffFrom} onChange={e => setNewDiscEffFrom(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }} title="When new period applies — future courses only" />
+                      </label>
+                    </div>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Description
+                      <textarea value={newDiscDesc} onChange={e => setNewDiscDesc(e.target.value)} rows={2} placeholder="Program description — appears on public Courses offered" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13.5px' }} />
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Add Program</button>
+                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Period = {newDiscPeriodMins} min · {progMins ? `${progMins} min` : '45 min'} per period for hours conversion</span>
+                    </div>
                   </form>
                 )}
 
-                {/* Programs list — structure defines yearly vs semester breakup (separate boxes). */}
+                {/* Programs list — grouped by category; category + structure + period */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '24px' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '10px 12px' }}>Program</th><th style={{ padding: '10px 12px' }}>Levels</th><th style={{ padding: '10px 12px' }}>Structure</th><th style={{ padding: '10px 12px' }}>Description</th><th style={{ padding: '10px 12px' }}>Actions</th>
+                        <th style={{ padding: '10px 12px' }}>Program</th><th style={{ padding: '10px 12px' }}>Category</th><th style={{ padding: '10px 12px' }}>Structure</th><th style={{ padding: '10px 12px' }}>Period</th><th style={{ padding: '10px 12px' }}>Description</th><th style={{ padding: '10px 12px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {dbData.curriculum.length === 0 ? (
-                        <tr><td colSpan="5" style={{ padding: '18px', textAlign: 'center', color: 'var(--text-faint)' }}>No programs yet.</td></tr>
-                      ) : dbData.curriculum.map(d => (
-                        editingDisc === d.id ? (
+                        <tr><td colSpan="6" style={{ padding: '18px', textAlign: 'center', color: 'var(--text-faint)' }}>No programs yet.</td></tr>
+                      ) : dbData.curriculum.map(d => {
+                        const catName = (dbData.program_categories||[]).find(c=>c.id===d.category_id)?.name || '';
+                        return editingDisc === d.id ? (
                           <tr key={d.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
-                            <td style={{ padding: '8px' }}><input value={discEditName} onChange={e => setDiscEditName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
-                            <td style={{ padding: '8px' }}><input value={discEditLevels} onChange={e => setDiscEditLevels(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}><label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Name<br /><input value={discEditName} onChange={e => setDiscEditName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label></td>
+                            <td style={{ padding: '8px' }}><label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Category<br /><select value={discEditCat} onChange={e => setDiscEditCat(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }}><option value="">—</option>{(dbData.program_categories||[]).map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}</select></label></td>
                             <td style={{ padding: '8px' }}>
-                              <select value={discEditStructure} onChange={e => setDiscEditStructure(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }}>
+                              <label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Structure<br /><select value={discEditStructure} onChange={e => setDiscEditStructure(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }}>
                                 <option value="semester">Semester only</option><option value="yearly">Yearly only</option><option value="yearly_semester">Yearly + Semester</option>
-                              </select>
-                              {(discEditStructure === 'yearly' || discEditStructure === 'yearly_semester') && <input type="number" min="1" max="10" value={discEditYearCount} onChange={e => setDiscEditYearCount(e.target.value)} placeholder="Years" title="Years" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} />}
-                              {(discEditStructure === 'semester' || discEditStructure === 'yearly_semester') && <input type="number" min="1" max="4" value={discEditSemPerYear} onChange={e => setDiscEditSemPerYear(e.target.value)} placeholder="Sems/Year" title="Sems per Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} />}
+                              </select></label>
+                              {(discEditStructure === 'yearly' || discEditStructure === 'yearly_semester') && <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Years<br /><input type="number" min="1" max="10" value={discEditYearCount} onChange={e => setDiscEditYearCount(e.target.value)} placeholder="Years" title="Years" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} /></label>}
+                              {(discEditStructure === 'semester' || discEditStructure === 'yearly_semester') && <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Sems/Year<br /><input type="number" min="1" max="4" value={discEditSemPerYear} onChange={e => setDiscEditSemPerYear(e.target.value)} placeholder="Sems/Year" title="Sems per Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label>}
                             </td>
-                            <td style={{ padding: '8px' }}><input value={discEditDesc} onChange={e => setDiscEditDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></td>
+                            <td style={{ padding: '8px' }}>
+                              <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Mins<br /><input type="number" min="10" max="120" value={discEditPeriodMins} onChange={e => setDiscEditPeriodMins(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', marginBottom: '6px' }} /></label>
+                              <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>From<br /><input type="date" value={discEditEffFrom||''} onChange={e => setDiscEditEffFrom(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label>
+                            </td>
+                            <td style={{ padding: '8px' }}><label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Description<br /><input value={discEditDesc} onChange={e => setDiscEditDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label></td>
                             <td style={{ padding: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              <button onClick={() => handleUpdateDiscipline(d, { name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim(), structure_mode: discEditStructure, year_count: Number(discEditYearCount) || 2, semesters_per_year: Number(discEditSemPerYear) || 2 })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                              <button onClick={() => handleUpdateDiscipline(d, { name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim(), structure_mode: discEditStructure, year_count: Number(discEditYearCount) || 2, semesters_per_year: Number(discEditSemPerYear) || 2, category_id: discEditCat || null, period_minutes: Number(discEditPeriodMins) || 45, period_effective_from: discEditEffFrom || null })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                               <button onClick={() => setEditingDisc(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                             </td>
                           </tr>
                         ) : (
                           <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '10px 12px', fontWeight: 600 }}>{d.name}</td>
-                            <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.levels || '—'}</td>
+                            <td style={{ padding: '10px 12px', fontWeight: 600 }}>{d.name}<br /><span style={{ fontWeight: 400, fontSize: '11.5px', color: 'var(--text-faint)' }}>{d.levels || ''}</span></td>
+                            <td style={{ padding: '10px 12px' }}>{catName ? <span style={{ background: 'var(--primary)', color: '#fff', padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700 }}>{catName}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)', fontSize: '12.5px' }}>
                               {d.structure_mode === 'yearly' ? `Yearly · ${d.year_count || 2} yrs` : d.structure_mode === 'yearly_semester' ? `Yearly + Sem · ${d.year_count || 2}y × ${d.semesters_per_year || 2}/yr` : `Semester · ${d.semesters_per_year || 2}/yr`}
                             </td>
+                            <td style={{ padding: '10px 12px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{d.period_minutes ? `${d.period_minutes} min` : '45 min'}{d.period_effective_from ? <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}><br />from {d.period_effective_from}</span> : ''}</td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.description || '—'}</td>
                             <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); setDiscEditYearCount(d.year_count || 2); setDiscEditSemPerYear(d.semesters_per_year || 2); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); setDiscEditYearCount(d.year_count || 2); setDiscEditSemPerYear(d.semesters_per_year || 2); setDiscEditCat(d.category_id || ''); setDiscEditPeriodMins(d.period_minutes || 45); setDiscEditEffFrom(d.period_effective_from || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('curriculum', d.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                             </td>
                           </tr>
-                        )
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
                 {canCreate('curriculum') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                    {/* Add Course — 21-field header: periods→hours auto, dynamic exam types, structured COs */}
+                    {/* Add Course — collapsible, 15 ordered fields with side headings */}
+                    {!showAddCourse ? (
+                      <button type="button" onClick={() => setShowAddCourse(true)} style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>+ Add Course</button>
+                    ) : (
                     <form onSubmit={handleAddCourse} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                        <select value={courseDisc} onChange={e => setCourseDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', minWidth: '180px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <b style={{ fontSize: '15px', color: 'var(--primary-deep)' }}>Add Course</b>
+                        <button type="button" onClick={() => setShowAddCourse(false)} style={{ background: 'none', border: '1px solid var(--border)', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Collapse</button>
+                      </div>
+                      {/* 1. Choose program */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>1. Choose Program</label>
+                        <select value={courseDisc} onChange={e => setCourseDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 220px', minWidth: '180px' }}>
                           <option value="">Select Program…</option>
-                          {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          {dbData.curriculum.map(d => { const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id)?.name; return <option key={d.id} value={d.id}>{d.name}{cat?` · ${cat}`:''}</option>; })}
                         </select>
-                        {dbData.course_types.length === 0 ? (
-                          <span style={{ fontSize: '13px', color: 'var(--text-faint)', alignSelf: 'center' }}>No course types — add one below.</span>
-                        ) : (
-                          <select value={courseType} onChange={e => setCourseType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                            {dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                          </select>
-                        )}
-                        {(selectedDiscStructure === 'yearly' || selectedDiscStructure === 'yearly_semester') && (
-                          <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-                          </select>
-                        )}
-                        {(selectedDiscStructure === 'semester' || selectedDiscStructure === 'yearly_semester') && (
-                          <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }}>
-                            {courseSemesters.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        )}
-                        <input placeholder="Code (BCVP310) *" value={courseCode} onChange={e => setCourseCode(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '130px' }} required />
-                        <input placeholder="Course Name *" value={courseName} onChange={e => setCourseName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} required />
-                        <select value={courseKind} onChange={e => setCourseKind(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '110px' }} title="Type">
+                        {selectedDisc && <span style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'var(--bg)', padding: '3px 8px', borderRadius: '99px', border: '1px solid var(--border)' }}>{progMins} min / period</span>}
+                      </div>
+                      {/* 2. Choose semester/year */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>2. Semester / Year</label>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                          {(selectedDiscStructure === 'yearly' || selectedDiscStructure === 'yearly_semester') && (
+                            <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 140px' }}>
+                              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                          )}
+                          {(selectedDiscStructure === 'semester' || selectedDiscStructure === 'yearly_semester') && (
+                            <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 140px' }}>
+                              {courseSemesters.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          )}
+                          {selectedDiscStructure !== 'yearly' && selectedDiscStructure !== 'yearly_semester' && selectedDiscStructure !== 'semester' && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Pick Program first</span>}
+                        </div>
+                      </div>
+                      {/* 3. Course name */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>3. Course Name</label>
+                        <input placeholder="Course Name *" value={courseName} onChange={e => setCourseName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 260px' }} required />
+                      </div>
+                      {/* 4. Course Code */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>4. Course Code</label>
+                        <input placeholder="Code (BCVP310) *" value={courseCode} onChange={e => setCourseCode(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px', width: '160px' }} required />
+                      </div>
+                      {/* 5. Course Type */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>5. Course Type</label>
+                        <select value={courseKind} onChange={e => setCourseKind(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px' }} title="Type">
                           <option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option>
                         </select>
-                        <input type="number" min="0" placeholder="Credits" title="Credits" value={courseCredits} onChange={e => setCourseCredits(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '90px' }} />
+                        {dbData.course_types.length > 0 ? (
+                          <select value={courseType} onChange={e => setCourseType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                            {dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                          </select>
+                        ) : <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>No programme types</span>}
                       </div>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Teaching periods
-                          <input type="number" min="0" placeholder="Periods" title="Teaching Periods (45 min each)" value={coursePeriods} onChange={e => setCoursePeriods(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '110px' }} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Teaching hours (auto)
-                          <input type="text" value={derivedHours === '' ? '' : String(derivedHours)} readOnly placeholder="auto" title="Auto: periods × 45 / 60" style={{ padding: '8px', border: '1px solid var(--border)', width: '110px', background: 'var(--bg)', color: 'var(--text-faint)' }} />
-                        </label>
-                        <span style={{ fontSize: '11px', color: 'var(--text-faint)', alignSelf: 'flex-end', paddingBottom: '8px' }}>periods × 45 min</span>
-                        <input type="number" min="0" placeholder="CIE marks" title="CIE Marks" value={courseCie} onChange={e => setCourseCie(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '100px' }} />
-                        <input placeholder="CIE duration (e.g. 45 Min)" title="CIE exam duration" value={courseCieDur} onChange={e => setCourseCieDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '150px' }} />
-                        <input type="number" min="0" placeholder="SEE marks" title="SEE Marks" value={courseSee} onChange={e => setCourseSee(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '100px' }} />
-                        <input placeholder="SEE duration (e.g. 1 hour)" title="SEE exam duration" value={courseSeeDur} onChange={e => setCourseSeeDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '150px' }} />
+                      {/* 6. Credits */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>6. No. of Credits</label>
+                        <input type="number" min="0" placeholder="Credits" title="Credits" value={courseCredits} onChange={e => setCourseCredits(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
                       </div>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <select value={courseExamTypeId} onChange={e => setCourseExamTypeId(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', minWidth: '160px' }} title="Examination Type (dynamic)">
+                      {/* 7. Teaching hours (auto) */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>7. Teaching Hours</label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Periods
+                            <input type="number" min="0" placeholder="Periods" value={coursePeriods} onChange={e => setCoursePeriods(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
+                          </label>
+                          <span style={{ fontSize: '18px', color: 'var(--text-faint)', paddingTop: '14px' }}>→</span>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Hours (auto)
+                            <input type="text" value={derivedHours === '' ? '' : String(derivedHours)} readOnly placeholder="auto" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px', background: 'var(--bg)', color: 'var(--text-faint)' }} />
+                          </label>
+                          <span style={{ fontSize: '11px', color: 'var(--text-faint)', paddingTop: '14px' }}>periods × {progMins} min / 60 — not editable</span>
+                        </div>
+                      </div>
+                      {/* 8. CIE Marks */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>8. CIE Marks</label>
+                        <input type="number" min="0" placeholder="CIE marks" value={courseCie} onChange={e => setCourseCie(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '120px' }} />
+                      </div>
+                      {/* 9. CIE duration */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>9. CIE Duration</label>
+                        <input placeholder="e.g. 45 Min" value={courseCieDur} onChange={e => setCourseCieDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                      </div>
+                      {/* 10. SEE Marks */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>10. SEE Marks</label>
+                        <input type="number" min="0" placeholder="SEE marks" value={courseSee} onChange={e => setCourseSee(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '120px' }} />
+                      </div>
+                      {/* 11. SEE duration */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>11. SEE Duration</label>
+                        <input placeholder="e.g. 1 hour" value={courseSeeDur} onChange={e => setCourseSeeDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                      </div>
+                      {/* 12. Exam type */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>12. Exam Type</label>
+                        <select value={courseExamTypeId} onChange={e => setCourseExamTypeId(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', minWidth: '180px', flex: '1 1 180px' }} title="Examination Type (dynamic)">
                           <option value="">Examination type…</option>
                           {(dbData.examination_types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
-                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>or add:</span>
-                        <input placeholder="New exam type" value={newExamTypeName} onChange={e => setNewExamTypeName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '150px' }} />
+                        <input placeholder="New exam type" value={newExamTypeName} onChange={e => setNewExamTypeName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '150px' }} />
                         <button type="button" onClick={handleAddExamType} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>+ Add type</button>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>Course objectives (one per line)</label>
-                        <textarea value={courseObjectives} onChange={e => setCourseObjectives(e.target.value)} rows={3} placeholder="e.g. Add on to existing repertoire..." style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13.5px' }} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>Course outcomes → CO1, CO2… (used for CO mapping in modules)</label>
-                          <button type="button" onClick={() => { const n = courseOutcomes.length+1; setCourseOutcomes([...courseOutcomes, { code: `CO${n}`, text: '' }]); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add outcome</button>
+                      {/* 13. Course Objectives */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0, paddingTop: '6px' }}>13. Course Objectives</label>
+                        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <button type="button" onClick={() => setCourseObjectives([...courseObjectives, ''])} style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add Course Objectives</button>
+                          {courseObjectives.length === 0 ? <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No objectives yet — click Add.</span> : courseObjectives.map((txt, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '22px' }}>{i + 1}.</span>
+                              <input value={txt} onChange={e => { const c=[...courseObjectives]; c[i]=e.target.value; setCourseObjectives(c); }} placeholder={`Objective ${i + 1}`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                              <button type="button" onClick={() => setCourseObjectives(courseObjectives.filter((_,j)=>j!==i))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                            </div>
+                          ))}
                         </div>
-                        {courseOutcomes.length === 0 ? (
-                          <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', padding: '8px', border: '1px dashed var(--border)', borderRadius: '6px' }}>No outcomes yet — click + Add outcome.</div>
-                        ) : courseOutcomes.map((o, idx) => (
-                          <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ background: 'var(--primary)', color: '#fff', padding: '3px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, minWidth: '42px', textAlign: 'center' }}>{o.code}</span>
-                            <input value={o.text} onChange={e => { const c=[...courseOutcomes]; c[idx]={...c[idx], text:e.target.value}; setCourseOutcomes(c); }} placeholder={`Outcome ${o.code} text`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
-                            <button type="button" onClick={() => setCourseOutcomes(courseOutcomes.filter((_,i)=>i!==idx).map((x,i)=>({ ...x, code:`CO${i+1}` })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
-                          </div>
-                        ))}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>Pedagogy (one per line)</label>
-                        <textarea value={coursePedagogy} onChange={e => setCoursePedagogy(e.target.value)} rows={2} placeholder="Live demo involving students..." style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13.5px' }} />
+                      {/* 14. Course Outcomes */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0, paddingTop: '6px' }}>14. Course Outcomes</label>
+                        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <button type="button" onClick={() => { const n = courseOutcomes.length+1; setCourseOutcomes([...courseOutcomes, { code: `CO${n}`, text: '' }]); }} style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add Course Outcomes</button>
+                          {courseOutcomes.length === 0 ? (
+                            <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No outcomes yet — click Add.</span>
+                          ) : courseOutcomes.map((o, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ background: 'var(--primary)', color: '#fff', padding: '3px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, minWidth: '42px', textAlign: 'center' }}>{o.code}</span>
+                              <input value={o.text} onChange={e => { const c=[...courseOutcomes]; c[idx]={...c[idx], text:e.target.value}; setCourseOutcomes(c); }} placeholder={`Outcome ${o.code} text`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                              <button type="button" onClick={() => setCourseOutcomes(courseOutcomes.filter((_,i)=>i!==idx).map((x,i)=>({ ...x, code:`CO${i+1}` })))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <button type="submit" style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Add Course</button>
+                      {/* 15. Pedagogy */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0, paddingTop: '6px' }}>15. Pedagogy</label>
+                        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <button type="button" onClick={() => setCoursePedagogyList([...coursePedagogyList, ''])} style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add Pedagogy</button>
+                          {coursePedagogyList.length === 0 && !coursePedagogy ? <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No pedagogy yet — click Add.</span> : null}
+                          {coursePedagogyList.map((txt, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '22px' }}>{i + 1}.</span>
+                              <input value={txt} onChange={e => { const c=[...coursePedagogyList]; c[i]=e.target.value; setCoursePedagogyList(c); }} placeholder={`Pedagogy ${i + 1}`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                              <button type="button" onClick={() => setCoursePedagogyList(coursePedagogyList.filter((_,j)=>j!==i))} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                            </div>
+                          ))}
+                          {coursePedagogyList.length===0 && coursePedagogy ? <textarea value={coursePedagogy} onChange={e=>setCoursePedagogy(e.target.value)} rows={2} placeholder="Live demo involving students..." style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /> : null}
+                        </div>
+                      </div>
+                      <button type="submit" style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}>Save Course</button>
                     </form>
+                    )}
 
-                    {/* Import syllabus file — DOCX/PDF/XLSX parsed preview then verified save */}
+                    {/* Import syllabus file — DOCX/PDF/XLSX/CSV/HTML/TXT/PPTX parsed preview then verified save */}
                     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <b style={{ fontSize: '14px', color: 'var(--primary-deep)' }}>Import from file — DOCX / PDF / XLSX</b>
-                        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Parses program, CIE/SEE, hours/periods, objectives, outcomes, pedagogy, modules → preview → save verified</span>
+                        <b style={{ fontSize: '14px', color: 'var(--primary-deep)' }}>Import from file</b>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>DOCX / PDF / XLSX / CSV / HTML / TXT / MD / PPTX</span>
+                          <button type="button" onClick={downloadTemplate} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>⬇ Download Import Template</button>
+                        </div>
                       </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Parses program, CIE/SEE, hours/periods, objectives, outcomes, pedagogy, modules → preview → edit & verify per level → publish. Template has Courses + Modules_Topics sheets matching the exact fields.</div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <input type="file" accept=".docx,.pdf,.xlsx,.xls" onChange={e => { setSyllabusFile(e.target.files?.[0] || null); setSyllabusParsed(null); setSyllabusDrafts([]); setSyllabusParseErr(''); }} style={{ flex: '1 1 200px', fontSize: '13px' }} />
+                        <input type="file" accept=".docx,.pdf,.xlsx,.xls,.csv,.html,.htm,.txt,.md,.pptx,.ppt" onChange={e => { setSyllabusFile(e.target.files?.[0] || null); setSyllabusParsed(null); setSyllabusDrafts([]); setSyllabusParseErr(''); }} style={{ flex: '1 1 200px', fontSize: '13px' }} />
                         <select value={syllabusTargetDisc} onChange={e => setSyllabusTargetDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px', fontSize: '13px' }}>
                           <option value="">Program (from file or pick)</option>
                           {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -2004,7 +2235,7 @@ export default function Home() {
                                       <button type="button" onClick={() => updateDraft(idx, { modules: [{ module_number: 1, title: '', hours: null, rbt_level: '', methodology: '', co_mapping: '', topics: [] }] })} style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add module</button>
                                     )}
                                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
-                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingPeriods != null) setCoursePeriods(p.teachingPeriods); else if (p.teachingHours != null) setCoursePeriods(Math.round(p.teachingHours * 60 / 45)); if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p.examinationHoursCie) setCourseCieDur(p.examinationHoursCie); if (p.examinationHoursSee) setCourseSeeDur(p.examinationHoursSee); if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives.join('\n')); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) setCoursePedagogy(p.pedagogy); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
+                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingPeriods != null) setCoursePeriods(p.teachingPeriods); else if (p.teachingHours != null) setCoursePeriods(Math.round(p.teachingHours * 60 / 45)); if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p.examinationHoursCie) setCourseCieDur(p.examinationHoursCie); if (p.examinationHoursSee) setCourseSeeDur(p.examinationHoursSee); if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) { const lines=String(p.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); setCoursePedagogyList(lines); setCoursePedagogy(String(p.pedagogy)); } setShowAddCourse(true); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
                                       <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: d._verified ? 'var(--primary)' : 'var(--text-faint)', cursor: 'pointer', marginLeft: 'auto' }}><input type="checkbox" checked={!!d._verified} onChange={e => updateDraft(idx, { _verified: e.target.checked })} /> Mark verified</label>
                                     </div>
                                   </div>
@@ -2104,7 +2335,7 @@ export default function Home() {
                           return (
                           <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td style={{ padding: '10px 8px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{prog?.name || '—'}</td>
-                            <td style={{ padding: '10px 8px' }}><b>{c.code}</b><br /><span style={{ color: 'var(--text-soft)' }}>{c.name}</span></td>
+                            <td style={{ padding: '10px 8px' }}><button onClick={() => setActiveSyllabusCourse(c)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}><b style={{ color:'var(--primary)', textDecoration:'underline' }}>{c.code}</b><br /><span style={{ color:'var(--primary)', textDecoration:'underline', fontWeight:600 }}>{c.name}</span></button></td>
                             <td style={{ padding: '10px 8px' }}>{c.type || c.course_type || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.year_label || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.semester || '—'}</td>
@@ -2287,28 +2518,128 @@ export default function Home() {
                             );
                           })}
                           {canCreate('curriculum') && (
-                            <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary-deep)' }}>Add Module (Postgres)</div>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                <input placeholder="Module title *" value={modTitle} onChange={e => setModTitle(e.target.value)} style={{ flex: '1 1 220px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
-                                <input placeholder="Hours" type="number" min="0" value={modHours} onChange={e => setModHours(e.target.value)} style={{ width: '90px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
-                                <select value={modRbt} onChange={e => setModRbt(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
-                                  <option value="Remember">Remember</option><option value="Understand">Understand</option><option value="Apply">Apply</option><option value="Analyze">Analyze</option><option value="Evaluate">Evaluate</option><option value="Create">Create</option>
-                                </select>
+                            <div style={{ background: 'var(--surface-muted)', border: '1.5px solid var(--primary)', borderRadius: '12px', overflow: 'hidden' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: showAddSyllabus ? 'var(--primary)' : 'var(--bg-saffron)', color: showAddSyllabus ? '#fff' : 'var(--primary-deep)', cursor: 'pointer' }} onClick={() => setShowAddSyllabus(!showAddSyllabus)}>
+                                <b style={{ fontSize: '14px' }}>{showAddSyllabus ? '▾ Add Syllabus — Adding Modules' : '▸ Add Syllabus'}</b>
+                                <span style={{ fontSize: '11px', opacity: 0.85 }}>{showAddSyllabus ? 'Collapse' : 'Click to add modules'}</span>
                               </div>
-                              <textarea placeholder="Teaching methodology" value={modMethod} onChange={e => setModMethod(e.target.value)} rows={2} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }} />
-                              <textarea placeholder="Topics — one per line" value={modTopicsText} onChange={e => setModTopicsText(e.target.value)} rows={3} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }} />
-                              {coList.length > 0 && (
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)' }}>CO mapping:</span>
-                                  {coList.map(o => (
-                                    <label key={o.code} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', background: modCo.includes(o.code) ? 'var(--primary)' : 'var(--surface)', color: modCo.includes(o.code) ? '#fff' : 'var(--text)', padding: '3px 8px', borderRadius: '99px', border: '1px solid var(--border)', cursor: 'pointer' }}>
-                                      <input type="checkbox" checked={modCo.includes(o.code)} onChange={e => setModCo(e.target.checked ? [...modCo, o.code] : modCo.filter(c=>c!==o.code))} style={{ accentColor: 'var(--primary)' }} />{o.code}
-                                    </label>
-                                  ))}
+                              {showAddSyllabus && (
+                                <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', background: '#fff' }}>
+                                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '140px', flexShrink: 0 }}>Academic Year</label>
+                                    <input value={syllModAcademicYear} onChange={e => setSyllModAcademicYear(e.target.value)} placeholder="2024-25" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px', fontSize: '13px' }} />
+                                    <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Version auto-increments per course</span>
+                                  </div>
+                                  <div style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <b style={{ fontSize: '13px', color: 'var(--primary-deep)' }}>Add Module</b>
+                                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>All fields have side headings — every input labeled</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0 }}>Module Name</label>
+                                      <input placeholder="Module Name *" value={modTitle} onChange={e => setModTitle(e.target.value)} style={{ flex: '1 1 220px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0 }}>Teaching Hours</label>
+                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+                                        <input type="number" min="0" step="0.5" value={modHours} onChange={e => { setModHours(e.target.value); if (e.target.value !== '' && e.target.value != null) { const v = Number(e.target.value); const mins = (()=>{ const d=dbData.curriculum.find(x=>x.id===activeSyllabusCourse.discipline_id); const m=Number(d?.period_minutes); return Number.isFinite(m)&&m>=10&&m<=120?m:45; })(); if (Number.isFinite(v)) setModPeriods(String(Math.round(v*60/mins))); }} } placeholder="Hours" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '100px', fontSize: '13px' }} />
+                                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>→</span>
+                                        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Periods (auto)
+                                          <input type="text" value={modPeriods} readOnly placeholder="auto" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', background: 'var(--bg)', color: 'var(--text-faint)', fontSize: '13px' }} title="Auto: hours × 60 / period mins — not editable" />
+                                        </label>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+                                          {(() => { const d=dbData.curriculum.find(x=>x.id===activeSyllabusCourse.discipline_id); const m=Number(d?.period_minutes); const mins=Number.isFinite(m)&&m>=10&&m<=120?m:45; return `period = ${mins} min (from Program)`; })()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '7px' }}>Add RBT Levels</label>
+                                      <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                          <select value={modRbtDraft} onChange={e => setModRbtDraft(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', flex: '1 1 160px' }}>
+                                            {RBT_OPTS.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
+                                          </select>
+                                          <button type="button" onClick={() => { if (!modRbtList.includes(modRbtDraft)) setModRbtList([...modRbtList, modRbtDraft]); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add RBT Level</button>
+                                        </div>
+                                        {modRbtList.length ? (
+                                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {modRbtList.map(lv => {
+                                              const lab = RBT_OPTS.find(o=>o.v===lv)?.label || lv;
+                                              return <span key={lv} style={{ background: 'var(--primary)', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '12px', display: 'flex', gap: '6px', alignItems: 'center' }}>{lab} <button type="button" onClick={() => setModRbtList(modRbtList.filter(x=>x!==lv))} style={{ background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff', borderRadius: '99px', cursor: 'pointer', padding: '1px 6px', fontSize: '11px' }}>×</button></span>;
+                                            })}
+                                          </div>
+                                        ) : <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>No RBT levels yet — add one or more.</span>}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '7px' }}>Add Teaching Methodology</label>
+                                      <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                          <select value={modMethodDraft} onChange={e => setModMethodDraft(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', flex: '1 1 200px' }}>
+                                            <option value="">Select methodology…</option>
+                                            {pedagogyOptions.map((p, i) => <option key={i} value={p}>{p}</option>)}
+                                          </select>
+                                          <button type="button" onClick={() => { const v = modMethodDraft.trim(); if (v && !modMethodList.includes(v)) { setModMethodList([...modMethodList, v]); setModMethodDraft(''); } }} disabled={!modMethodDraft} style={{ background: pedagogyOptions.length ? 'var(--accent)' : 'var(--text-faint)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '4px', cursor: pedagogyOptions.length ? 'pointer' : 'not-allowed', fontSize: '12px', opacity: modMethodDraft ? 1 : 0.6 }}>+ Add Methodology</button>
+                                        </div>
+                                        {pedagogyOptions.length === 0 ? <span style={{ fontSize: '11.5px', color: 'var(--primary)', background: 'var(--bg-saffron)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>No pedagogy in this course yet — add pedagogy to the course first (in course form above). Methodology list is filtered from course pedagogy only.</span> : null}
+                                        {modMethodList.length ? (
+                                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {modMethodList.map(m => <span key={m} style={{ background: 'var(--primary-deep)', color: '#fff', padding: '4px 10px', borderRadius: '99px', fontSize: '12px', display: 'flex', gap: '6px', alignItems: 'center' }}>{m} <button type="button" onClick={() => setModMethodList(modMethodList.filter(x=>x!==m))} style={{ background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff', borderRadius: '99px', cursor: 'pointer', padding: '1px 6px', fontSize: '11px' }}>×</button></span>)}
+                                          </div>
+                                        ) : pedagogyOptions.length ? <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>No methodology selected — add from dropdown (only pedagogy options).</span> : null}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '7px' }}>Add Topic</label>
+                                      <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <button type="button" onClick={() => setModTopics([...modTopics, { topic: '', description: '' }])} style={{ alignSelf: 'flex-start', background: 'none', border: '1.5px dashed var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add Topic</button>
+                                        {modTopics.length === 0 ? <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>No topics yet — click Add Topic (each topic has optional description).</span> : modTopics.map((t, i) => (
+                                          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', background: '#fff', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '22px', paddingTop: '8px' }}>{i + 1}.</span>
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                              <label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Topic
+                                                <input value={t.topic} onChange={e => { const c=[...modTopics]; c[i]={...c[i], topic:e.target.value}; setModTopics(c); }} placeholder="Topic name" style={{ width: '100%', padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', marginTop: '3px' }} />
+                                              </label>
+                                              <label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Description (optional)
+                                                <input value={t.description} onChange={e => { const c=[...modTopics]; c[i]={...c[i], description:e.target.value}; setModTopics(c); }} placeholder="Brief description for this topic" style={{ width: '100%', padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', marginTop: '3px' }} />
+                                              </label>
+                                            </div>
+                                            <button type="button" onClick={() => setModTopics(modTopics.filter((_, j)=>j!==i))} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', alignSelf: 'flex-start' }}>Remove</button>
+                                          </div>
+                                        ))}
+                                        {modTopics.length===0 && modTopicsText ? (
+                                          <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Bulk topics (fallback — one per line)
+                                            <textarea value={modTopicsText} onChange={e=>setModTopicsText(e.target.value)} rows={2} placeholder="One topic per line (fallback) — or use Add Topic above" style={{ width: '100%', padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px', marginTop: '3px' }} />
+                                          </label>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                    {coList.length > 0 && (
+                                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                        <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '6px' }}>CO Mapping</label>
+                                        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            {coList.map(o => (
+                                              <label key={o.code} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', background: modCo.includes(o.code) ? 'var(--primary)' : 'var(--surface)', color: modCo.includes(o.code) ? '#fff' : 'var(--text)', padding: '4px 10px', borderRadius: '99px', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                                                <input type="checkbox" checked={modCo.includes(o.code)} onChange={e => {
+                                                  const next = e.target.checked ? [...modCo, o.code] : modCo.filter(c=>c!==o.code);
+                                                  setModCo(next);
+                                                  const last = e.target.checked ? o.code : next[next.length-1];
+                                                  const hit = coList.find(x=>x.code===last);
+                                                  setModCoDetail(hit ? `${hit.code}: ${hit.text}` : '');
+                                                }} style={{ accentColor: 'var(--primary)' }} />{o.code}
+                                              </label>
+                                            ))}
+                                          </div>
+                                          <textarea value={modCoDetail} readOnly placeholder="Select a CO to see its details here (non-editable) — shows outcome text for mapped COs." style={{ width: '100%', minHeight: '56px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '12.5px', background: 'var(--bg)', color: 'var(--text-soft)' }} />
+                                          {modCo.length ? <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Mapped: {modCo.join(', ')}</div> : null}
+                                        </div>
+                                      </div>
+                                    )}
+                                    <button type="button" onClick={handleAddModule} style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>Save Syllabus</button>
+                                  </div>
                                 </div>
                               )}
-                              <button type="button" onClick={handleAddModule} style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Add Module</button>
                             </div>
                           )}
                         </div>
