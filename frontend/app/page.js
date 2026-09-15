@@ -243,12 +243,6 @@ export default function Home() {
     if (view === 'admin' && session) fetchData();
   }, [view, activeModule, session]);
 
-  // If the selected course type was deleted, fall back to the first available type.
-  useEffect(() => {
-    if (dbData.course_types.length && !dbData.course_types.some(t => t.name === courseType)) {
-      setCourseType(dbData.course_types[0].name);
-    }
-  }, [dbData.course_types]);
   useEffect(() => {
     if (dbData.batches.length && !timetableBatch) setTimetableBatch(dbData.batches[0].id);
     if (dbData.batches.length && timetableBatch && !dbData.batches.some(b => b.id === timetableBatch)) setTimetableBatch(dbData.batches[0].id);
@@ -333,6 +327,8 @@ export default function Home() {
   const [newDiscStructure, setNewDiscStructure] = useState('semester');
   const [newDiscYearCount, setNewDiscYearCount] = useState(2);
   const [newDiscSemPerYear, setNewDiscSemPerYear] = useState(2);
+  const [newDiscTotalSems, setNewDiscTotalSems] = useState(4);
+  const [newDiscMonthCount, setNewDiscMonthCount] = useState(12);
   const [newDiscCat, setNewDiscCat] = useState('');
   const [newDiscPeriodMins, setNewDiscPeriodMins] = useState(45);
   const [newDiscEffFrom, setNewDiscEffFrom] = useState('');
@@ -343,6 +339,8 @@ export default function Home() {
   const [discEditStructure, setDiscEditStructure] = useState('semester');
   const [discEditYearCount, setDiscEditYearCount] = useState(2);
   const [discEditSemPerYear, setDiscEditSemPerYear] = useState(2);
+  const [discEditTotalSems, setDiscEditTotalSems] = useState(4);
+  const [discEditMonthCount, setDiscEditMonthCount] = useState(12);
   const [discEditCat, setDiscEditCat] = useState('');
   const [discEditPeriodMins, setDiscEditPeriodMins] = useState(45);
   const [discEditEffFrom, setDiscEditEffFrom] = useState('');
@@ -354,20 +352,22 @@ export default function Home() {
   const [progCatEditDurVal, setProgCatEditDurVal] = useState('');
   const [progCatEditDurUnit, setProgCatEditDurUnit] = useState('years');
 
-  // Course form (BPA/MPA syllabus header — image BCVP310) — 21-field header
+  // Course form — hours input → periods auto; exam duration hrs+mins split
   const [courseDisc, setCourseDisc] = useState('');
-  const [courseType, setCourseType] = useState('Masters');
   const [courseSem, setCourseSem] = useState('Semester I');
   const [courseYearLabel, setCourseYearLabel] = useState('');
+  const [courseMonthLabel, setCourseMonthLabel] = useState('');
   const [courseCode, setCourseCode] = useState('');
   const [courseName, setCourseName] = useState('');
   const [courseKind, setCourseKind] = useState('DSC');
   const [courseCredits, setCourseCredits] = useState(5);
-  const [coursePeriods, setCoursePeriods] = useState(100);
+  const [courseHours, setCourseHours] = useState('');
   const [courseCie, setCourseCie] = useState(50);
   const [courseSee, setCourseSee] = useState(50);
-  const [courseCieDur, setCourseCieDur] = useState('45 Min');
-  const [courseSeeDur, setCourseSeeDur] = useState('1 hour');
+  const [courseCieH, setCourseCieH] = useState('');
+  const [courseCieM, setCourseCieM] = useState('');
+  const [courseSeeH, setCourseSeeH] = useState('');
+  const [courseSeeM, setCourseSeeM] = useState('');
   const [courseExamTypeId, setCourseExamTypeId] = useState('');
   const [courseExamType, setCourseExamType] = useState('Practical');
   const [courseObjectives, setCourseObjectives] = useState([]); // ["text",...] via Add Course Objectives
@@ -416,16 +416,39 @@ export default function Home() {
   const [filterYear, setFilterYear] = useState('');
 
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-  const activeCourseType = dbData.course_types.find(t => t.name === courseType);
-  const courseSemesters = Array.from({ length: activeCourseType?.semester_count || 4 }, (_, i) => `Semester ${ROMAN[i]}`);
   const selectedDisc = dbData.curriculum.find(d => d.id === courseDisc) || null;
   const selectedDiscStructure = selectedDisc?.structure_mode || 'semester';
+  const selCat = selectedDisc ? (dbData.program_categories||[]).find(c=>c.id===selectedDisc.category_id) : null;
+  const categoryLimit = (() => { if (!selCat?.duration_value) return null; return { v: selCat.duration_value, u: selCat.duration_unit }; })();
+  // strict program limits from category
+  const maxYearsForProgram = (() => { if (!categoryLimit) return 10; return categoryLimit.u==='months' ? Math.floor(categoryLimit.v/12) || 1 : categoryLimit.v; })();
   const yearOptions = (() => {
-    const n = Number(selectedDisc?.year_count) || 2;
+    const n = Math.min(Number(selectedDisc?.year_count) || 2, maxYearsForProgram);
     return Array.from({ length: Math.min(n, 10) }, (_, i) => `Year ${ROMAN[i]}`);
   })();
+  const monthOptions = (() => {
+    const n = Math.min(Number(selectedDisc?.month_count) || 12, categoryLimit?.u==='months' ? categoryLimit.v : 24);
+    return Array.from({ length: n }, (_, i) => `Month ${i+1}`);
+  })();
+  const semestersPerProgram = (() => {
+    const yrs = Number(selectedDisc?.year_count) || (categoryLimit?.u==='months'? Math.floor((Number(selCat?.duration_value)||24)/6) : categoryLimit?.v || 2);
+    const perYear = Number(selectedDisc?.semesters_per_year) || 2;
+    return yrs * perYear;
+  })();
+  const courseSemesters = (() => {
+    if (selectedDiscStructure==='semester') return Array.from({ length: semestersPerProgram }, (_, i) => `Semester ${ROMAN[i] || i+1}`);
+    return Array.from({ length: Number(selectedDisc?.semesters_per_year)||2 }, (_, i) => `Semester ${ROMAN[i]}`);
+  })();
+  // year→semester mapping: 4yr 2/yr → Yr3 gets Sem5,6
+  const semestersForSelectedYear = (() => {
+    if (selectedDiscStructure!=='semester' || !courseYearLabel) return courseSemesters;
+    const yi = ROMAN.indexOf(courseYearLabel.replace('Year ','').trim()); if (yi<0) return courseSemesters;
+    const perYear = Number(selectedDisc?.semesters_per_year)||2;
+    const start = yi*perYear;
+    return courseSemesters.slice(start, start+perYear);
+  })();
   const progMins = (() => { const v = Number(selectedDisc?.period_minutes); return Number.isFinite(v) && v>=10 && v<=120 ? v : 45; })();
-  const derivedHours = (() => { const n = Number(coursePeriods); if (!Number.isFinite(n) || n <= 0) return ''; return Math.round(n * progMins / 60 * 100) / 100; })();
+  const derivedPeriods = (() => { const h = Number(courseHours); if (!Number.isFinite(h)||h<=0) return ''; return Math.round(h*60/progMins); })();
   const pedagogyOptions = (() => {
     if (coursePedagogyList.length) return coursePedagogyList.filter(s=>String(s).trim());
     const t = String(coursePedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
@@ -433,14 +456,19 @@ export default function Home() {
   })();
 
   useEffect(() => { if (!courseDisc && dbData.curriculum.length) setCourseDisc(dbData.curriculum[0].id); }, [dbData.curriculum]);
-  useEffect(() => { if (courseSemesters.length && !courseSemesters.includes(courseSem)) setCourseSem(courseSemesters[0]); }, [courseSemesters]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const opts = semestersForSelectedYear; if (opts.length && !opts.includes(courseSem)) setCourseSem(opts[0]); }, [courseDisc, courseYearLabel]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!selectedDisc) return;
     const mode = selectedDisc.structure_mode || 'semester';
-    if (mode === 'yearly' || mode === 'yearly_semester') {
+    if (mode === 'semester') {
       if (!courseYearLabel && yearOptions.length) setCourseYearLabel(yearOptions[0]);
-      else if (courseYearLabel && !yearOptions.includes(courseYearLabel)) setCourseYearLabel(yearOptions[0] || '');
-    } else if (courseYearLabel) setCourseYearLabel('');
+    } else if (mode === 'yearly') {
+      if (!courseYearLabel && yearOptions.length) setCourseYearLabel(yearOptions[0]);
+      if (courseSem) setCourseSem('');
+    } else if (mode === 'monthly') {
+      if (!courseMonthLabel && monthOptions.length) setCourseMonthLabel(monthOptions[0]);
+    }
+    if (mode !== 'semester' && mode !== 'yearly' && courseYearLabel && mode==='monthly') setCourseYearLabel('');
   }, [courseDisc, dbData.curriculum]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live session form state
@@ -1098,14 +1126,23 @@ export default function Home() {
   const handleAddDiscipline = async (e) => {
     e.preventDefault();
     if (!newDiscName.trim()) return;
-    const res = await apiCall(`${apiUrl}/api/curriculum`, {
-      method: 'POST',
-      body: JSON.stringify({
-        name: newDiscName.trim(), levels: newDiscLevels.trim(), description: newDiscDesc.trim(),
-        structure_mode: newDiscStructure, year_count: Number(newDiscYearCount) || 2, semesters_per_year: Number(newDiscSemPerYear) || 2,
-        category_id: newDiscCat || null, period_minutes: Number(newDiscPeriodMins) || 45, period_effective_from: newDiscEffFrom || null,
-      })
-    });
+    if (!newDiscCat) { alert('Choose a Program Category first.'); return; }
+    // strict category limit check client-side mirrors backend
+    const cat = (dbData.program_categories||[]).find(c=>c.id===newDiscCat);
+    if (cat?.duration_value) {
+      const toYears=(v,u)=> u==='months'? v/12 : v;
+      const catYears = toYears(cat.duration_value, cat.duration_unit);
+      const progYears = newDiscStructure==='monthly' ? Number(newDiscMonthCount)/12 : Number(newDiscYearCount);
+      if (progYears > catYears + 1e-9) { alert(`Program exceeds category duration ${cat.duration_value} ${cat.duration_unit}`); return; }
+    }
+    const body = {
+      name: newDiscName.trim(), levels: newDiscLevels.trim(), description: newDiscDesc.trim(),
+      structure_mode: newDiscStructure, category_id: newDiscCat, period_minutes: Number(newDiscPeriodMins) || 45, period_effective_from: newDiscEffFrom || null,
+    };
+    if (newDiscStructure==='monthly') body.month_count = Number(newDiscMonthCount) || 12;
+    else if (newDiscStructure==='yearly') body.year_count = Number(newDiscYearCount) || 2;
+    else if (newDiscStructure==='semester') { const yrs=Number(newDiscYearCount)||2; const tot=Number(newDiscTotalSems)||4; if(tot%yrs!==0){ alert('Semesters must divide equally across years (e.g. 4yr×2/yr=8).'); return; } body.year_count=yrs; body.semesters_per_year=tot/yrs; }
+    const res = await apiCall(`${apiUrl}/api/curriculum`, { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Create failed'); return; }
     setNewDiscName(''); setNewDiscLevels(''); setNewDiscDesc(''); setNewDiscEffFrom(''); fetchData();
   };
@@ -1150,39 +1187,36 @@ export default function Home() {
     if (!courseDisc) { alert('Choose a Program first.'); return; }
     const disc = dbData.curriculum.find(d => d.id === courseDisc);
     const mode = disc?.structure_mode || 'semester';
-    const mins = (()=>{ const v=Number(disc?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45; })();
-    const derived = derivedHours === '' ? null : Number(derivedHours);
     const pedText = coursePedagogyList.length ? coursePedagogyList.filter(s=>String(s).trim()).join('\n') : (coursePedagogy.trim() || null);
-    const objArr = courseObjectives.length ? courseObjectives.filter(s=>String(s).trim()) : (courseObjectives ? String(courseObjectives).split('\n').filter(s=>s.trim()) : []);
+    const objArr = courseObjectives.length ? courseObjectives.filter(s=>String(s).trim()) : [];
+    const h = Number(courseHours); if (!Number.isFinite(h)||courseHours==='') { alert('Enter Teaching Hours.'); return; }
+    const mins = (()=>{ const v=Number(disc?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45; })();
+    const periods = Math.round(h*60/mins);
     const payload = {
-      discipline_id: courseDisc, course_type: courseType, code: courseCode.trim(), name: courseName.trim(),
-      type: courseKind, credits: Number(courseCredits) || 0, teaching_hours: derived,
-      teaching_periods: coursePeriods !== '' ? Number(coursePeriods) : null,
+      discipline_id: courseDisc, code: courseCode.trim(), name: courseName.trim(),
+      type: courseKind, credits: Number(courseCredits) || 0, teaching_hours: h, teaching_periods: periods,
       cie_marks: Number(courseCie) || 0, see_marks: Number(courseSee) || 0,
       examination_type: courseExamType || null, examination_type_id: courseExamTypeId || null,
-      examination_hours_cie: courseCieDur || null, examination_hours_see: courseSeeDur || null,
-      cie_duration: courseCieDur || null, see_duration: courseSeeDur || null,
+      cie_hours: courseCieH===''?null:Number(courseCieH), cie_mins: courseCieM===''?null:Number(courseCieM),
+      see_hours: courseSeeH===''?null:Number(courseSeeH), see_mins: courseSeeM===''?null:Number(courseSeeM),
+      examination_hours_cie: (courseCieH||courseCieM)? `${courseCieH||0}h ${courseCieM||0}m` : null,
+      examination_hours_see: (courseSeeH||courseSeeM)? `${courseSeeH||0}h ${courseSeeM||0}m` : null,
       objectives_json: objArr,
       outcomes_json: courseOutcomes.filter(o=>o.text.trim()).map(o=>({ code:o.code, text:o.text.trim() })),
       pedagogy: pedText,
     };
-    if (mode === 'yearly') {
-      if (!courseYearLabel) { alert('Choose a Year.'); return; }
-      payload.year_label = courseYearLabel;
-      payload.year_number = ROMAN.indexOf(courseYearLabel.replace('Year ', '')) + 1 || null;
-      payload.semester = null;
-    } else if (mode === 'yearly_semester') {
-      if (!courseYearLabel) { alert('Choose a Year.'); return; }
-      payload.year_label = courseYearLabel;
-      payload.year_number = ROMAN.indexOf(courseYearLabel.replace('Year ', '')) + 1 || null;
-      payload.semester = courseSem;
-    } else {
-      payload.semester = courseSem;
-      payload.year_label = null; payload.year_number = null;
+    if (mode === 'monthly') {
+      if (!courseMonthLabel) { alert('Choose a Month.'); return; } payload.month_label = courseMonthLabel; payload.year_label=null; payload.year_number=null; payload.semester=null;
+    } else if (mode === 'yearly') {
+      if (!courseYearLabel) { alert('Choose a Year.'); return; } payload.year_label = courseYearLabel; payload.year_number = ROMAN.indexOf(courseYearLabel.replace('Year ', '')) + 1 || null; payload.semester = null; payload.month_label=null;
+    } else if (mode === 'semester') {
+      if (!courseYearLabel) { alert('Choose a Year.'); return; } payload.year_label = courseYearLabel; payload.year_number = ROMAN.indexOf(courseYearLabel.replace('Year ', '')) + 1 || null; payload.semester = courseSem; payload.month_label=null;
+      // validate semester belongs to selected year
+      if (!semestersForSelectedYear.includes(courseSem)) { alert('Semester does not belong to selected year.'); return; }
     }
     const res = await apiCall(`${apiUrl}/api/courses`, { method: 'POST', body: JSON.stringify(payload) });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Add course failed'); return; }
-    setCourseCode(''); setCourseName(''); setCourseObjectives([]); setCourseOutcomes([]); setCoursePedagogyList([]); setCoursePedagogy(''); setShowAddCourse(false); fetchData();
+    setCourseCode(''); setCourseName(''); setCourseHours(''); setCourseObjectives([]); setCourseOutcomes([]); setCoursePedagogyList([]); setCoursePedagogy(''); setShowAddCourse(false); fetchData();
   };
   const handleAddExamType = async () => {
     const name = newExamTypeName.trim();
@@ -1237,17 +1271,17 @@ export default function Home() {
       const outcomes = (d.outcomes || []).filter(Boolean).map((t, i) => ({ code: `CO${i + 1}`, text: t }));
       const pedagogy = String(d.pedagogy || '').trim() || null;
       const payload = {
-        discipline_id: discId, course_type: courseType, code: String(d.code).trim(), name: String(d.courseName).trim(),
+        discipline_id: discId, code: String(d.code).trim(), name: String(d.courseName).trim(),
         type: d.type || courseKind, credits: d.credits ?? 0, teaching_hours: th, teaching_periods: tp,
         cie_marks: d.cieMarks ?? 0, see_marks: d.seeMarks ?? 0,
         examination_type: d.examinationType || null, examination_type_id: examTypeId,
         examination_hours_cie: d.examinationHoursCie || null, examination_hours_see: d.examinationHoursSee || null,
         cie_duration: d.examinationHoursCie || null, see_duration: d.examinationHoursSee || null,
         objectives_json: objectives, outcomes_json: outcomes, pedagogy,
-        semester: d.semester || courseSem, year_label: d.yearLabel || (mode === 'yearly' || mode === 'yearly_semester' ? courseYearLabel : null),
+        semester: d.semester || courseSem, year_label: d.yearLabel || (mode === 'yearly' ? courseYearLabel : null),
         year_number: d.yearLabel ? (ROMAN.indexOf(String(d.yearLabel).replace('Year ', '').trim()) + 1 || null) : null,
       };
-      if ((mode === 'yearly' || mode === 'yearly_semester') && !payload.year_label) { errs.push(`${d.code}: Year required for this program`); fail++; continue; }
+      if (mode === 'yearly' && !payload.year_label) { errs.push(`${d.code}: Year required for this program`); fail++; continue; }
       try {
         const res = await apiCall(`${apiUrl}/api/courses`, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Create failed'); }
@@ -1272,32 +1306,28 @@ export default function Home() {
     if (ok) { alert(`Published ${ok} paper(s)${fail ? `, ${fail} failed:\n` + errs.join('\n') : '.'}`); setSyllabusParsed(null); setSyllabusDrafts([]); setSyllabusFile(null); fetchData(); }
     else alert('All failed:\n' + errs.join('\n'));
   };
+  const parseDurationToHM = (s) => { const m = String(s||'').match(/(\d+)\s*h/i); const n = String(s||'').match(/(\d+)\s*m/i); return { h: m ? m[1] : '', mm: n ? n[1] : '' }; };
   const applyParsedToCourseForm = () => {
     if (!syllabusParsed?.parsed) return;
     const p = syllabusParsed.parsed;
-    if (p.programName && !syllabusTargetDisc) {
-      // leave for user to pick program
-    }
     if (p.courseName) setCourseName(p.courseName);
     if (p.code) setCourseCode(p.code);
     if (p.type) setCourseKind(p.type);
     if (p.credits != null) setCourseCredits(p.credits);
-    if (p.teachingPeriods != null) setCoursePeriods(p.teachingPeriods);
-    else if (p.teachingHours != null) setCoursePeriods(Math.round(p.teachingHours * 60 / 45));
+    if (p.teachingHours != null) setCourseHours(String(p.teachingHours));
+    else if (p.teachingPeriods != null) setCourseHours(String(Math.round(p.teachingPeriods * 45 / 60 * 100)/100));
     if (p.cieMarks != null) setCourseCie(p.cieMarks);
     if (p.seeMarks != null) setCourseSee(p.seeMarks);
     if (p.examinationType) setCourseExamType(p.examinationType);
-    if (p.examinationHoursCie) setCourseCieDur(p.examinationHoursCie);
-    if (p.examinationHoursSee) setCourseSeeDur(p.examinationHoursSee);
+    if (p.examinationHoursCie) { const {h,mm}=parseDurationToHM(p.examinationHoursCie); setCourseCieH(h); setCourseCieM(mm); }
+    if (p.examinationHoursSee) { const {h,mm}=parseDurationToHM(p.examinationHoursSee); setCourseSeeH(h); setCourseSeeM(mm); }
     if (p.semester) setCourseSem(p.semester);
     if (p.yearLabel) setCourseYearLabel(p.yearLabel);
-    if (p.objectives?.length) setCourseObjectives(p.objectives.join('\n'));
+    if (p.objectives?.length) setCourseObjectives(p.objectives);
     if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t,i)=>({code:`CO${i+1}`, text:t})));
-    if (p.pedagogy) setCoursePedagogy(p.pedagogy);
-    if (p.modules?.length) {
-      // stash for save — topics go to Postgres after course created
-      setSyllabusParsed(prev => ({ ...prev, _pendingModules: p.modules }));
-    }
+    if (p.pedagogy) { const lines=String(p.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); setCoursePedagogyList(lines); setCoursePedagogy(String(p.pedagogy)); }
+    if (p.modules?.length) setSyllabusParsed(prev => ({ ...prev, _pendingModules: p.modules }));
+    setShowAddCourse(true);
     alert('Parsed fields filled into Add Course form — review and submit.');
   };
   const saveParsedAsCourse = async () => {
@@ -1316,18 +1346,17 @@ export default function Home() {
     const disc = dbData.curriculum.find(d=>d.id===discId);
     const mode = disc?.structure_mode || 'semester';
     const coursePayload = {
-      discipline_id: discId, course_type: courseType, code: String(p.code).trim(), name: String(p.courseName).trim(),
+      discipline_id: discId, code: String(p.code).trim(), name: String(p.courseName).trim(),
       type: p.type || courseKind, credits: p.credits ?? 0, teaching_hours: th, teaching_periods: tp,
       cie_marks: p.cieMarks ?? 0, see_marks: p.seeMarks ?? 0,
       examination_type: p.examinationType || null, examination_type_id: examTypeId,
       examination_hours_cie: p.examinationHoursCie || null, examination_hours_see: p.examinationHoursSee || null,
       cie_duration: p.examinationHoursCie || null, see_duration: p.examinationHoursSee || null,
       objectives_json: objectives, outcomes_json: outcomes, pedagogy,
-      semester: p.semester || courseSem, year_label: p.yearLabel || (mode==='yearly'||mode==='yearly_semester' ? courseYearLabel : null),
+      semester: p.semester || courseSem, year_label: p.yearLabel || (mode==='yearly' ? courseYearLabel : null),
       year_number: p.yearLabel ? (ROMAN.indexOf(String(p.yearLabel).replace('Year ','').trim())+1 || null) : null,
     };
     if (mode==='yearly' && !coursePayload.year_label) { alert('Choose a Year for this program.'); return; }
-    if (mode==='yearly_semester' && !coursePayload.year_label) { alert('Choose a Year.'); return; }
     setSyllabusSaving(true);
     try {
       const res = await apiCall(`${apiUrl}/api/courses`, { method:'POST', body: JSON.stringify(coursePayload) });
@@ -1874,7 +1903,7 @@ export default function Home() {
                       <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: 'var(--text-soft)' }}>Duration
                         <input type="number" min="1" max="99" placeholder="e.g. 2" value={newProgCatDurVal} onChange={e => setNewProgCatDurVal(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} />
                         <select value={newProgCatDurUnit} onChange={e => setNewProgCatDurUnit(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}>
-                          <option value="years">Years</option><option value="months">Months</option><option value="semesters">Semesters</option><option value="weeks">Weeks</option>
+                          <option value="years">Years</option><option value="months">Months</option>
                         </select>
                       </label>
                       <button type="button" onClick={handleAddProgCat} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Add</button>
@@ -1886,7 +1915,7 @@ export default function Home() {
                             <input value={progCatEditName} onChange={e=>setProgCatEditName(e.target.value)} style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'12px', width:'110px' }} />
                             <input type="number" min="1" max="99" value={progCatEditDurVal} onChange={e=>setProgCatEditDurVal(e.target.value)} placeholder="Dur" style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'12px', width:'60px' }} />
                             <select value={progCatEditDurUnit} onChange={e=>setProgCatEditDurUnit(e.target.value)} style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'11px' }}>
-                              <option value="years">Years</option><option value="months">Months</option><option value="semesters">Semesters</option><option value="weeks">Weeks</option>
+                              <option value="years">Years</option><option value="months">Months</option>
                             </select>
                             <button type="button" onClick={()=>handleUpdateProgCat(cat)} style={{ background:'var(--primary)', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'99px', cursor:'pointer', fontSize:'11px' }}>Save</button>
                             <button type="button" onClick={()=>setEditingProgCat(null)} style={{ background:'none', border:'1px solid var(--border)', padding:'3px 10px', borderRadius:'99px', cursor:'pointer', fontSize:'11px' }}>Cancel</button>
@@ -1916,22 +1945,33 @@ export default function Home() {
                       </label>
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Structure
                         <select value={newDiscStructure} onChange={e => setNewDiscStructure(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }} title="Structure">
-                          <option value="semester">Semester only</option>
-                          <option value="yearly">Yearly only</option>
-                          <option value="yearly_semester">Yearly + Semester</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                          <option value="semester">Semester Based</option>
                         </select>
                       </label>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      {(newDiscStructure === 'yearly' || newDiscStructure === 'yearly_semester') && (
-                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Years
-                          <input type="number" min="1" max="10" value={newDiscYearCount} onChange={e => setNewDiscYearCount(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
+                      {newDiscStructure === 'monthly' && (
+                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Months (equal split)
+                          <input type="number" min="1" max="24" value={newDiscMonthCount} onChange={e => setNewDiscMonthCount(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px' }} />
                         </label>
                       )}
-                      {(newDiscStructure === 'semester' || newDiscStructure === 'yearly_semester') && (
-                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Semesters per Year
-                          <input type="number" min="1" max="4" value={newDiscSemPerYear} onChange={e => setNewDiscSemPerYear(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px' }} />
+                      {newDiscStructure === 'yearly' && (
+                        <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Years {categoryLimit ? <span style={{ fontWeight:400, color:'var(--text-faint)' }}>(max {maxYearsForProgram} from category)</span> : null}
+                          <input type="number" min="1" max={maxYearsForProgram} value={newDiscYearCount} onChange={e => setNewDiscYearCount(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
                         </label>
+                      )}
+                      {newDiscStructure === 'semester' && (
+                        <>
+                          <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Years {categoryLimit ? <span style={{ fontWeight:400, color:'var(--text-faint)' }}>(max {maxYearsForProgram})</span> : null}
+                            <input type="number" min="1" max={maxYearsForProgram} value={newDiscYearCount} onChange={e => { setNewDiscYearCount(e.target.value); const y=Number(e.target.value)||1; const tot=Number(newDiscTotalSems)||4; if(tot%y!==0) setNewDiscTotalSems(String(Math.ceil(tot/y)*y)); }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>No. of Semesters (total, equally divided)
+                            <input type="number" min="1" max="20" value={newDiscTotalSems} onChange={e => { const v=Number(e.target.value)||1; setNewDiscTotalSems(e.target.value); const y=Number(newDiscYearCount)||1; if(v%y===0) setNewDiscSemPerYear(String(v/y)); }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px' }} />
+                          </label>
+                          <span style={{ fontSize: '11px', color: 'var(--text-faint)', alignSelf: 'flex-end', paddingBottom: '8px' }}>= {Number(newDiscTotalSems)%Number(newDiscYearCount||1)===0 ? `${Number(newDiscTotalSems)/Number(newDiscYearCount||1)}/yr` : 'must divide equally'}</span>
+                        </>
                       )}
                       <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)', gap: '3px' }}>Period duration (mins)
                         <input type="number" min="10" max="120" value={newDiscPeriodMins} onChange={e => setNewDiscPeriodMins(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px' }} title="Minutes per period — used for hours↔periods everywhere for this program" />
@@ -1969,10 +2009,11 @@ export default function Home() {
                             <td style={{ padding: '8px' }}><label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Category<br /><select value={discEditCat} onChange={e => setDiscEditCat(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }}><option value="">—</option>{(dbData.program_categories||[]).map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}</select></label></td>
                             <td style={{ padding: '8px' }}>
                               <label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Structure<br /><select value={discEditStructure} onChange={e => setDiscEditStructure(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }}>
-                                <option value="semester">Semester only</option><option value="yearly">Yearly only</option><option value="yearly_semester">Yearly + Semester</option>
+                                <option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="semester">Semester Based</option>
                               </select></label>
-                              {(discEditStructure === 'yearly' || discEditStructure === 'yearly_semester') && <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Years<br /><input type="number" min="1" max="10" value={discEditYearCount} onChange={e => setDiscEditYearCount(e.target.value)} placeholder="Years" title="Years" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} /></label>}
-                              {(discEditStructure === 'semester' || discEditStructure === 'yearly_semester') && <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Sems/Year<br /><input type="number" min="1" max="4" value={discEditSemPerYear} onChange={e => setDiscEditSemPerYear(e.target.value)} placeholder="Sems/Year" title="Sems per Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label>}
+                              {discEditStructure === 'monthly' && <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Months<br /><input type="number" min="1" max="24" value={discEditMonthCount} onChange={e => setDiscEditMonthCount(e.target.value)} placeholder="Months" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} /></label>}
+                              {discEditStructure === 'yearly' && <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Years<br /><input type="number" min="1" max="10" value={discEditYearCount} onChange={e => setDiscEditYearCount(e.target.value)} placeholder="Years" title="Years" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} /></label>}
+                              {discEditStructure === 'semester' && <><label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Years<br /><input type="number" min="1" max="10" value={discEditYearCount} onChange={e => setDiscEditYearCount(e.target.value)} placeholder="Years" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', marginBottom: '6px' }} /></label><label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Sems/Year<br /><input type="number" min="1" max="4" value={discEditSemPerYear} onChange={e => setDiscEditSemPerYear(e.target.value)} placeholder="Sems/Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label></>}
                             </td>
                             <td style={{ padding: '8px' }}>
                               <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Mins<br /><input type="number" min="10" max="120" value={discEditPeriodMins} onChange={e => setDiscEditPeriodMins(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', marginBottom: '6px' }} /></label>
@@ -1980,7 +2021,7 @@ export default function Home() {
                             </td>
                             <td style={{ padding: '8px' }}><label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Description<br /><input value={discEditDesc} onChange={e => setDiscEditDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%' }} /></label></td>
                             <td style={{ padding: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              <button onClick={() => handleUpdateDiscipline(d, { name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim(), structure_mode: discEditStructure, year_count: Number(discEditYearCount) || 2, semesters_per_year: Number(discEditSemPerYear) || 2, category_id: discEditCat || null, period_minutes: Number(discEditPeriodMins) || 45, period_effective_from: discEditEffFrom || null })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                              <button onClick={() => { const b={ name: discEditName.trim(), levels: discEditLevels.trim(), description: discEditDesc.trim(), structure_mode: discEditStructure, category_id: discEditCat || null, period_minutes: Number(discEditPeriodMins) || 45, period_effective_from: discEditEffFrom || null }; if(discEditStructure==='monthly') b.month_count=Number(discEditMonthCount)||12; else if(discEditStructure==='yearly') b.year_count=Number(discEditYearCount)||2; else { b.year_count=Number(discEditYearCount)||2; b.semesters_per_year=Number(discEditSemPerYear)||2; } handleUpdateDiscipline(d,b); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                               <button onClick={() => setEditingDisc(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                             </td>
                           </tr>
@@ -1989,12 +2030,12 @@ export default function Home() {
                             <td style={{ padding: '10px 12px', fontWeight: 600 }}>{d.name}<br /><span style={{ fontWeight: 400, fontSize: '11.5px', color: 'var(--text-faint)' }}>{d.levels || ''}</span></td>
                             <td style={{ padding: '10px 12px' }}>{catName ? <span style={{ background: 'var(--primary)', color: '#fff', padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700 }}>{catName}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)', fontSize: '12.5px' }}>
-                              {d.structure_mode === 'yearly' ? `Yearly · ${d.year_count || 2} yrs` : d.structure_mode === 'yearly_semester' ? `Yearly + Sem · ${d.year_count || 2}y × ${d.semesters_per_year || 2}/yr` : `Semester · ${d.semesters_per_year || 2}/yr`}
+                              {d.structure_mode === 'monthly' ? `Monthly · ${d.month_count||12} mo` : d.structure_mode === 'yearly' ? `Yearly · ${d.year_count || 2} yrs` : `Semester · ${d.year_count||2}y × ${d.semesters_per_year || 2}/yr`}
                             </td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{d.period_minutes ? `${d.period_minutes} min` : '45 min'}{d.period_effective_from ? <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}><br />from {d.period_effective_from}</span> : ''}</td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.description || '—'}</td>
                             <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); setDiscEditYearCount(d.year_count || 2); setDiscEditSemPerYear(d.semesters_per_year || 2); setDiscEditCat(d.category_id || ''); setDiscEditPeriodMins(d.period_minutes || 45); setDiscEditEffFrom(d.period_effective_from || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); setDiscEditYearCount(d.year_count || 2); setDiscEditSemPerYear(d.semesters_per_year || 2); setDiscEditMonthCount(d.month_count||12); setDiscEditCat(d.category_id || ''); setDiscEditPeriodMins(d.period_minutes || 45); setDiscEditEffFrom(d.period_effective_from || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('curriculum', d.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                             </td>
                           </tr>
@@ -2024,21 +2065,32 @@ export default function Home() {
                         </select>
                         {selectedDisc && <span style={{ fontSize: '11px', color: 'var(--text-faint)', background: 'var(--bg)', padding: '3px 8px', borderRadius: '99px', border: '1px solid var(--border)' }}>{progMins} min / period</span>}
                       </div>
-                      {/* 2. Choose semester/year */}
+                      {/* 2. Year / Semester / Month — per structure */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>2. Semester / Year</label>
+                        <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>2. Year / Semester / Month</label>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
-                          {(selectedDiscStructure === 'yearly' || selectedDiscStructure === 'yearly_semester') && (
+                          {selectedDiscStructure === 'monthly' && (
+                            <select value={courseMonthLabel} onChange={e => setCourseMonthLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 140px' }}>
+                              {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          )}
+                          {selectedDiscStructure === 'yearly' && (
                             <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 140px' }}>
                               {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                             </select>
                           )}
-                          {(selectedDiscStructure === 'semester' || selectedDiscStructure === 'yearly_semester') && (
-                            <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 140px' }}>
-                              {courseSemesters.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                          {selectedDiscStructure === 'semester' && (
+                            <>
+                              <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px' }}>
+                                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                              </select>
+                              <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px' }}>
+                                {semestersForSelectedYear.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                              <span style={{ fontSize: '11px', color: 'var(--text-faint)', alignSelf: 'center' }}>Year {courseYearLabel.replace('Year ', '')} → {semestersForSelectedYear.join(', ')}</span>
+                            </>
                           )}
-                          {selectedDiscStructure !== 'yearly' && selectedDiscStructure !== 'yearly_semester' && selectedDiscStructure !== 'semester' && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Pick Program first</span>}
+                          {!['monthly','yearly','semester'].includes(selectedDiscStructure) && <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Pick Program first</span>}
                         </div>
                       </div>
                       {/* 3. Course name */}
@@ -2057,29 +2109,24 @@ export default function Home() {
                         <select value={courseKind} onChange={e => setCourseKind(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px' }} title="Type">
                           <option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option>
                         </select>
-                        {dbData.course_types.length > 0 ? (
-                          <select value={courseType} onChange={e => setCourseType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                            {dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                          </select>
-                        ) : <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>No programme types</span>}
                       </div>
                       {/* 6. Credits */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>6. No. of Credits</label>
                         <input type="number" min="0" placeholder="Credits" title="Credits" value={courseCredits} onChange={e => setCourseCredits(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
                       </div>
-                      {/* 7. Teaching hours (auto) */}
+                      {/* 7. Teaching hours → periods (reverse: hours input, periods auto) */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>7. Teaching Hours</label>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Periods
-                            <input type="number" min="0" placeholder="Periods" value={coursePeriods} onChange={e => setCoursePeriods(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Hours
+                            <input type="number" min="0" step="0.5" placeholder="Hours" value={courseHours} onChange={e => setCourseHours(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />
                           </label>
                           <span style={{ fontSize: '18px', color: 'var(--text-faint)', paddingTop: '14px' }}>→</span>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Hours (auto)
-                            <input type="text" value={derivedHours === '' ? '' : String(derivedHours)} readOnly placeholder="auto" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px', background: 'var(--bg)', color: 'var(--text-faint)' }} />
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Periods (auto)
+                            <input type="text" value={derivedPeriods === '' ? '' : String(derivedPeriods)} readOnly placeholder="auto" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px', background: 'var(--bg)', color: 'var(--text-faint)' }} />
                           </label>
-                          <span style={{ fontSize: '11px', color: 'var(--text-faint)', paddingTop: '14px' }}>periods × {progMins} min / 60 — not editable</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-faint)', paddingTop: '14px' }}>hours × 60 / {progMins} min — periods auto</span>
                         </div>
                       </div>
                       {/* 8. CIE Marks */}
@@ -2087,20 +2134,22 @@ export default function Home() {
                         <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>8. CIE Marks</label>
                         <input type="number" min="0" placeholder="CIE marks" value={courseCie} onChange={e => setCourseCie(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '120px' }} />
                       </div>
-                      {/* 9. CIE duration */}
+                      {/* 9. CIE duration — hours + mins */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>9. CIE Duration</label>
-                        <input placeholder="e.g. 45 Min" value={courseCieDur} onChange={e => setCourseCieDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                        <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="99" value={courseCieH} onChange={e=>setCourseCieH(e.target.value)} placeholder="hrs" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /> hrs</label>
+                        <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="59" value={courseCieM} onChange={e=>setCourseCieM(e.target.value)} placeholder="mins" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /> mins</label>
                       </div>
                       {/* 10. SEE Marks */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>10. SEE Marks</label>
                         <input type="number" min="0" placeholder="SEE marks" value={courseSee} onChange={e => setCourseSee(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '120px' }} />
                       </div>
-                      {/* 11. SEE duration */}
+                      {/* 11. SEE duration — hours + mins */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ width: '160px', fontSize: '12px', fontWeight: 700, color: 'var(--text-soft)', flexShrink: 0 }}>11. SEE Duration</label>
-                        <input placeholder="e.g. 1 hour" value={courseSeeDur} onChange={e => setCourseSeeDur(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px' }} />
+                        <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="99" value={courseSeeH} onChange={e=>setCourseSeeH(e.target.value)} placeholder="hrs" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /> hrs</label>
+                        <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="59" value={courseSeeM} onChange={e=>setCourseSeeM(e.target.value)} placeholder="mins" style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px' }} /> mins</label>
                       </div>
                       {/* 12. Exam type */}
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2254,7 +2303,7 @@ export default function Home() {
                                       <button type="button" onClick={() => updateDraft(idx, { modules: [{ module_number: 1, title: '', hours: null, rbt_level: '', methodology: '', co_mapping: '', topics: [] }] })} style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add module</button>
                                     )}
                                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
-                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingPeriods != null) setCoursePeriods(p.teachingPeriods); else if (p.teachingHours != null) setCoursePeriods(Math.round(p.teachingHours * 60 / 45)); if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p.examinationHoursCie) setCourseCieDur(p.examinationHoursCie); if (p.examinationHoursSee) setCourseSeeDur(p.examinationHoursSee); if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) { const lines=String(p.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); setCoursePedagogyList(lines); setCoursePedagogy(String(p.pedagogy)); } setShowAddCourse(true); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
+                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingHours != null) setCourseHours(String(p.teachingHours)); else if (p.teachingPeriods != null) setCourseHours(String(Math.round(p.teachingPeriods * 45 / 60 * 100)/100)); if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p.examinationHoursCie){ const m=String(p.examinationHoursCie).match(/(\d+)\s*h/i), n=String(p.examinationHoursCie).match(/(\d+)\s*m/i); setCourseCieH(m?m[1]:''); setCourseCieM(n?n[1]:''); } if (p.examinationHoursSee){ const m=String(p.examinationHoursSee).match(/(\d+)\s*h/i), n=String(p.examinationHoursSee).match(/(\d+)\s*m/i); setCourseSeeH(m?m[1]:''); setCourseSeeM(n?n[1]:''); } if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) { const lines=String(p.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); setCoursePedagogyList(lines); setCoursePedagogy(String(p.pedagogy)); } setShowAddCourse(true); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
                                       <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: d._verified ? 'var(--primary)' : 'var(--text-faint)', cursor: 'pointer', marginLeft: 'auto' }}><input type="checkbox" checked={!!d._verified} onChange={e => updateDraft(idx, { _verified: e.target.checked })} /> Mark verified</label>
                                     </div>
                                   </div>
@@ -2298,7 +2347,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Select Course — filtered list (fixes "Select vs Add" and ghost after delete). */}
+                {/* Select Course — filtered list */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-deep)' }}>Select Course:</span>
                   <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
@@ -2307,7 +2356,7 @@ export default function Home() {
                   </select>
                   <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
                     <option value="">All Types</option>
-                    {dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                    <option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option>
                   </select>
                   <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }}>
                     <option value="">All Years</option>
@@ -2318,7 +2367,7 @@ export default function Home() {
                     {Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                   {(filterDisc || filterType || filterSem || filterYear) && <button onClick={() => { setFilterDisc(''); setFilterType(''); setFilterSem(''); setFilterYear(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '12px' }}>Clear</button>}
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || c.course_type === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear)).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear)).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
                 </div>
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '820px' }}>
@@ -2329,8 +2378,8 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {(() => {
-                        const filtered = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || c.course_type === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear));
-                        if (filtered.length === 0) return <tr><td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>{dbData.courses.length === 0 ? 'No courses yet — use Add Course above.' : 'No courses match filters.'}</td></tr>;
+                        const filtered = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear));
+                        if (filtered.length === 0) return <tr><td colSpan="9" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>{dbData.courses.length === 0 ? 'No courses yet — use Add Course above.' : 'No courses match filters.'}</td></tr>;
                         return filtered.map(c => {
                           const prog = dbData.curriculum.find(d => d.id === c.discipline_id);
                           const isEditing = editingCourse === c.id;
@@ -2338,7 +2387,8 @@ export default function Home() {
                             return (
                               <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
                                 <td style={{ padding: '6px' }}><select value={editCourse.discipline_id || ''} onChange={e => setEditCourse({ ...editCourse, discipline_id: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', fontSize: '12px' }}>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
-                                <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px', marginLeft: '4px' }} placeholder="Name" /></td>
+                                <td style={{ padding: '6px' }}><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px' }} placeholder="Name" /></td>
+                                <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.course_type || ''} onChange={e => setEditCourse({ ...editCourse, course_type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}>{dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}</select><select value={editCourse.type || 'DSC'} onChange={e => setEditCourse({ ...editCourse, type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '70px', marginTop: '4px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.year_label || ''} onChange={e => setEditCourse({ ...editCourse, year_label: e.target.value || null, year_number: e.target.value ? ROMAN.indexOf(e.target.value.replace('Year ', '')) + 1 : null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="">—</option>{ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => setEditCourse({ ...editCourse, semester: e.target.value || null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
@@ -2354,7 +2404,8 @@ export default function Home() {
                           return (
                           <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td style={{ padding: '10px 8px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{prog?.name || '—'}</td>
-                            <td style={{ padding: '10px 8px' }}><button onClick={() => setActiveSyllabusCourse(c)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}><b style={{ color:'var(--primary)', textDecoration:'underline' }}>{c.code}</b><br /><span style={{ color:'var(--primary)', textDecoration:'underline', fontWeight:600 }}>{c.name}</span></button></td>
+                            <td style={{ padding: '10px 8px' }}><span style={{ color:'var(--primary)', textDecoration:'underline', fontWeight:600 }}>{c.name}</span></td>
+                            <td style={{ padding: '10px 8px' }}><button onClick={() => setActiveSyllabusCourse(c)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}><b style={{ color:'var(--primary)', textDecoration:'underline' }}>{c.code}</b></button></td>
                             <td style={{ padding: '10px 8px' }}>{c.type || c.course_type || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.year_label || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.semester || '—'}</td>
@@ -2363,7 +2414,7 @@ export default function Home() {
                             <td style={{ padding: '10px 8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                               {canAdmin('curriculum') && <button onClick={() => { setEditingCourse(c.id); setEditCourse({ ...c }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
-                              <button onClick={() => setActiveSyllabusCourse(c)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
+                              <button onClick={() => { setActiveSyllabusCourse(c); setShowAddSyllabus(true); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
                             </td>
                           </tr>
                           );
@@ -2578,7 +2629,7 @@ export default function Home() {
                                           <select value={modRbtDraft} onChange={e => setModRbtDraft(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px', flex: '1 1 160px' }}>
                                             {RBT_OPTS.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
                                           </select>
-                                          <button type="button" onClick={() => { if (!modRbtList.includes(modRbtDraft)) setModRbtList([...modRbtList, modRbtDraft]); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add RBT Level</button>
+                                          <button type="button" onClick={() => { if (!modRbtList.includes(modRbtDraft)) setModRbtList([...modRbtList, modRbtDraft].sort((a,b)=>{ const o={L1:1,L2:2,L3:3,L4:4,L5:5,L6:6}; return (o[a]||9)-(o[b]||9); })); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add RBT Level</button>
                                         </div>
                                         {modRbtList.length ? (
                                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

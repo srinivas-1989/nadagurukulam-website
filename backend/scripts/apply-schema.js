@@ -26,6 +26,7 @@ const FILES = [
   path.join(__dirname, '../../specs/supabase-roles-rename.sql'),
   path.join(__dirname, '../../specs/supabase-curriculum-rebuild.sql'),
   path.join(__dirname, '../../specs/supabase-category-duration.sql'),
+  path.join(__dirname, '../../specs/supabase-curriculum-structure-fix.sql'),
 ];
 
 (async () => {

@@ -552,15 +552,16 @@ const crud = (table, orderCol = 'created_at') => ({
         if (req.body.verified !== undefined && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) delete req.body.verified;
         if (req.body.verified_by !== undefined) delete req.body.verified_by;
       }
-      // ── courses: auto-derive teaching_hours via program period_minutes ──
+      // ── courses: hours input → auto periods via program mins (reverse of before); also normalize exam hrs/mins ──
       let payload = { ...req.body };
-      if (table === 'courses' && payload.teaching_periods !== undefined && payload.teaching_periods !== '' && payload.teaching_periods !== null) {
-        let mins = 45;
-        if (payload.discipline_id) {
-          try { const { data: d } = await supabase.from('disciplines').select('period_minutes').eq('id', payload.discipline_id).single(); if (d?.period_minutes) mins = d.period_minutes; } catch {}
+      if (table === 'courses') {
+        if (payload.teaching_hours !== undefined && payload.teaching_hours !== '' && payload.teaching_hours !== null) {
+          const h = Number(payload.teaching_hours); if (!Number.isFinite(h)||h<0) return res.status(400).json({ error: 'teaching_hours must be >=0' });
+          let mins = 45; if (payload.discipline_id) { try { const { data: d } = await supabase.from('disciplines').select('period_minutes').eq('id', payload.discipline_id).single(); if (d?.period_minutes) mins = d.period_minutes; } catch {} }
+          const p = derivePeriods(h, mins); if (p !== null) payload.teaching_periods = p;
         }
-        const derived = deriveHours(payload.teaching_periods, mins);
-        if (derived !== null) payload.teaching_hours = derived;
+        ['cie_hours','cie_mins','see_hours','see_mins'].forEach(k=>{ if(payload[k]==='') payload[k]=null; if(payload[k]!==undefined&&payload[k]!==null){ const v=Number(payload[k]); if(!Number.isFinite(v)||v<0) payload[k]=null; else payload[k]=Math.round(v); } });
+        if (payload.month_label === '') payload.month_label = null;
       }
       if (table === 'courses') {
         if (typeof payload.objectives_json === 'string') { try { payload.objectives_json = JSON.parse(payload.objectives_json); } catch {} }
@@ -579,16 +580,25 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'course_module_topics' && payload.description === '') payload.description = null;
       if (table === 'disciplines') {
         if (payload.category_id === '') payload.category_id = null;
+        if (payload.structure_mode && !['monthly','yearly','semester'].includes(payload.structure_mode)) return res.status(400).json({ error: 'Invalid structure_mode' });
+        if (payload.month_count !== undefined && payload.month_count !== '' && payload.month_count !== null) { const v=Number(payload.month_count); if(!Number.isFinite(v)||v<1||v>24) return res.status(400).json({ error: 'month_count 1..24' }); payload.month_count=Math.round(v); }
+        if (payload.month_count === '') payload.month_count = null;
+        if (payload.year_count !== undefined && payload.year_count !== '' && payload.year_count !== null) { const v=Number(payload.year_count); if(!Number.isFinite(v)||v<1||v>10) return res.status(400).json({ error: 'year_count 1..10' }); payload.year_count=Math.round(v); }
+        if (payload.semesters_per_year !== undefined && payload.semesters_per_year !== '' && payload.semesters_per_year !== null) { const v=Number(payload.semesters_per_year); if(!Number.isFinite(v)||v<1||v>4) return res.status(400).json({ error: 'semesters_per_year 1..4' }); payload.semesters_per_year=Math.round(v); }
         if (payload.period_minutes !== undefined && payload.period_minutes !== '' && payload.period_minutes !== null) {
           const v = Number(payload.period_minutes); payload.period_minutes = Number.isFinite(v) ? Math.min(120, Math.max(10, Math.round(v))) : 45;
         } else if (payload.period_minutes === '') payload.period_minutes = 45;
         if (payload.period_effective_from === '') payload.period_effective_from = null;
         if (payload.description === '') payload.description = null;
+        // enforce category duration limits: program total years/months must not exceed category
+        if (payload.category_id) {
+          try { const { data: cat } = await supabase.from('program_categories').select('duration_value, duration_unit').eq('id', payload.category_id).single(); if (cat?.duration_value) { const toYears=(v,u)=> u==='months'? v/12 : v; const progYears = payload.structure_mode==='monthly' ? (payload.month_count||0)/12 : Number(payload.year_count||0); if (progYears && progYears > toYears(cat.duration_value, cat.duration_unit)) return res.status(400).json({ error: `Program exceeds category duration ${cat.duration_value} ${cat.duration_unit}` }); } } catch {}
+        }
       }
       if (table === 'program_categories') {
         if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) return res.status(403).json({ error: 'Managing program categories requires Full access on Curriculum.' });
         if (payload.name !== undefined) payload.name = String(payload.name).trim();
-        if (payload.duration_unit !== undefined && payload.duration_unit !== '' && payload.duration_unit !== null && !['years','months','semesters','weeks'].includes(payload.duration_unit)) return res.status(400).json({ error: 'Invalid duration_unit' });
+        if (payload.duration_unit !== undefined && payload.duration_unit !== '' && payload.duration_unit !== null && !['years','months'].includes(payload.duration_unit)) return res.status(400).json({ error: 'Invalid duration_unit (years or months only)' });
         if (payload.duration_value !== undefined && payload.duration_value !== '' && payload.duration_value !== null) { const v=Number(payload.duration_value); if(!Number.isFinite(v)||v<1||v>99) return res.status(400).json({ error: 'duration_value 1..99' }); payload.duration_value=Math.round(v); }
         if (payload.duration_value === '') payload.duration_value = null;
         if (payload.duration_unit === '') payload.duration_unit = null;
@@ -720,12 +730,15 @@ const crud = (table, orderCol = 'created_at') => ({
         if (filtered.designation === '') filtered.designation = null;
         updateData = filtered;
       }
-      if (table === 'courses' && updateData.teaching_periods !== undefined && updateData.teaching_periods !== '' && updateData.teaching_periods !== null) {
-        let mins = 45;
-        const did = updateData.discipline_id || (await supabase.from('courses').select('discipline_id').eq('id', req.params.id).single().then(r=>r.data?.discipline_id).catch(()=>null));
-        if (did) { try { const { data: d } = await supabase.from('disciplines').select('period_minutes').eq('id', did).single(); if (d?.period_minutes) mins = d.period_minutes; } catch {} }
-        const derived = deriveHours(updateData.teaching_periods, mins);
-        if (derived !== null) updateData.teaching_hours = derived;
+      if (table === 'courses') {
+        if (updateData.teaching_hours !== undefined && updateData.teaching_hours !== '' && updateData.teaching_hours !== null) {
+          const h = Number(updateData.teaching_hours); if (!Number.isFinite(h)||h<0) return res.status(400).json({ error: 'teaching_hours must be >=0' });
+          let mins = 45; const did2 = updateData.discipline_id || (await supabase.from('courses').select('discipline_id').eq('id', req.params.id).single().then(r=>r.data?.discipline_id).catch(()=>null));
+          if (did2) { try { const { data: d } = await supabase.from('disciplines').select('period_minutes').eq('id', did2).single(); if (d?.period_minutes) mins = d.period_minutes; } catch {} }
+          const p = derivePeriods(h, mins); if (p!==null) updateData.teaching_periods = p;
+        }
+        ['cie_hours','cie_mins','see_hours','see_mins'].forEach(k=>{ if(updateData[k]==='') updateData[k]=null; if(updateData[k]!==undefined&&updateData[k]!==null){ const v=Number(updateData[k]); if(!Number.isFinite(v)||v<0) updateData[k]=null; else updateData[k]=Math.round(v); } });
+        if (updateData.month_label === '') updateData.month_label = null;
       }
       if (table === 'courses') {
         if (typeof updateData.objectives_json === 'string') { try { updateData.objectives_json = JSON.parse(updateData.objectives_json); } catch {} }
@@ -743,6 +756,11 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'course_module_topics' && updateData.description === '') updateData.description = null;
       if (table === 'disciplines') {
         if (updateData.category_id === '') updateData.category_id = null;
+        if (updateData.structure_mode && !['monthly','yearly','semester'].includes(updateData.structure_mode)) return res.status(400).json({ error: 'Invalid structure_mode' });
+        if (updateData.month_count !== undefined && updateData.month_count !== '' && updateData.month_count !== null) { const v=Number(updateData.month_count); if(!Number.isFinite(v)||v<1||v>24) return res.status(400).json({ error: 'month_count 1..24' }); updateData.month_count=Math.round(v); }
+        if (updateData.month_count === '') updateData.month_count = null;
+        if (updateData.year_count !== undefined && updateData.year_count !== '' && updateData.year_count !== null) { const v=Number(updateData.year_count); if(!Number.isFinite(v)||v<1||v>10) return res.status(400).json({ error: 'year_count 1..10' }); updateData.year_count=Math.round(v); }
+        if (updateData.semesters_per_year !== undefined && updateData.semesters_per_year !== '' && updateData.semesters_per_year !== null) { const v=Number(updateData.semesters_per_year); if(!Number.isFinite(v)||v<1||v>4) return res.status(400).json({ error: 'semesters_per_year 1..4' }); updateData.semesters_per_year=Math.round(v); }
         if (updateData.period_minutes !== undefined && updateData.period_minutes !== '' && updateData.period_minutes !== null) {
           const v = Number(updateData.period_minutes); updateData.period_minutes = Number.isFinite(v) ? Math.min(120, Math.max(10, Math.round(v))) : 45;
         } else if (updateData.period_minutes === '') updateData.period_minutes = 45;
@@ -752,7 +770,7 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'program_categories') {
         if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) return res.status(403).json({ error: 'Managing program categories requires Full access on Curriculum.' });
         if (updateData.name !== undefined) updateData.name = String(updateData.name).trim();
-        if (updateData.duration_unit !== undefined && updateData.duration_unit !== '' && updateData.duration_unit !== null && !['years','months','semesters','weeks'].includes(updateData.duration_unit)) return res.status(400).json({ error: 'Invalid duration_unit' });
+        if (updateData.duration_unit !== undefined && updateData.duration_unit !== '' && updateData.duration_unit !== null && !['years','months'].includes(updateData.duration_unit)) return res.status(400).json({ error: 'Invalid duration_unit (years or months only)' });
         if (updateData.duration_value !== undefined && updateData.duration_value !== '' && updateData.duration_value !== null) { const v=Number(updateData.duration_value); if(!Number.isFinite(v)||v<1||v>99) return res.status(400).json({ error: 'duration_value 1..99' }); updateData.duration_value=Math.round(v); }
         if (updateData.duration_value === '') updateData.duration_value = null;
         if (updateData.duration_unit === '') updateData.duration_unit = null;
