@@ -84,7 +84,7 @@ export default function Home() {
 
   // API Data State
   const [dbData, setDbData] = useState({
-    users: [], curriculum: [], batches: [], timetable: [],
+    users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], course_types: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
     class_entries: [], class_confirmations: []
@@ -216,7 +216,7 @@ export default function Home() {
     try {
       if (session?.user?.id) loadMyProfile(session.user.id);
       const endpoints = [
-        ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'],
+        ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'], ['timetable_periods', 'timetable_periods'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
@@ -345,6 +345,13 @@ export default function Home() {
   const [courseOutcomes, setCourseOutcomes] = useState([]); // [{code:'CO1', text:''}]
   const [coursePedagogy, setCoursePedagogy] = useState('');
   const [newExamTypeName, setNewExamTypeName] = useState('');
+  // Curriculum file import: DOCX/PDF/XLSX -> parsed preview -> verified save
+  const [syllabusFile, setSyllabusFile] = useState(null);
+  const [syllabusParsing, setSyllabusParsing] = useState(false);
+  const [syllabusParsed, setSyllabusParsed] = useState(null); // {filename,size,parsed,rawPreview}
+  const [syllabusParseErr, setSyllabusParseErr] = useState('');
+  const [syllabusSaving, setSyllabusSaving] = useState(false);
+  const [syllabusTargetDisc, setSyllabusTargetDisc] = useState('');
   // Postgres modules (course_modules + course_module_topics)
   const [modTitle, setModTitle] = useState('');
   const [modHours, setModHours] = useState('');
@@ -609,23 +616,30 @@ export default function Home() {
     setEditingBatch(null); fetchData();
   };
 
-  // Timetable — FIXED grid 08:15–16:00 (45m periods + breaks), XLS style.
-  // Columns always fixed: 1 2 3 | BREAK | 4 5 | LUNCH | NAP | EXTRA | STUDY — clubbed via colspan.
-  const FIXED_TT = [
-    { key:'p1', label:'1', start:'08:15', end:'09:00', kind:'period', num:1 },
-    { key:'p2', label:'2', start:'09:00', end:'09:45', kind:'period', num:2 },
-    { key:'p3', label:'3', start:'09:45', end:'10:30', kind:'period', num:3 },
-    { key:'br1', label:'BREAK', start:'10:30', end:'10:45', kind:'break' },
-    { key:'p4', label:'4', start:'10:45', end:'11:30', kind:'period', num:4 },
-    { key:'p5', label:'5', start:'11:30', end:'12:15', kind:'period', num:5 },
-    { key:'lunch', label:'LUNCH', start:'12:15', end:'13:00', kind:'break' },
-    { key:'nap', label:'NAP', start:'13:00', end:'13:25', kind:'break' },
-    { key:'extra', label:'EXTRA', start:'13:30', end:'14:30', kind:'block', num:6 },
-    { key:'study', label:'STUDY', start:'14:30', end:'16:00', kind:'block', num:7 },
+  // Timetable — dynamic columns (timetable_periods table) with 8-period fallback.
+  // Default: 1 2 3 | BREAK | 4 5 | LUNCH | NAP | 6 7 8  — clubbed via colspan inside segments. Admin can rename/reorder via Period Manager.
+  const FALLBACK_TT = [
+    { key:'p1', label:'1', start:'08:15', end:'09:00', kind:'period', num:1, sort_order:1 },
+    { key:'p2', label:'2', start:'09:00', end:'09:45', kind:'period', num:2, sort_order:2 },
+    { key:'p3', label:'3', start:'09:45', end:'10:30', kind:'period', num:3, sort_order:3 },
+    { key:'br1', label:'BREAK', start:'10:30', end:'10:45', kind:'break', num:null, sort_order:4 },
+    { key:'p4', label:'4', start:'10:45', end:'11:30', kind:'period', num:4, sort_order:5 },
+    { key:'p5', label:'5', start:'11:30', end:'12:15', kind:'period', num:5, sort_order:6 },
+    { key:'lunch', label:'LUNCH', start:'12:15', end:'13:00', kind:'break', num:null, sort_order:7 },
+    { key:'nap', label:'NAP', start:'13:00', end:'13:25', kind:'break', num:null, sort_order:8 },
+    { key:'p6', label:'6', start:'13:30', end:'14:30', kind:'period', num:6, sort_order:9 },
+    { key:'p7', label:'7', start:'14:30', end:'15:15', kind:'period', num:7, sort_order:10 },
+    { key:'p8', label:'8', start:'15:15', end:'16:00', kind:'period', num:8, sort_order:11 },
   ];
-  const FIXED_TEACH = FIXED_TT.filter(c=>c.kind!=='break');
-  const FIXED_MAP = Object.fromEntries(FIXED_TT.map(c=>[c.key,c]));
-  const TT_SEGMENTS = [['p1','p2','p3'],['p4','p5'],['extra','study']];
+  const TT = (() => {
+    const rows = (dbData.timetable_periods || []).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    if (!rows.length) return FALLBACK_TT;
+    return rows.map(r => ({ key:r.key, label:r.label, start:String(r.start_time||'').slice(0,5), end:String(r.end_time||'').slice(0,5), kind:r.kind, num:r.num ?? null, sort_order:r.sort_order, id:r.id }));
+  })();
+  const FIXED_TT = TT;
+  const FIXED_TEACH = TT.filter(c=>c.kind!=='break');
+  const FIXED_MAP = Object.fromEntries(TT.map(c=>[c.key,c]));
+  const TT_SEGMENTS = (() => { const segs=[]; let cur=[]; TT.forEach(c=>{ if(c.kind==='break'){ if(cur.length) segs.push([...cur]); cur=[]; } else cur.push(c.key); }); if(cur.length) segs.push(cur); return segs.length?segs:[FIXED_TEACH.map(c=>c.key)]; })();
   const ttSegmentOf = (k) => TT_SEGMENTS.findIndex(s=>s.includes(k));
   const slotsOverlap = (a, b) => a.start < b.end && b.start < a.end;
   const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -674,6 +688,18 @@ export default function Home() {
   const [editSlotInput, setEditSlotInput] = useState('');
   const [editSlotBatch, setEditSlotBatch] = useState('');
   const [timetableBatch, setTimetableBatch] = useState('');
+  const [timetableCombined, setTimetableCombined] = useState(false);
+  const [editingPeriodId, setEditingPeriodId] = useState(null);
+  const [periodKey, setPeriodKey] = useState('');
+  const [periodLabel, setPeriodLabel] = useState('');
+  const [periodStart, setPeriodStart] = useState('08:15');
+  const [periodEnd, setPeriodEnd] = useState('09:00');
+  const [periodKind, setPeriodKind] = useState('period');
+  const [periodNum, setPeriodNum] = useState('');
+  const [periodSort, setPeriodSort] = useState('');
+  const [showPeriodMgr, setShowPeriodMgr] = useState(false);
+  const [ttCourseIds, setTtCourseIds] = useState([]);
+  const [editTtCourseIds, setEditTtCourseIds] = useState([]);
   const slotDisplaySubjects = (s) => {
     if (s?.subjects && Array.isArray(s.subjects) && s.subjects.length) return s.subjects.join(' / ');
     if (s?.subject) return s.subject;
@@ -689,8 +715,8 @@ export default function Home() {
     if (!fc || !tc) return;
     const fi = FIXED_TT.findIndex(c=>c.key===newSlotFrom), ti = FIXED_TT.findIndex(c=>c.key===newSlotTo);
     if (ti < fi) { alert('Invalid period range'); return; }
-    if (ttSegmentOf(newSlotFrom) !== ttSegmentOf(newSlotTo)) { alert('Club only within same block: 1-3, or 4-5, or Extra+Study'); return; }
-    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: fc.start, end_time: tc.end, room: newSlotRoom.trim() || null, subject: subjectsArr[0], subjects: subjectsArr, period_number: fc.num || null };
+    if (ttSegmentOf(newSlotFrom) !== ttSegmentOf(newSlotTo)) { alert('Club only within same block (periods separated by breaks cannot be merged)'); return; }
+    const candidate = { batch_id: newSlotBatch, day_of_week: newSlotDay, start_time: fc.start, end_time: tc.end, room: newSlotRoom.trim() || null, subject: subjectsArr[0], subjects: subjectsArr, period_number: fc.num || null, course_ids: ttCourseIds.length ? ttCourseIds : null };
     const sameBatch = (a,b) => a===b;
     const sameRoom = (a,b) => a && b && String(a).trim() && String(b).trim() && String(a).trim()===String(b).trim();
     const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
@@ -706,19 +732,50 @@ export default function Home() {
     }
     const slotRes = await apiCall(`${apiUrl}/api/timetable`, { method: 'POST', body: JSON.stringify(candidate) });
     if (!slotRes.ok) { const x = await slotRes.json().catch(() => ({})); alert(x.error || 'Failed to add slot'); return; }
-    setNewSlotRoom(''); setNewSlotSubject(''); setNewSlotSubjects([]); setNewSlotInput(''); fetchData();
+    setNewSlotRoom(''); setNewSlotSubject(''); setNewSlotSubjects([]); setNewSlotInput(''); setTtCourseIds([]); fetchData();
   };
   const handleUpdateSlot = async (id) => {
     const fc = FIXED_MAP[editSlotFrom], tc = FIXED_MAP[editSlotTo];
     if (!fc || !tc) { alert('Pick period range'); return; }
     const fi = FIXED_TT.findIndex(c=>c.key===editSlotFrom), ti = FIXED_TT.findIndex(c=>c.key===editSlotTo);
     if (ti < fi) { alert('Invalid period range'); return; }
-    if (ttSegmentOf(editSlotFrom) !== ttSegmentOf(editSlotTo)) { alert('Club only within same block: 1-3, or 4-5, or Extra+Study'); return; }
+    if (ttSegmentOf(editSlotFrom) !== ttSegmentOf(editSlotTo)) { alert('Club only within same block (periods separated by breaks cannot be merged)'); return; }
     const subjectsArr = editSlotSubjects.length ? editSlotSubjects : (editSlotSubject.trim() ? [editSlotSubject.trim()] : []);
-    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: fc.start, end_time: tc.end, room: editSlotRoom.trim() || null, subject: subjectsArr[0] || null, subjects: subjectsArr, period_number: fc.num || null };
+    const payload = { batch_id: editSlotBatch || undefined, day_of_week: editSlotDay, start_time: fc.start, end_time: tc.end, room: editSlotRoom.trim() || null, subject: subjectsArr[0] || null, subjects: subjectsArr, period_number: fc.num || null, course_ids: editTtCourseIds.length ? editTtCourseIds : null };
     const res = await apiCall(`${apiUrl}/api/timetable/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Update failed'); return; }
     setEditingSlot(null); fetchData();
+  };
+  const handleAddPeriod = async (e) => {
+    e.preventDefault();
+    if (!periodKey.trim() || !periodLabel.trim()) { alert('Key and label required'); return; }
+    const key = periodKey.trim().toLowerCase().replace(/\s+/g, '_');
+    const so = periodSort !== '' ? Number(periodSort) : (Math.max(0, ...TT.map(c=>c.sort_order||0)) + 1);
+    const payload = { key, label: periodLabel.trim(), start_time: periodStart, end_time: periodEnd, kind: periodKind, num: periodNum !== '' ? Number(periodNum) : null, sort_order: so };
+    const res = await apiCall(`${apiUrl}/api/timetable_periods`, { method:'POST', body: JSON.stringify(payload) });
+    if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Add period failed'); return; }
+    setPeriodKey(''); setPeriodLabel(''); setPeriodNum(''); setPeriodSort(''); fetchData();
+  };
+  const handleUpdatePeriod = async () => {
+    if (!editingPeriodId) return;
+    const payload = { label: periodLabel.trim(), start_time: periodStart, end_time: periodEnd, kind: periodKind, num: periodNum !== '' ? Number(periodNum) : null, sort_order: periodSort !== '' ? Number(periodSort) : undefined };
+    const res = await apiCall(`${apiUrl}/api/timetable_periods/${editingPeriodId}`, { method:'PUT', body: JSON.stringify(payload) });
+    if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Update failed'); return; }
+    setEditingPeriodId(null); setPeriodKey(''); setPeriodLabel(''); setPeriodSort(''); fetchData();
+  };
+  const handleDeletePeriod = async (id) => {
+    if (!confirm('Delete period column? Slots keep their times.')) return;
+    await apiCall(`${apiUrl}/api/timetable_periods/${id}`, { method:'DELETE' }); fetchData();
+  };
+  const movePeriod = async (id, dir) => {
+    const sorted = [...TT].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const idx = sorted.findIndex(p=>p.id===id);
+    const swap = dir==='up' ? idx-1 : idx+1;
+    if (swap<0||swap>=sorted.length) return;
+    const a=sorted[idx], b=sorted[swap];
+    await apiCall(`${apiUrl}/api/timetable_periods/${a.id}`, { method:'PUT', body: JSON.stringify({ sort_order: b.sort_order }) });
+    await apiCall(`${apiUrl}/api/timetable_periods/${b.id}`, { method:'PUT', body: JSON.stringify({ sort_order: a.sort_order }) });
+    fetchData();
   };
 
   // ── Class completion loop — one entry per slot per date, student confirmations, analytics ──
@@ -1060,6 +1117,106 @@ export default function Home() {
     const j = await res.json().catch(()=>null);
     if (j?.id) setCourseExamTypeId(j.id);
     setNewExamTypeName(''); fetchData();
+  };
+  const parseSyllabusFile = async () => {
+    if (!syllabusFile) { alert('Pick a .docx/.pdf/.xlsx first'); return; }
+    if (syllabusFile.size > 15 * 1024 * 1024) { setSyllabusParseErr('File too large (max 15 MB)'); return; }
+    setSyllabusParsing(true); setSyllabusParseErr(''); setSyllabusParsed(null);
+    try {
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(syllabusFile); });
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      if (sess?.access_token) headers.Authorization = `Bearer ${sess.access_token}`;
+      const res = await fetch(`${apiUrl}/api/curriculum/parse`, { method: 'POST', headers, body: JSON.stringify({ filename: syllabusFile.name, mime: syllabusFile.type || 'application/octet-stream', data: b64 }) });
+      const j = await res.json().catch(()=>({}));
+      if (!res.ok) { setSyllabusParseErr(j.error || 'Parse failed'); return; }
+      setSyllabusParsed(j);
+      if (j.parsed?.programName) {
+        const hit = dbData.curriculum.find(d => d.name.toLowerCase() === String(j.parsed.programName).trim().toLowerCase());
+        if (hit) setSyllabusTargetDisc(hit.id);
+      }
+    } catch (e) { setSyllabusParseErr(String(e.message||e)); } finally { setSyllabusParsing(false); }
+  };
+  const applyParsedToCourseForm = () => {
+    if (!syllabusParsed?.parsed) return;
+    const p = syllabusParsed.parsed;
+    if (p.programName && !syllabusTargetDisc) {
+      // leave for user to pick program
+    }
+    if (p.courseName) setCourseName(p.courseName);
+    if (p.code) setCourseCode(p.code);
+    if (p.type) setCourseKind(p.type);
+    if (p.credits != null) setCourseCredits(p.credits);
+    if (p.teachingPeriods != null) setCoursePeriods(p.teachingPeriods);
+    else if (p.teachingHours != null) setCoursePeriods(Math.round(p.teachingHours * 60 / 45));
+    if (p.cieMarks != null) setCourseCie(p.cieMarks);
+    if (p.seeMarks != null) setCourseSee(p.seeMarks);
+    if (p.examinationType) setCourseExamType(p.examinationType);
+    if (p.examinationHoursCie) setCourseCieDur(p.examinationHoursCie);
+    if (p.examinationHoursSee) setCourseSeeDur(p.examinationHoursSee);
+    if (p.semester) setCourseSem(p.semester);
+    if (p.yearLabel) setCourseYearLabel(p.yearLabel);
+    if (p.objectives?.length) setCourseObjectives(p.objectives.join('\n'));
+    if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t,i)=>({code:`CO${i+1}`, text:t})));
+    if (p.pedagogy) setCoursePedagogy(p.pedagogy);
+    if (p.modules?.length) {
+      // stash for save — topics go to Postgres after course created
+      setSyllabusParsed(prev => ({ ...prev, _pendingModules: p.modules }));
+    }
+    alert('Parsed fields filled into Add Course form — review and submit.');
+  };
+  const saveParsedAsCourse = async () => {
+    if (!syllabusParsed?.parsed) return;
+    const p = syllabusParsed.parsed;
+    const discId = syllabusTargetDisc || courseDisc || dbData.curriculum[0]?.id;
+    if (!discId) { alert('Pick a Program first.'); return; }
+    if (!p.courseName || !p.code) { alert('Course Name and Code required — edit preview or course form.'); return; }
+    const matched = (dbData.examination_types||[]).find(t => t.name.toLowerCase()===String(p.examinationType||'').toLowerCase());
+    const examTypeId = matched?.id || courseExamTypeId || null;
+    const th = p.teachingHours != null ? p.teachingHours : (p.teachingPeriods != null ? Math.round(p.teachingPeriods * 45 / 60 * 100)/100 : null);
+    const tp = p.teachingPeriods ?? (p.teachingHours != null ? Math.round(p.teachingHours * 60 / 45) : null);
+    const objectives = (p.objectives||[]).filter(Boolean);
+    const outcomes = (p.outcomes||[]).filter(Boolean).map((t,i)=>({code:`CO${i+1}`, text:t}));
+    const pedagogy = String(p.pedagogy||'').trim() || null;
+    const disc = dbData.curriculum.find(d=>d.id===discId);
+    const mode = disc?.structure_mode || 'semester';
+    const coursePayload = {
+      discipline_id: discId, course_type: courseType, code: String(p.code).trim(), name: String(p.courseName).trim(),
+      type: p.type || courseKind, credits: p.credits ?? 0, teaching_hours: th, teaching_periods: tp,
+      cie_marks: p.cieMarks ?? 0, see_marks: p.seeMarks ?? 0,
+      examination_type: p.examinationType || null, examination_type_id: examTypeId,
+      examination_hours_cie: p.examinationHoursCie || null, examination_hours_see: p.examinationHoursSee || null,
+      cie_duration: p.examinationHoursCie || null, see_duration: p.examinationHoursSee || null,
+      objectives_json: objectives, outcomes_json: outcomes, pedagogy,
+      semester: p.semester || courseSem, year_label: p.yearLabel || (mode==='yearly'||mode==='yearly_semester' ? courseYearLabel : null),
+      year_number: p.yearLabel ? (ROMAN.indexOf(String(p.yearLabel).replace('Year ','').trim())+1 || null) : null,
+    };
+    if (mode==='yearly' && !coursePayload.year_label) { alert('Choose a Year for this program.'); return; }
+    if (mode==='yearly_semester' && !coursePayload.year_label) { alert('Choose a Year.'); return; }
+    setSyllabusSaving(true);
+    try {
+      const res = await apiCall(`${apiUrl}/api/courses`, { method:'POST', body: JSON.stringify(coursePayload) });
+      if (!res.ok) { const e=await res.json().catch(()=>({})); alert(e.error||'Create course failed'); return; }
+      const created = await res.json().catch(()=>null);
+      const courseId = created?.id;
+      const mods = syllabusParsed._pendingModules || p.modules || [];
+      if (courseId && mods.length) {
+        for (const mm of mods) {
+          const rr = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: courseId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
+          const mc = await rr.json().catch(()=>null);
+          const modId = mc?.id;
+          if (modId && mm.topics?.length) {
+            for (let i=0;i<mm.topics.length;i++) await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: mm.topics[i], sort_order: i }) });
+          }
+        }
+      }
+      // also save structured syllabus to Mongo for detail view
+      if (courseId && (objectives.length || outcomes.length || mods.length)) {
+        await apiCall(`${apiUrl}/api/curriculum-content/course_${courseId}`, { method:'PUT', body: JSON.stringify({ objectives, outcomes: outcomes.map(o=>o.text), pedagogy: pedagogy ? pedagogy.split('\n').filter(Boolean) : [], modules: mods.map(m=>({ title:m.title, hours:m.hours, rbt_level:m.rbt_level, methodology:m.methodology, co_mapping:m.co_mapping, topics:m.topics, description:'' })), assessments: '' }) }).catch(()=>{});
+      }
+      alert('Course + modules saved from file.');
+      setSyllabusParsed(null); setSyllabusFile(null); setSyllabusTargetDisc(''); fetchData();
+    } finally { setSyllabusSaving(false); }
   };
   const handleAddModule = async () => {
     if (!activeSyllabusCourse?.id || !modTitle.trim()) { alert('Enter module title'); return; }
@@ -1679,6 +1836,45 @@ export default function Home() {
                       </div>
                       <button type="submit" style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Add Course</button>
                     </form>
+
+                    {/* Import syllabus file — DOCX/PDF/XLSX parsed preview then verified save */}
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <b style={{ fontSize: '14px', color: 'var(--primary-deep)' }}>Import from file — DOCX / PDF / XLSX</b>
+                        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Parses program, CIE/SEE, hours/periods, objectives, outcomes, pedagogy, modules → preview → save verified</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <input type="file" accept=".docx,.pdf,.xlsx,.xls" onChange={e => { setSyllabusFile(e.target.files?.[0] || null); setSyllabusParsed(null); setSyllabusParseErr(''); }} style={{ flex: '1 1 200px', fontSize: '13px' }} />
+                        <select value={syllabusTargetDisc} onChange={e => setSyllabusTargetDisc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px', fontSize: '13px' }}>
+                          <option value="">Program (from file or pick)</option>
+                          {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                        <button type="button" onClick={parseSyllabusFile} disabled={!syllabusFile || syllabusParsing} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', opacity: syllabusParsing ? 0.6 : 1 }}>{syllabusParsing ? 'Parsing…' : 'Parse & preview'}</button>
+                      </div>
+                      {syllabusParseErr && <div style={{ color: 'var(--primary)', fontSize: '13px', background: 'var(--bg-saffron)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}>{syllabusParseErr}</div>}
+                      {syllabusParsed?.parsed && (
+                        <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                          <div style={{ padding: '10px 14px', background: 'var(--bg-saffron)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                            <b style={{ color: 'var(--primary-deep)' }}>{syllabusParsed.parsed.code || '—'} · {syllabusParsed.parsed.courseName || '—'}</b>
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-soft)' }}>{syllabusParsed.filename} · {syllabusParsed.parsed.modules?.length || 0} modules · {(syllabusParsed.size / 1024).toFixed(1)} KB</span>
+                          </div>
+                          <div style={{ padding: '12px 14px', fontSize: '12.5px', color: 'var(--text-soft)', display: 'grid', gap: '6px' }}>
+                            <div><b>Program:</b> {syllabusParsed.parsed.programName || '—'} · <b>Type:</b> {syllabusParsed.parsed.type || '—'} · <b>Sem:</b> {syllabusParsed.parsed.semester || '—'}{syllabusParsed.parsed.yearLabel ? ` · ${syllabusParsed.parsed.yearLabel}` : ''}</div>
+                            <div><b>Hours / Periods:</b> {syllabusParsed.parsed.teachingHours ?? '—'}{syllabusParsed.parsed.teachingPeriods ? ` / ${syllabusParsed.parsed.teachingPeriods}` : ''} · <b>Credits:</b> {syllabusParsed.parsed.credits ?? '—'} · <b>CIE/SEE:</b> {syllabusParsed.parsed.cieMarks ?? '—'} / {syllabusParsed.parsed.seeMarks ?? '—'}</div>
+                            {syllabusParsed.parsed.examinationType && <div><b>Exam:</b> {syllabusParsed.parsed.examinationType}{syllabusParsed.parsed.examinationHoursCie ? ` · CIE ${syllabusParsed.parsed.examinationHoursCie}` : ''}{syllabusParsed.parsed.examinationHoursSee ? ` · SEE ${syllabusParsed.parsed.examinationHoursSee}` : ''}</div>}
+                            {syllabusParsed.parsed.objectives?.length > 0 && <div><b>Objectives ({syllabusParsed.parsed.objectives.length}):</b> {syllabusParsed.parsed.objectives.slice(0, 3).join(' · ').slice(0, 200)}{syllabusParsed.parsed.objectives.length > 3 ? ' …' : ''}</div>}
+                            {syllabusParsed.parsed.outcomes?.length > 0 && <div><b>Outcomes ({syllabusParsed.parsed.outcomes.length}):</b> {syllabusParsed.parsed.outcomes.slice(0, 3).join(' · ').slice(0, 200)}{syllabusParsed.parsed.outcomes.length > 3 ? ' …' : ''}</div>}
+                            {syllabusParsed.parsed.pedagogy && <div><b>Pedagogy:</b> {String(syllabusParsed.parsed.pedagogy).split('\n').slice(0, 2).join(' · ').slice(0, 160)}</div>}
+                            {syllabusParsed.parsed.modules?.length > 0 && <div><b>Modules:</b> {syllabusParsed.parsed.modules.map(m => `${m.module_number}. ${m.title || 'Untitled'}${m.hours ? ` (${m.hours}h)` : ''}`).join(' · ').slice(0, 240)}</div>}
+                          </div>
+                          <div style={{ padding: '10px 14px', display: 'flex', gap: '8px', flexWrap: 'wrap', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+                            <button type="button" onClick={applyParsedToCourseForm} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Fill Add Course form ↓</button>
+                            <button type="button" onClick={saveParsedAsCourse} disabled={syllabusSaving} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px', opacity: syllabusSaving ? 0.6 : 1 }}>{syllabusSaving ? 'Saving…' : 'Save verified → course + modules'}</button>
+                            <button type="button" onClick={() => { setSyllabusParsed(null); setSyllabusFile(null); setSyllabusParseErr(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Clear</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Course types are data too — add, edit and delete freely. */}
                     <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2648,30 +2844,140 @@ export default function Home() {
                     ) : (
                       <input placeholder="Class / Topic * (e.g. Practical 1, Theory)" value={newSlotSubject} onChange={e => setNewSlotSubject(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
                     )}
+                    <div style={{ flex: '1 1 220px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>{ttCourseIds.map(id => { const c=dbData.courses.find(x=>x.id===id); return <span key={id} style={{ background: 'var(--bg)', border: '1px solid var(--primary)', padding: '3px 8px', borderRadius: '99px', fontSize: '11px', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>{c ? `${c.code}` : id.slice(0,6)}<button type="button" onClick={()=>setTtCourseIds(a=>a.filter(x=>x!==id))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>×</button></span>; })}</div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select id="ttCoursePick" defaultValue="" onChange={e=>{ const v=e.target.value; if(v&&!ttCourseIds.includes(v)) setTtCourseIds(a=>[...a,v]); e.target.value=''; }} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: 1, fontSize: '12px' }}>
+                          <option value="">Link course (curriculum)…</option>
+                          {dbData.courses.map(c=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Optional: wire slot to curriculum course — drives teaching logs & filtered views. Free subjects still work as extra topics.</div>
+                    </div>
                     <input placeholder="Room (optional)" value={newSlotRoom} onChange={e => setNewSlotRoom(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '130px' }} />
                     <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add Slot</button>
                   </form>
                 )}
-                <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '10px', lineHeight: 1.5 }}>Fixed columns: <b>1</b> 08:15–09:00 · <b>2</b> 09:00–09:45 · <b>3</b> 09:45–10:30 · <b>BREAK</b> 10:30–10:45 · <b>4</b> 10:45–11:30 · <b>5</b> 11:30–12:15 · <b>LUNCH</b> 12:15–13:00 · <b>NAP</b> 13:00–13:25 · <b>EXTRA</b> 13:30–14:30 · <b>STUDY</b> 14:30–16:00 — club within 1-3, 4-5, or Extra+Study (spans columns).</div>
-
-                {/* Batch picker for the weekly grid */}
+                <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '10px', lineHeight: 1.5 }}>Columns: {TT.map(c=>`${c.kind==='break'?`[${c.label}]`:`<b>${c.label}</b>`} ${c.start}–${c.end}`).join(' · ')} — club within same break-separated block (colspan). Default 8 periods; edit below.</div>
+                {canAdmin('timetable') && (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <b style={{ fontSize: '13px', color: 'var(--primary-deep)' }}>Period manager — columns are data</b>
+                      <button type="button" onClick={()=>setShowPeriodMgr(v=>!v)} style={{ background: showPeriodMgr?'var(--primary)':'none', color: showPeriodMgr?'#fff':'var(--primary)', border: '1px solid var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>{showPeriodMgr ? 'Hide' : 'Edit columns'}</button>
+                    </div>
+                    {showPeriodMgr && (
+                      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <form onSubmit={handleAddPeriod} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                          <input placeholder="key (e.g. p9)" value={periodKey} onChange={e=>setPeriodKey(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '12px' }} required />
+                          <input placeholder="Label (e.g. 9)" value={periodLabel} onChange={e=>setPeriodLabel(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '12px' }} required />
+                          <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Start<input type="time" value={periodStart} onChange={e=>setPeriodStart(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', display: 'block' }} /></label>
+                          <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>End<input type="time" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', display: 'block' }} /></label>
+                          <select value={periodKind} onChange={e=>setPeriodKind(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}><option value="period">period</option><option value="break">break</option><option value="block">block</option></select>
+                          <input type="number" placeholder="No." value={periodNum} onChange={e=>setPeriodNum(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} title="period_number" />
+                          <input type="number" placeholder="Order" value={periodSort} onChange={e=>setPeriodSort(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} title="sort_order" />
+                          <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Add column</button>
+                        </form>
+                        <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                            <thead><tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}><th style={{ padding: '6px 8px' }}>Key/Label</th><th style={{ padding: '6px 8px' }}>Time</th><th style={{ padding: '6px 8px' }}>Kind</th><th style={{ padding: '6px 8px' }}>Order</th><th style={{ padding: '6px 8px' }}></th></tr></thead>
+                            <tbody>
+                              {TT.map(p => editingPeriodId===p.id ? (
+                                <tr key={p.id} style={{ background: 'var(--bg-saffron)', borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '6px' }}><span style={{ fontWeight: 600 }}>{p.key}</span><input value={periodLabel} onChange={e=>setPeriodLabel(e.target.value)} style={{ marginLeft: '6px', padding: '4px', border: '1px solid var(--border)', borderRadius: '4px', width: '80px' }} /></td>
+                                  <td style={{ padding: '6px', whiteSpace: 'nowrap' }}><input type="time" value={periodStart} onChange={e=>setPeriodStart(e.target.value)} style={{ padding: '4px', border: '1px solid var(--border)', borderRadius: '4px' }} />–<input type="time" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)} style={{ padding: '4px', border: '1px solid var(--border)', borderRadius: '4px' }} /></td>
+                                  <td style={{ padding: '6px' }}><select value={periodKind} onChange={e=>setPeriodKind(e.target.value)} style={{ padding: '4px', border: '1px solid var(--border)', borderRadius: '4px' }}><option value="period">period</option><option value="break">break</option><option value="block">block</option></select></td>
+                                  <td style={{ padding: '6px' }}><input type="number" value={periodSort} onChange={e=>setPeriodSort(e.target.value)} style={{ padding: '4px', border: '1px solid var(--border)', borderRadius: '4px', width: '60px' }} /></td>
+                                  <td style={{ padding: '6px', display: 'flex', gap: '4px' }}><button onClick={handleUpdatePeriod} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Save</button><button onClick={()=>setEditingPeriodId(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Cancel</button></td>
+                                </tr>
+                              ) : (
+                                <tr key={p.id||p.key} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '6px 8px' }}><b>{p.label}</b> <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>{p.key}{p.num?` · #${p.num}`:''}</span></td>
+                                  <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{p.start}–{p.end}</td>
+                                  <td style={{ padding: '6px 8px' }}><span style={{ padding: '1px 6px', borderRadius: '99px', background: p.kind==='break'?'var(--bg-saffron)':'var(--primary)', color: p.kind==='break'?'var(--text-soft)':'#fff', fontSize: '11px' }}>{p.kind}</span></td>
+                                  <td style={{ padding: '6px 8px' }}>{p.sort_order}</td>
+                                  <td style={{ padding: '6px 8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                    <button onClick={()=>movePeriod(p.id,'up')} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>↑</button>
+                                    <button onClick={()=>movePeriod(p.id,'down')} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>↓</button>
+                                    <button onClick={()=>{ setEditingPeriodId(p.id); setPeriodKey(p.key); setPeriodLabel(p.label); setPeriodStart(p.start); setPeriodEnd(p.end); setPeriodKind(p.kind); setPeriodNum(p.num?String(p.num):''); setPeriodSort(String(p.sort_order)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Edit</button>
+                                    <button onClick={()=>handleDeletePeriod(p.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Delete</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Reorder with ↑/↓ (swaps sort_order). Breaks split clubbing segments. Changes apply to grid instantly; existing slots keep their start/end times.</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Batch picker + combined view + search */}
                 {dbData.batches.length > 0 && (
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
                     <label style={{ fontSize: '13px', color: 'var(--text-soft)', fontWeight: 600 }}>Grid for batch</label>
-                    <select value={timetableBatch} onChange={e => setTimetableBatch(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '200px' }}>
+                    <select value={timetableBatch} onChange={e => { setTimetableBatch(e.target.value); setTimetableCombined(false); }} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '180px' }} disabled={timetableCombined}>
                       {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>Fixed grid — header period, sub-header timing, cell class (clubbed via colspan)</span>
+                    {canAdmin('timetable') && <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-soft)', cursor: 'pointer' }}><input type="checkbox" checked={timetableCombined} onChange={e=>setTimetableCombined(e.target.checked)} /> Combined (all batches)</label>}
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>{timetableCombined ? 'Admin combined — day × period stacked by batch' : 'header period, sub-header timing, cell class (colspan)'}</span>
                   </div>
                 )}
 
-                {/* Fixed weekly grid — 10 cols, breaks shaded, clubbed slots colspan */}
+                {/* Weekly grid — single or combined */}
                 {(() => {
+                  const gridDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                  const allSlots = dbData.timetable;
                   const batchId = timetableBatch || (dbData.batches[0]?.id || '');
-                  const batchSlots = batchId ? dbData.timetable.filter(s => s.batch_id === batchId) : [];
+                  if (timetableCombined && canAdmin('timetable')) {
+                    if (!allSlots.length) return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>No slots yet — add periods above.</div>;
+                    return (
+                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '16px' }}>
+                        <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-soft)', background: 'var(--bg-saffron)', borderBottom: '1px solid var(--border)' }}>Combined view — every batch stacked per period · <b>Edit</b> any chip via batch filter above</div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'fixed' }}>
+                          <colgroup><col style={{ width: '84px' }} />{FIXED_TT.map(c=><col key={c.key} style={{ width: c.kind==='break' ? '6%' : `${Math.max(7, (94 - FIXED_TT.filter(x=>x.kind==='break').length*6) / FIXED_TT.filter(x=>x.kind!=='break').length)}%` }} />)}</colgroup>
+                          <thead>
+                            <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+                              <th style={{ padding: '10px 8px', borderRight: '1px solid var(--border)', textAlign: 'left' }}>DAY</th>
+                              {FIXED_TT.map(col => <th key={col.key} style={{ padding: '8px 4px', borderRight: '1px solid var(--border)', fontWeight: col.kind==='break'?600:700, color: col.kind==='break'?'var(--text-faint)':'var(--primary-deep)', background: col.kind==='break'?'var(--bg-saffron)':'var(--bg)', fontSize: col.kind==='break'?'11px':'13px' }}>{col.label}</th>)}
+                            </tr>
+                            <tr style={{ background: 'var(--bg-saffron)', borderBottom: '2px solid var(--border)', textAlign: 'center', fontSize: '11px', color: 'var(--text-soft)' }}>
+                              <th style={{ padding: '5px 8px', borderRight: '1px solid var(--border)' }}></th>
+                              {FIXED_TT.map(col => <th key={col.key} style={{ padding: '5px 2px', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap', background: col.kind==='break'?'var(--bg-saffron)':'#fff' }}>{col.start}–{col.end.slice(0,5)}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {gridDays.map(day => (
+                              <tr key={day} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '10px 8px', fontWeight: 700, background: 'var(--bg)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{day.slice(0,3).toUpperCase()}</td>
+                                {FIXED_TT.map(col => {
+                                  if (col.kind==='break') return <td key={col.key} style={{ padding: '10px 4px', borderRight: '1px solid var(--border)', textAlign: 'center', background: 'var(--bg-saffron)', color: 'var(--text-faint)', fontSize: '10px', fontWeight: 600 }}>{col.label}</td>;
+                                  const starters = allSlots.filter(s=> s.day_of_week===day && slotToKeys(s).from===col.key);
+                                  const covered = allSlots.some(s=>{ if(s.day_of_week!==day) return false; const {from,to}=slotToKeys(s); const fi=FIXED_TT.findIndex(c=>c.key===from), ti=FIXED_TT.findIndex(c=>c.key===to); const ci=FIXED_TT.findIndex(c=>c.key===col.key); return ci>fi&&ci<=ti; });
+                                  if (covered) return null;
+                                  if (!starters.length) return <td key={col.key} style={{ padding: '8px 4px', borderRight: '1px solid var(--border)', textAlign: 'center', verticalAlign: 'middle', background: 'var(--surface)', color: 'var(--text-faint)', fontSize: '12px' }}>—</td>;
+                                  // use max span among starters for colspan, but render all starters stacked
+                                  const span = Math.max(...starters.map(s=>{ const {from,to}=slotToKeys(s); return FIXED_TT.findIndex(c=>c.key===to)-FIXED_TT.findIndex(c=>c.key===from)+1; }));
+                                  return (
+                                    <td key={col.key} colSpan={span>1?span:undefined} style={{ padding: '6px', borderRight: '1px solid var(--border)', verticalAlign: 'top', background: 'var(--surface)' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        {starters.map(slot => {
+                                          const batch = dbData.batches.find(b=>b.id===slot.batch_id);
+                                          return <div key={slot.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 6px', fontSize: '11.5px' }}><span style={{ fontWeight: 700, color: 'var(--primary-deep)' }}>{slotDisplaySubjects(slot)}</span><span style={{ color: 'var(--text-faint)' }}> · {batch?.name || '—'}{slot.room?` · ${slot.room}`:''}</span></div>;
+                                        })}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  }
+                  const batchSlots = batchId ? allSlots.filter(s => s.batch_id === batchId) : [];
                   if (!batchId) return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>Create a batch and add slots to see the weekly grid.</div>;
                   if (batchSlots.length === 0) return <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13.5px', marginBottom: '16px' }}>No slots for this batch yet — add the first period above (pick From/To to club periods).</div>;
-                  const gridDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
                   const daySlots = (day) => batchSlots.filter(s=>s.day_of_week===day);
                   const coveredForDay = (day) => {
                     const m=new Set();
@@ -2682,12 +2988,7 @@ export default function Home() {
                     });
                     return m;
                   };
-                  const starterForDay = (day, colKey) => {
-                    return daySlots(day).find(s=>{
-                      const {from}=slotToKeys(s);
-                      return from===colKey;
-                    }) || null;
-                  };
+                  const starterForDay = (day, colKey) => daySlots(day).find(s=> slotToKeys(s).from===colKey) || null;
                   return (
                     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '16px' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'fixed' }}>
@@ -2733,7 +3034,7 @@ export default function Home() {
                           })}
                         </tbody>
                       </table>
-                      <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-faint)', borderTop: '1px solid var(--border)' }}>Fixed PERIOD → timing → class. Club periods via From/To (within 1-3, 4-5, Extra+Study) — grid spans columns. BREAK/LUNCH/NAP always fixed columns.</div>
+                      <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--text-faint)', borderTop: '1px solid var(--border)' }}>PERIOD → timing → class. Club periods via From/To within same break-separated block. BREAK/LUNCH/NAP fixed.</div>
                     </div>
                   );
                 })()}

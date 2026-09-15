@@ -5,12 +5,18 @@ const { createClient } = require('@supabase/supabase-js');
 const mongoose = require('mongoose');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
-const multer = require('multer');
-const mammoth = require('mammoth');
-const pdfParse = require('pdf-parse');
-const XLSX = require('xlsx');
+let nodemailer = null;
+try { nodemailer = require('nodemailer'); } catch {}
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+let multer = null; let upload = null;
+try { multer = require('multer'); upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }); } catch {}
+
+let mammoth = null;
+try { mammoth = require('mammoth'); } catch {}
+let pdfParse = null;
+try { pdfParse = require('pdf-parse'); } catch {}
+let XLSX = null;
+try { XLSX = require('xlsx'); } catch {}
 
 // ── helpers ───────────────────────────────────────────────────────────────
 function deriveHours(periods) {
@@ -86,7 +92,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '16mb' }));
+app.use(express.json({ limit: '30mb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/api/health', (req, res) => res.json({ ok: true, cms: mongoose.connection.readyState === 1 ? 'up' : 'down' }));
@@ -210,6 +216,7 @@ const API_TO_MODULE = {
   jobs: 'jobs', enquiries: 'enquiries', activities: 'activities',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   course_types: 'curriculum', examination_types: 'curriculum',
+  timetable_periods: 'timetable',
   roles: 'roles', role_permissions: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
@@ -217,7 +224,7 @@ const API_TO_MODULE = {
 };
 // Reverse: table name → module_key (crud is instantiated with table names)
 const TABLE_TO_MODULE = {
-  disciplines: 'curriculum', timetable_slots: 'timetable',
+  disciplines: 'curriculum', timetable_slots: 'timetable', timetable_periods: 'timetable',
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   course_types: 'curriculum', examination_types: 'curriculum',
@@ -833,9 +840,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', course_types: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', course_types: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'course_types', 'examination_types', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'course_types', 'examination_types', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
@@ -870,6 +877,265 @@ const curriculumContentSchema = new mongoose.Schema({
   content: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { timestamps: true, collection: 'curriculum_content' });
 const CurriculumContent = mongoose.models.CurriculumContent || mongoose.model('CurriculumContent', curriculumContentSchema, 'curriculum_content');
+
+// ── Syllabus file parse — DOCX / PDF / XLSX → structured JSON preview ──────────
+// POST /api/curriculum/parse  multipart field "file"  (Manage on curriculum)
+// Pure parse, no DB write — frontend shows editable preview then saves via CRUD.
+function parseSyllabusText(raw) {
+  const txt = String(raw || '');
+  const linesRaw = txt.split('\n');
+  const lines = linesRaw.map(l => l.trim());
+  const nextAfter = (...labels) => {
+    for (const label of labels) {
+      const lab = label.toLowerCase();
+      for (let i = 0; i < lines.length; i++) {
+        const cur = lines[i].toLowerCase();
+        if (cur === lab || cur === lab + ':' || cur === lab + ' :') {
+          for (let j = i + 1; j < lines.length; j++) if (lines[j].trim()) return lines[j].trim();
+        }
+      }
+      // header-style without colon on its own line, value next non-empty
+      // also try inline "Label: value"
+      for (let i = 0; i < linesRaw.length; i++) {
+        const re = new RegExp('^\\s*' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*(.+)$', 'i');
+        const m = String(linesRaw[i] || '').match(re);
+        if (m && m[1].trim()) return m[1].trim();
+      }
+    }
+    return '';
+  };
+  const field = (label) => nextAfter(label);
+  const programName = field('Program Name') || field('Program');
+  const courseName = field('Course Name');
+  const code = field('Code');
+  const semesterRaw = field('Semester');
+  const typeRaw = (() => {
+    const v = field('Type');
+    if (/^(DSC|SEC|DSE|AECC|GE|Core)$/i.test(v)) return v.toUpperCase();
+    return v;
+  })();
+  const tpRaw = field('Teaching Hours/Periods') || field('Teaching Hours') || field('Teaching Periods');
+  let teachingHours = null, teachingPeriods = null;
+  if (tpRaw) {
+    const parts = tpRaw.split('/').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 2) { teachingHours = Number(parts[0]) || null; teachingPeriods = Number(parts[1]) || null; }
+    else if (parts.length === 1) {
+      const n = Number(parts[0]);
+      if (Number.isFinite(n)) teachingHours = n;
+    }
+  }
+  const cieMarksRaw = field('CIE Marks') || field('CIE');
+  const seeMarksRaw = field('SEE Marks') || field('SEE');
+  const creditsRaw = field('Credits');
+  const examType = field('Examination Type') || field('Exam Type');
+  const cieExamH = (txt.match(/CIE\s*:\s*([^\n]+)/i) || [])[1]?.trim() || '';
+  const seeExamH = (txt.match(/SEE\s*:\s*([^\n]+)/i) || [])[1]?.trim() || '';
+  // Year label if present (Year I / Year 1)
+  const yearRaw = field('Year') || field('Year Label');
+  const semester = (() => {
+    if (!semesterRaw) return '';
+    const s = semesterRaw.trim();
+    if (/^[IVX]+$/i.test(s)) return 'Semester ' + s.toUpperCase();
+    if (/^\d+$/.test(s)) { const rom = ['I','II','III','IV','V','VI','VII','VIII','IX','X']; const n = Number(s); if (n>=1&&n<=10) return 'Semester ' + rom[n-1]; }
+    return s;
+  })();
+  const yearLabel = (() => {
+    if (!yearRaw) return '';
+    const y = yearRaw.trim();
+    if (/^[IVX]+$/i.test(y)) return 'Year ' + y.toUpperCase();
+    if (/^\d+$/.test(y)) { const rom = ['I','II','III','IV','V','VI','VII','VIII','IX','X']; const n=Number(y); if(n>=1&&n<=10) return 'Year '+rom[n-1]; }
+    if (/^Year/i.test(y)) return y;
+    return y;
+  })();
+  const credits = creditsRaw ? Number(String(creditsRaw).replace(/[^0-9]/g,'')) || null : null;
+  const cieMarks = cieMarksRaw ? Number(String(cieMarksRaw).replace(/[^0-9]/g,'')) || null : null;
+  const seeMarks = seeMarksRaw ? Number(String(seeMarksRaw).replace(/[^0-9]/g,'')) || null : null;
+
+  const splitSentences = (block) => {
+    if (!block) return [];
+    const cleaned = block.replace(/\s+/g, ' ').trim();
+    // split on " . " or line breaks already collapsed
+    let items = [];
+    // try period split keeping meaning
+    const rawParts = block.split(/\n+/).map(s=>s.trim()).filter(s=> s && s.length>6 && !/^(OBJ|OUTCOMES|Pedagogy|Module|Hours|RBT|Teaching|CO Mapping|Suggested|Activity|Assessment)/i.test(s));
+    if (rawParts.length >= 2) items = rawParts;
+    else {
+      items = cleaned.split(/\.\s+/).map(s=>s.trim()).filter(Boolean).map(s=> s.endsWith('.')?s:s+'.');
+    }
+    return items.map(s=>s.replace(/\s+/g,' ').trim()).filter(s=>s.length>8);
+  };
+  const blockBetween = (startRe, endRe) => {
+    const s = txt.search(startRe);
+    if (s === -1) return '';
+    const after = txt.slice(s);
+    const e = after.search(endRe);
+    if (e === -1) return after;
+    // find actual end start
+    const slice = txt.slice(s);
+    const m = slice.match(endRe);
+    if (!m) return slice;
+    return slice.slice(0, m.index);
+  };
+  let objBlock = '';
+  {
+    const m = txt.match(/OBJ\w*CTIVES?\s*:?\s*\n+([\s\S]*?)(?=OUTCOMES?:|Pedagogy:\s|Module\s+\d)/i);
+    if (m) objBlock = m[1];
+  }
+  let outBlock = '';
+  {
+    const m = txt.match(/(?:^|\n)\s*OUTCOMES?\s*:?\s*(?:At the end[^\n]*\n+)?([\s\S]*?)(?=Pedagogy:\s|Module\s+\d\s*[-–])/i);
+    if (m) outBlock = m[1];
+  }
+  let pedBlock = '';
+  {
+    const m = txt.match(/Pedagogy:\s*([\s\S]*?)(?=Module\s+\d|Suggested Learning|Activity Based|Assessment Details|$)/i);
+    if (m) pedBlock = m[1];
+  }
+  const objectives = splitSentences(objBlock).slice(0, 12);
+  const outcomes = splitSentences(outBlock).slice(0, 12);
+  const pedagogyLines = pedBlock ? pedBlock.split('\n').map(s=>s.trim()).filter(s=> s && s.length>3 && !/^(Module|Hours|RBT|Teaching|CO Mapping)/i.test(s)).slice(0,8) : [];
+  const pedagogy = pedagogyLines.join('\n');
+
+  // Modules
+  const mods = [];
+  const modRe = /Module\s+(\d+)\s*[-–—:\s]*([^\n]*)/gi;
+  let m; const idxs=[];
+  while ((m = modRe.exec(txt)) !== null) idxs.push({ n: Number(m[1]), title: m[2].trim(), idx: m.index });
+  // Ignore duplicate numbering from appended syllabus docs concatenated — keep only first contiguous numbering run if Module 1 repeats far apart.
+  // If we see Module 1 again after Module 4 and gap>2000 chars, it indicates two syllabi concatenated; keep first syllabus only.
+  let cutIdx = idxs.length;
+  for (let i=1;i<idxs.length;i++) { if (idxs[i].n===1 && idxs[i].idx - idxs[i-1].idx > 1500) { cutIdx=i; break; } }
+  const useIdxs = idxs.slice(0, cutIdx);
+  for (let i=0;i<useIdxs.length;i++) {
+    const cur = useIdxs[i]; const nxt = useIdxs[i+1];
+    const block = txt.slice(cur.idx, nxt ? nxt.idx : txt.length);
+    const hrs = (block.match(/Hours:\s*\n*\s*(\d+)/i) || [])[1];
+    const rbt = (block.match(/RBT Level:\s*\n*\s*([^\n]+)/i) || [])[1]?.trim() || '';
+    const co = (block.match(/CO Mapping:\s*([^\n]+)/i) || [])[1]?.trim() || '';
+    // methodology: lines after "Teaching Methodology" until CO Mapping or topics
+    let methodology = '';
+    {
+      const mm = block.match(/Teaching\s*\n*Methodology\s*\n*([\s\S]*?)(?=(?:CO Mapping:|Module\s+\d|$))/i);
+      if (mm) {
+        const cand = mm[1].split('\n').map(s=>s.trim()).filter(Boolean);
+        // Methodology keywords — first 1-4 lines are methodology, rest are topics
+        const methKeywords = /^(Chalk|Practical|Seminar|Live Demo|Guiding|Listening|Inducing|Encouraging|Comparative|Lecture|Notation|Rhythmic|Creative)/i;
+        const methLines=[]; let k=0;
+        for (const ln of cand) {
+          if (k<4 && methKeywords.test(ln)) { methLines.push(ln); k++; }
+          else if (k>0 && k<4 && ln.length<60 && methKeywords.test(ln)) { methLines.push(ln); k++; }
+          else break;
+        }
+        methodology = methLines.join('\n');
+      }
+    }
+    // topics: remaining non-header lines between methodology and CO Mapping
+    const linesB = block.split('\n').map(s=>s.trim()).filter(s=> s);
+    const headerPats = [/^Module\s+\d+/i, /^Hours:/i, /^\d+$/, /^RBT Level:/i, /^L\d/i, /^Teaching$/i, /^Methodology$/i, /^CO Mapping:/i, /^Suggested/i, /^Activity/i, /^Assessment/i];
+    const isHeader = (ln) => headerPats.some(re=> re.test(ln));
+    // collect lines that are not header/methodology/co
+    const methSet = new Set(methodology.split('\n').map(s=>s.trim()).filter(Boolean));
+    const topics = [];
+    for (const ln of linesB) {
+      if (isHeader(ln)) continue;
+      if (methSet.has(ln)) continue;
+      if (/^L\d/.test(ln) && ln.length<12) continue; // RBT value alone like "L1 to L4"
+      if (/^CO\d/i.test(ln) && ln.length<10) continue;
+      if (ln.length<2) continue;
+      // Skip pedagogy blurb lines that leaked? keep short topic-like lines
+      if (ln.length>80) continue;
+      if (/^(Chalk|Practical|Seminar|Live Demo|Guiding|Listening|Inducing|Encouraging)/i.test(ln)) continue;
+      // Intro lines like "Madhyamakala Kritis in" or "Vilambakala Kritis in" — keep but trim " in"
+      let t = ln.replace(/\s+in\s*$/i,'').trim();
+      // skip standalone fragments like "Points to be consider..."
+      if (/^Points to be/i.test(t)) continue;
+      if (/^Raga bhava|^Shruti|^Sahitya|^Gamaka|^Broadening|^Control over/i.test(t)) continue;
+      if (/^Swathi|^Patnam|^On the basis|^o\s/i.test(t)) continue;
+      if (topics.includes(t)) continue;
+      topics.push(t);
+      if (topics.length>=20) break;
+    }
+    // Title fallback if empty or generic
+    let title = cur.title || '';
+    if (!title) title = topics[0] || `Module ${cur.n}`;
+    mods.push({ module_number: cur.n, title: title.slice(0,120), hours: hrs ? Number(hrs) : null, rbt_level: rbt || null, methodology: methodology || null, co_mapping: co || null, topics: topics.slice(0,20) });
+  }
+
+  return {
+    programName: programName || '',
+    courseName: courseName || '',
+    code: code || '',
+    type: typeRaw || 'DSC',
+    semester,
+    yearLabel,
+    teachingHours,
+    teachingPeriods,
+    cieMarks,
+    seeMarks,
+    credits,
+    examinationType: examType || '',
+    examinationHoursCie: cieExamH || '',
+    examinationHoursSee: seeExamH || '',
+    objectives,
+    outcomes,
+    pedagogy,
+    modules: mods,
+  };
+}
+
+async function bufferToText(buffer, orig, mime) {
+  const ext = String(orig || '').toLowerCase().split('.').pop() || '';
+  const mt = String(mime || '').toLowerCase();
+  if (ext === 'docx' || mt.includes('wordprocessingml') || mt.includes('officedocument')) {
+    if (!mammoth) throw Object.assign(new Error('DOCX parser not installed on server'), { status: 503 });
+    const r = await mammoth.extractRawText({ buffer });
+    return r.value || '';
+  }
+  if (ext === 'pdf' || mt.includes('pdf')) {
+    if (!pdfParse) throw Object.assign(new Error('PDF parser not installed on server'), { status: 503 });
+    const data = await pdfParse(buffer);
+    return data.text || '';
+  }
+  if (ext === 'xlsx' || ext === 'xls' || mt.includes('spreadsheetml') || mt.includes('excel')) {
+    if (!XLSX) throw Object.assign(new Error('XLSX parser not installed on server'), { status: 503 });
+    const wb = XLSX.read(buffer, { type: 'buffer' });
+    const sht = wb.Sheets[wb.SheetNames[0]];
+    if (!sht) throw Object.assign(new Error('XLSX has no sheets'), { status: 400 });
+    const rows = XLSX.utils.sheet_to_json(sht, { header: 1, defval: '' });
+    return rows.map(r => Array.isArray(r) ? r.join(' | ') : String(r)).join('\n');
+  }
+  throw Object.assign(new Error('Unsupported file type. Use .docx, .pdf, or .xlsx'), { status: 400 });
+}
+
+app.post('/api/curriculum/parse', authMiddleware, (req, res, next) => {
+  const ct = String(req.headers['content-type'] || '');
+  if (upload && ct.includes('multipart/form-data')) return upload.single('file')(req, res, next);
+  next();
+}, async (req, res) => {
+  try {
+    const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+    if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Manage on Curriculum required to parse syllabus files.' });
+    let buffer = null, orig = '', mime = '', size = 0;
+    if (req.file && req.file.buffer) {
+      buffer = req.file.buffer; orig = String(req.file.originalname || ''); mime = String(req.file.mimetype || ''); size = req.file.size || buffer.length;
+    } else if (req.body && req.body.data) {
+      orig = String(req.body.filename || req.body.originalname || req.body.name || 'upload.docx');
+      mime = String(req.body.mime || req.body.mimetype || '');
+      const b64 = String(req.body.data || '');
+      if (b64.length > 22 * 1024 * 1024) return res.status(413).json({ error: 'File too large (max 15 MB)' });
+      try { buffer = Buffer.from(b64, 'base64'); } catch { return res.status(400).json({ error: 'Invalid base64 data' }); }
+      size = buffer.length;
+    } else {
+      return res.status(400).json({ error: 'No file uploaded. Send multipart field "file" or JSON { filename, mime, data: base64 }' });
+    }
+    let text = '';
+    try { text = await bufferToText(buffer, orig, mime); }
+    catch (e) { const s = e.status || 422; return res.status(s).json({ error: 'Failed to extract text: ' + (e.message || e) }); }
+    if (!text || !text.trim()) return res.status(422).json({ error: 'No extractable text found in file.' });
+    const parsed = parseSyllabusText(text);
+    res.json({ filename: orig, size, parsed, rawPreview: text.slice(0, 4000) });
+  } catch (e) { res.status(500).json({ error: e.message || 'Parse failed' }); }
+});
 
 // Curriculum detailed syllabus content endpoint
 app.get('/api/curriculum-content/:key', async (req, res) => {
