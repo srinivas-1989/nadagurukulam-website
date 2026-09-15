@@ -347,8 +347,12 @@ export default function Home() {
   const [discEditPeriodMins, setDiscEditPeriodMins] = useState(45);
   const [discEditEffFrom, setDiscEditEffFrom] = useState('');
   const [newProgCatName, setNewProgCatName] = useState('');
+  const [newProgCatDurVal, setNewProgCatDurVal] = useState('');
+  const [newProgCatDurUnit, setNewProgCatDurUnit] = useState('years');
   const [editingProgCat, setEditingProgCat] = useState(null);
   const [progCatEditName, setProgCatEditName] = useState('');
+  const [progCatEditDurVal, setProgCatEditDurVal] = useState('');
+  const [progCatEditDurUnit, setProgCatEditDurUnit] = useState('years');
 
   // Course form (BPA/MPA syllabus header — image BCVP310) — 21-field header
   const [courseDisc, setCourseDisc] = useState('');
@@ -1107,13 +1111,18 @@ export default function Home() {
   };
   const handleAddProgCat = async () => {
     const name = newProgCatName.trim(); if (!name) return;
-    const res = await apiCall(`${apiUrl}/api/program_categories`, { method:'POST', body: JSON.stringify({ name }) });
+    const body = { name };
+    if (newProgCatDurVal) { body.duration_value = Number(newProgCatDurVal); body.duration_unit = newProgCatDurUnit; }
+    const res = await apiCall(`${apiUrl}/api/program_categories`, { method:'POST', body: JSON.stringify(body) });
     if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Add failed'); return; }
-    setNewProgCatName(''); fetchData();
+    setNewProgCatName(''); setNewProgCatDurVal(''); fetchData();
   };
   const handleUpdateProgCat = async (row) => {
     const name = progCatEditName.trim(); if (!name) return;
-    const res = await apiCall(`${apiUrl}/api/program_categories/${row.id}`, { method:'PUT', body: JSON.stringify({ name }) });
+    const body = { name };
+    if (progCatEditDurVal) { body.duration_value = Number(progCatEditDurVal); body.duration_unit = progCatEditDurUnit; }
+    else { body.duration_value = null; body.duration_unit = null; }
+    const res = await apiCall(`${apiUrl}/api/program_categories/${row.id}`, { method:'PUT', body: JSON.stringify(body) });
     if (!res.ok) { const j=await res.json().catch(()=>({})); alert(j.error||'Update failed'); return; }
     setEditingProgCat(null); fetchData();
   };
@@ -1861,21 +1870,31 @@ export default function Home() {
                   <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '14px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <b style={{ fontSize: '13px', color: 'var(--primary-deep)' }}>Program Categories</b>
-                      <input placeholder="New category (e.g. Diploma)" value={newProgCatName} onChange={e => setNewProgCatName(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px', fontSize: '13px' }} />
+                      <input placeholder="New category (e.g. Diploma)" value={newProgCatName} onChange={e => setNewProgCatName(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px', fontSize: '13px' }} />
+                      <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: 'var(--text-soft)' }}>Duration
+                        <input type="number" min="1" max="99" placeholder="e.g. 2" value={newProgCatDurVal} onChange={e => setNewProgCatDurVal(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} />
+                        <select value={newProgCatDurUnit} onChange={e => setNewProgCatDurUnit(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}>
+                          <option value="years">Years</option><option value="months">Months</option><option value="semesters">Semesters</option><option value="weeks">Weeks</option>
+                        </select>
+                      </label>
                       <button type="button" onClick={handleAddProgCat} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Add</button>
                     </div>
                     {(dbData.program_categories||[]).length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {(dbData.program_categories||[]).map(cat => editingProgCat===cat.id ? (
-                          <span key={cat.id} style={{ display:'flex', gap:'6px', alignItems:'center', background:'#fff', border:'1px solid var(--border)', padding:'4px 8px', borderRadius:'99px' }}>
-                            <input value={progCatEditName} onChange={e=>setProgCatEditName(e.target.value)} style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'12px', width:'120px' }} />
+                          <span key={cat.id} style={{ display:'flex', gap:'6px', alignItems:'center', background:'#fff', border:'1px solid var(--border)', padding:'4px 8px', borderRadius:'99px', flexWrap:'wrap' }}>
+                            <input value={progCatEditName} onChange={e=>setProgCatEditName(e.target.value)} style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'12px', width:'110px' }} />
+                            <input type="number" min="1" max="99" value={progCatEditDurVal} onChange={e=>setProgCatEditDurVal(e.target.value)} placeholder="Dur" style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'12px', width:'60px' }} />
+                            <select value={progCatEditDurUnit} onChange={e=>setProgCatEditDurUnit(e.target.value)} style={{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'99px', fontSize:'11px' }}>
+                              <option value="years">Years</option><option value="months">Months</option><option value="semesters">Semesters</option><option value="weeks">Weeks</option>
+                            </select>
                             <button type="button" onClick={()=>handleUpdateProgCat(cat)} style={{ background:'var(--primary)', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'99px', cursor:'pointer', fontSize:'11px' }}>Save</button>
                             <button type="button" onClick={()=>setEditingProgCat(null)} style={{ background:'none', border:'1px solid var(--border)', padding:'3px 10px', borderRadius:'99px', cursor:'pointer', fontSize:'11px' }}>Cancel</button>
                           </span>
                         ) : (
                           <span key={cat.id} style={{ display:'flex', gap:'6px', alignItems:'center', background:'#fff', border:'1px solid var(--border)', padding:'4px 10px', borderRadius:'99px', fontSize:'12.5px' }}>
-                            {cat.name}
-                            {canAdmin('curriculum') && <button type="button" onClick={()=>{setEditingProgCat(cat.id); setProgCatEditName(cat.name);}} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', color:'var(--primary)' }}>Edit</button>}
+                            {cat.name}{cat.duration_value ? <span style={{ fontSize:'11px', color:'var(--text-faint)', border:'1px solid var(--border)', padding:'1px 6px', borderRadius:'99px', background:'var(--bg)' }}>{cat.duration_value} {cat.duration_unit}</span> : null}
+                            {canAdmin('curriculum') && <button type="button" onClick={()=>{setEditingProgCat(cat.id); setProgCatEditName(cat.name); setProgCatEditDurVal(cat.duration_value ? String(cat.duration_value) : ''); setProgCatEditDurUnit(cat.duration_unit||'years');}} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', color:'var(--primary)' }}>Edit</button>}
                             {isFull('curriculum') && <button type="button" onClick={()=>{ if(confirm(`Delete category "${cat.name}"?`)) apiCall(`${apiUrl}/api/program_categories/${cat.id}`,{method:'DELETE'}).then(r=>{ if(!r.ok) r.json().then(j=>alert(j.error||'Delete failed')).catch(()=>alert('Delete failed')); else fetchData(); }); }} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'11px', color:'var(--primary)' }}>Delete</button>}
                           </span>
                         ))}

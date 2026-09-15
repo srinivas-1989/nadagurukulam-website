@@ -117,9 +117,14 @@ app.get('/api/public/jobs', async (req, res) => {
 });
 app.get('/api/public/disciplines', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('disciplines').select('*, program_categories(name)').order('name');
+    const { data, error } = await supabase.from('disciplines').select('*, program_categories(name, duration_value, duration_unit)').order('name');
     if (error) throw error;
-    const rows = (data || []).map(r => ({ ...r, category_name: r.program_categories?.name || null }));
+    const rows = (data || []).map(r => ({
+      ...r,
+      category_name: r.program_categories?.name || null,
+      category_duration_value: r.program_categories?.duration_value ?? null,
+      category_duration_unit: r.program_categories?.duration_unit ?? null,
+    }));
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -583,6 +588,11 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'program_categories') {
         if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) return res.status(403).json({ error: 'Managing program categories requires Full access on Curriculum.' });
         if (payload.name !== undefined) payload.name = String(payload.name).trim();
+        if (payload.duration_unit !== undefined && payload.duration_unit !== '' && payload.duration_unit !== null && !['years','months','semesters','weeks'].includes(payload.duration_unit)) return res.status(400).json({ error: 'Invalid duration_unit' });
+        if (payload.duration_value !== undefined && payload.duration_value !== '' && payload.duration_value !== null) { const v=Number(payload.duration_value); if(!Number.isFinite(v)||v<1||v>99) return res.status(400).json({ error: 'duration_value 1..99' }); payload.duration_value=Math.round(v); }
+        if (payload.duration_value === '') payload.duration_value = null;
+        if (payload.duration_unit === '') payload.duration_unit = null;
+        if ((payload.duration_value && !payload.duration_unit) || (!payload.duration_value && payload.duration_unit)) return res.status(400).json({ error: 'Set both duration value and unit, or neither' });
         if (!payload.name) return res.status(400).json({ error: 'name is required' });
       }
       if (table === 'course_syllabi') {
@@ -742,6 +752,10 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'program_categories') {
         if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) return res.status(403).json({ error: 'Managing program categories requires Full access on Curriculum.' });
         if (updateData.name !== undefined) updateData.name = String(updateData.name).trim();
+        if (updateData.duration_unit !== undefined && updateData.duration_unit !== '' && updateData.duration_unit !== null && !['years','months','semesters','weeks'].includes(updateData.duration_unit)) return res.status(400).json({ error: 'Invalid duration_unit' });
+        if (updateData.duration_value !== undefined && updateData.duration_value !== '' && updateData.duration_value !== null) { const v=Number(updateData.duration_value); if(!Number.isFinite(v)||v<1||v>99) return res.status(400).json({ error: 'duration_value 1..99' }); updateData.duration_value=Math.round(v); }
+        if (updateData.duration_value === '') updateData.duration_value = null;
+        if (updateData.duration_unit === '') updateData.duration_unit = null;
       }
       if (table === 'course_syllabi') {
         if (updateData.status && !['draft','published','archived'].includes(updateData.status)) return res.status(400).json({ error: 'Invalid status' });
