@@ -609,10 +609,12 @@ const crud = (table, orderCol = 'created_at') => ({
         if (!payload.course_id) return res.status(400).json({ error: 'course_id is required' });
         if (!payload.academic_year) return res.status(400).json({ error: 'academic_year is required (e.g. 2024-25)' });
         if (payload.status && !['draft','published','archived'].includes(payload.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (payload.version_number != null && payload.version_number !== '' && req.auth?.profile?.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can reset version number.' });
+        if (payload.version_number === '') payload.version_number = null;
         if (!payload.version_number) {
-          const { data: rows } = await supabase.from('course_syllabi').select('version_number').eq('course_id', payload.course_id).order('version_number', { ascending: false }).limit(1);
+          const { data: rows } = await supabase.from('course_syllabi').select('version_number').eq('course_id', payload.course_id).eq('academic_year', payload.academic_year).order('version_number', { ascending: false }).limit(1);
           payload.version_number = rows && rows[0] ? Number(rows[0].version_number) + 1 : 1;
-        }
+        } else payload.version_number = Math.max(1, Math.round(Number(payload.version_number)) || 1);
         if (payload.notes === '') payload.notes = null;
       }
       if (table === 'timetable_slots') {
@@ -779,6 +781,9 @@ const crud = (table, orderCol = 'created_at') => ({
         if (updateData.status && !['draft','published','archived'].includes(updateData.status)) return res.status(400).json({ error: 'Invalid status' });
         if (updateData.notes === '') updateData.notes = null;
         if (updateData.academic_year === '') return res.status(400).json({ error: 'academic_year cannot be empty' });
+        if (updateData.version_number !== undefined && updateData.version_number !== '' && updateData.version_number != null && req.auth?.profile?.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can reset version number.' });
+        if (updateData.version_number === '') updateData.version_number = null;
+        else if (updateData.version_number != null) updateData.version_number = Math.max(1, Math.round(Number(updateData.version_number)) || 1);
       }
       if (table === 'timetable_slots' && updateData.subjects !== undefined) {
         let arr = updateData.subjects;

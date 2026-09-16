@@ -401,7 +401,8 @@ export default function Home() {
   const [modMethod, setModMethod] = useState(''); // legacy single textarea
   const [editingModId, setEditingModId] = useState(null);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
-  const [syllModAcademicYear, setSyllModAcademicYear] = useState('2024-25');
+  const academicYearFor = (d=new Date()) => { const y=d.getFullYear(), m=d.getMonth()+1; const s=m>=4?y:y-1; return `${s}-${String(s+1).slice(2)}`; };
+  const [syllModAcademicYear, setSyllModAcademicYear] = useState(academicYearFor());
   const RBT_OPTS = [
     { v: 'L1', label: 'L1 — Remember' }, { v: 'L2', label: 'L2 — Understand' }, { v: 'L3', label: 'L3 — Apply' },
     { v: 'L4', label: 'L4 — Analyze' }, { v: 'L5', label: 'L5 — Evaluate' }, { v: 'L6', label: 'L6 — Create' },
@@ -410,6 +411,10 @@ export default function Home() {
   // Course list: inline edit + client filters ("Select Course" vs "Add Course")
   const [editingCourse, setEditingCourse] = useState(null);
   const [editCourse, setEditCourse] = useState({});
+  const [editObjectives, setEditObjectives] = useState([]);
+  const [editOutcomes, setEditOutcomes] = useState([]); // [{code,text}]
+  const [editPedagogyList, setEditPedagogyList] = useState([]);
+  const [editPedagogy, setEditPedagogy] = useState('');
   const [filterDisc, setFilterDisc] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterSem, setFilterSem] = useState('');
@@ -1457,9 +1462,21 @@ export default function Home() {
   };
 
   const handleUpdateCourse = async (id, payload) => {
-    const res = await apiCall(`${apiUrl}/api/courses/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    const full = {
+      ...payload,
+      objectives_json: editObjectives.filter(s=>String(s).trim()),
+      outcomes_json: editOutcomes.filter(o=>o.text.trim()).map(o=>({code:o.code,text:o.text.trim()})),
+      pedagogy: editPedagogyList.length ? editPedagogyList.filter(s=>String(s).trim()).join('\n') : (editPedagogy.trim()||null),
+    };
+    const res = await apiCall(`${apiUrl}/api/courses/${id}`, { method: 'PUT', body: JSON.stringify(full) });
     if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
-    setEditingCourse(null); fetchData();
+    setEditingCourse(null); setEditObjectives([]); setEditOutcomes([]); setEditPedagogyList([]); setEditPedagogy(''); fetchData();
+  };
+  const hydrateEditCourse = (c) => {
+    setEditingCourse(c.id); setEditCourse({ ...c });
+    try { const a=c.objectives_json; setEditObjectives(Array.isArray(a)?a:(typeof a==='string'?JSON.parse(a):[])); } catch { setEditObjectives([]); }
+    try { const j=c.outcomes_json; const arr=Array.isArray(j)?j:(typeof j==='string'?JSON.parse(j):[]); setEditOutcomes(arr.map((o,i)=>typeof o==='string'?{code:`CO${i+1}`,text:o}:{code:o.code||`CO${i+1}`,text:o.text||''})); } catch { setEditOutcomes([]); }
+    const ped=String(c.pedagogy||''); setEditPedagogy(ped); setEditPedagogyList(ped?ped.split('\n').map(s=>s.trim()).filter(Boolean):[]);
   };
 
   const currentModules = role ? MODULES.filter(m => perm(m.key)) : [];
@@ -2373,6 +2390,7 @@ export default function Home() {
                           const isEditing = editingCourse === c.id;
                           if (isEditing) {
                             return (
+                              <>
                               <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
                                 <td style={{ padding: '6px' }}><select value={editCourse.discipline_id || ''} onChange={e => setEditCourse({ ...editCourse, discipline_id: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', fontSize: '12px' }}>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px' }} placeholder="Name" /></td>
@@ -2384,9 +2402,31 @@ export default function Home() {
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.teaching_hours ?? ''} onChange={e => setEditCourse({ ...editCourse, teaching_hours: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} placeholder="Hrs" /></td>
                                 <td style={{ padding: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                   <button onClick={() => handleUpdateCourse(c.id, { code: editCourse.code, name: editCourse.name, discipline_id: editCourse.discipline_id, type: editCourse.type, semester: editCourse.semester || null, year_label: editCourse.year_label || null, year_number: editCourse.year_number || null, credits: editCourse.credits === '' ? null : Number(editCourse.credits), teaching_hours: editCourse.teaching_hours === '' ? null : Number(editCourse.teaching_hours) })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
-                                  <button onClick={() => setEditingCourse(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                                  <button onClick={() => { setEditingCourse(null); setEditObjectives([]); setEditOutcomes([]); setEditPedagogyList([]); setEditPedagogy(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                                 </td>
                               </tr>
+                              <tr key={`${c.id}-edit-extra`} style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                                <td colSpan={9} style={{ padding: '14px 12px' }}>
+                                  <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
+                                    <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><b style={{ fontSize:'12.5px', color:'var(--primary-deep)' }}>Objectives</b><button type="button" onClick={()=>setEditObjectives([...editObjectives,''])} style={{ background:'var(--accent)', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'4px', cursor:'pointer', fontSize:'11.5px' }}>+ Add Objective</button></div>
+                                      {editObjectives.length===0 ? <span style={{ fontSize:'12px', color:'var(--text-faint)' }}>No objectives — click Add.</span> : editObjectives.map((txt,j)=>(<div key={j} style={{ display:'flex', gap:'6px', alignItems:'center' }}><span style={{ minWidth:'18px', fontSize:'11px', fontWeight:700, color:'var(--primary)' }}>{j+1}.</span><input value={txt} onChange={e=>{ const a=[...editObjectives]; a[j]=e.target.value; setEditObjectives(a); }} placeholder={`Objective ${j+1}`} style={{ flex:1, padding:'7px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'13px' }} /><button type="button" onClick={()=>setEditObjectives(editObjectives.filter((_,k)=>k!==j))} style={{ background:'none', border:'1px solid var(--border)', padding:'4px 8px', borderRadius:'4px', cursor:'pointer', fontSize:'11px' }}>Remove</button></div>))}
+                                    </div>
+                                    <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><b style={{ fontSize:'12.5px', color:'var(--primary-deep)' }}>Outcomes (CO)</b><button type="button" onClick={()=>{ const n=editOutcomes.length+1; setEditOutcomes([...editOutcomes,{code:`CO${n}`,text:''}]); }} style={{ background:'var(--accent)', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'4px', cursor:'pointer', fontSize:'11.5px' }}>+ Add Outcome</button></div>
+                                      {editOutcomes.length===0 ? <span style={{ fontSize:'12px', color:'var(--text-faint)' }}>No outcomes — click Add.</span> : editOutcomes.map((o,oi)=>(<div key={oi} style={{ display:'flex', gap:'6px', alignItems:'center' }}><span style={{ background:'var(--primary)', color:'#fff', padding:'3px 8px', borderRadius:'99px', fontSize:'11px', fontWeight:700, minWidth:'38px', textAlign:'center' }}>{o.code}</span><input value={o.text} onChange={e=>{ const a=[...editOutcomes]; a[oi]={...a[oi],text:e.target.value}; setEditOutcomes(a); }} placeholder={`Outcome ${o.code}`} style={{ flex:1, padding:'7px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'13px' }} /><button type="button" onClick={()=>setEditOutcomes(editOutcomes.filter((_,k)=>k!==oi).map((x,i)=>({...x,code:`CO${i+1}`})))} style={{ background:'none', border:'1px solid var(--border)', padding:'4px 8px', borderRadius:'4px', cursor:'pointer', fontSize:'11px' }}>Remove</button></div>))}
+                                    </div>
+                                    <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><b style={{ fontSize:'12.5px', color:'var(--primary-deep)' }}>Pedagogy</b><button type="button" onClick={()=>setEditPedagogyList([...editPedagogyList,''])} style={{ background:'var(--accent)', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'4px', cursor:'pointer', fontSize:'11.5px' }}>+ Add Pedagogy</button></div>
+                                      {editPedagogyList.length===0 && !editPedagogy ? <span style={{ fontSize:'12px', color:'var(--text-faint)' }}>No pedagogy — click Add.</span> : null}
+                                      {editPedagogyList.map((txt,j)=>(<div key={j} style={{ display:'flex', gap:'6px', alignItems:'center' }}><span style={{ minWidth:'18px', fontSize:'11px', fontWeight:700, color:'var(--primary)' }}>{j+1}.</span><input value={txt} onChange={e=>{ const a=[...editPedagogyList]; a[j]=e.target.value; setEditPedagogyList(a); }} placeholder={`Pedagogy ${j+1}`} style={{ flex:1, padding:'7px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'13px' }} /><button type="button" onClick={()=>setEditPedagogyList(editPedagogyList.filter((_,k)=>k!==j))} style={{ background:'none', border:'1px solid var(--border)', padding:'4px 8px', borderRadius:'4px', cursor:'pointer', fontSize:'11px' }}>Remove</button></div>))}
+                                      {editPedagogyList.length===0 && editPedagogy ? <textarea value={editPedagogy} onChange={e=>setEditPedagogy(e.target.value)} rows={2} placeholder="Pedagogy (fallback)" style={{ padding:'8px', border:'1px solid var(--border)', borderRadius:'4px', fontFamily:'inherit', fontSize:'13px' }} /> : null}
+                                      <div style={{ fontSize:'11px', color:'var(--text-faint)' }}>Pedagogy items feed the Add Syllabus methodology dropdown (filtered).</div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                              </>
                             );
                           }
                           return (
@@ -2400,9 +2440,9 @@ export default function Home() {
                             <td style={{ padding: '10px 8px' }}>{c.credits ?? '—'}</td>
                             <td style={{ padding: '10px 8px', fontSize: '12.5px', color: 'var(--text-soft)' }}>{c.teaching_hours != null ? `${c.teaching_hours}${c.teaching_periods ? ` / ${c.teaching_periods}` : ''}` : '—'}</td>
                             <td style={{ padding: '10px 8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                              {canAdmin('curriculum') && <button onClick={() => { setEditingCourse(c.id); setEditCourse({ ...c }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {canAdmin('curriculum') && <button onClick={() => hydrateEditCourse(c)} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
-                              <button onClick={() => { setActiveSyllabusCourse(c); setShowAddSyllabus(true); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
+                              <button onClick={() => { setActiveSyllabusCourse(c); setShowAddSyllabus(true); setSyllModAcademicYear(academicYearFor()); setTimeout(()=>document.getElementById('add-syllabus-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),120); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
                             </td>
                           </tr>
                           );
@@ -2576,7 +2616,7 @@ export default function Home() {
                             );
                           })}
                           {canCreate('curriculum') && (
-                            <div style={{ background: 'var(--surface-muted)', border: '1.5px solid var(--primary)', borderRadius: '12px', overflow: 'hidden' }}>
+                            <div id="add-syllabus-panel" style={{ background: 'var(--surface-muted)', border: '1.5px solid var(--primary)', borderRadius: '12px', overflow: 'hidden' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: showAddSyllabus ? 'var(--primary)' : 'var(--bg-saffron)', color: showAddSyllabus ? '#fff' : 'var(--primary-deep)', cursor: 'pointer' }} onClick={() => setShowAddSyllabus(!showAddSyllabus)}>
                                 <b style={{ fontSize: '14px' }}>{showAddSyllabus ? '▾ Add Syllabus — Adding Modules' : '▸ Add Syllabus'}</b>
                                 <span style={{ fontSize: '11px', opacity: 0.85 }}>{showAddSyllabus ? 'Collapse' : 'Click to add modules'}</span>
@@ -2585,8 +2625,10 @@ export default function Home() {
                                 <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', background: '#fff' }}>
                                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '140px', flexShrink: 0 }}>Academic Year</label>
-                                    <input value={syllModAcademicYear} onChange={e => setSyllModAcademicYear(e.target.value)} placeholder="2024-25" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px', fontSize: '13px' }} />
-                                    <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Version auto-increments per course</span>
+                                    <input value={syllModAcademicYear} onChange={e => setSyllModAcademicYear(e.target.value)} placeholder={academicYearFor()} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px', fontSize: '13px' }} />
+                                    {(() => { const v=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear).reduce((m,s)=>Math.max(m,Number(s.version_number)||0),0)+1; return <span style={{ background:'var(--primary)', color:'#fff', padding:'3px 9px', borderRadius:'99px', fontSize:'11px', fontWeight:700 }}>V{v}</span>; })()}
+                                    <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Version auto-increments per course per year</span>
+                                    {role==='super_admin' && (()=>{ const ms=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear).reduce((m,s)=>Math.max(m,Number(s.version_number)||0),0); return ms>0 ? <button type="button" onClick={async()=>{ if(!confirm(`Reset versions for ${syllModAcademicYear}? Current max V${ms}. This will delete all V${ms} syllabi for this course/year (Super Admin only).`)) return; const toDel=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear&&Number(s.version_number)===ms); for(const s of toDel){ await apiCall(`${apiUrl}/api/course_syllabi/${s.id}`,{method:'DELETE'}); } alert(`Deleted V${ms} for ${syllModAcademicYear}. Next save will be V${ms} (reuse) or V${ms+1} if kept.`); fetchData(); }} style={{ background:'none', border:'1px solid var(--primary)', color:'var(--primary)', padding:'4px 10px', borderRadius:'4px', cursor:'pointer', fontSize:'11px' }}>Reset version</button> : null; })()}
                                   </div>
                                   <div style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2648,10 +2690,9 @@ export default function Home() {
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '7px' }}>Add Topic</label>
+                                      <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '7px' }}>Topics</label>
                                       <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <button type="button" onClick={() => setModTopics([...modTopics, { topic: '', description: '' }])} style={{ alignSelf: 'flex-start', background: 'none', border: '1.5px dashed var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add Topic</button>
-                                        {modTopics.length === 0 ? <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>No topics yet — click Add Topic (each topic has optional description).</span> : modTopics.map((t, i) => (
+                                        {modTopics.length === 0 ? <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>No topics yet — click Add Topic below (each topic has optional description).</span> : <>{modTopics.map((t, i) => (
                                           <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', background: '#fff', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px' }}>
                                             <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '22px', paddingTop: '8px' }}>{i + 1}.</span>
                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2664,7 +2705,8 @@ export default function Home() {
                                             </div>
                                             <button type="button" onClick={() => setModTopics(modTopics.filter((_, j)=>j!==i))} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', alignSelf: 'flex-start' }}>Remove</button>
                                           </div>
-                                        ))}
+                                        ))}</>}
+                                        <button type="button" onClick={() => setModTopics([...modTopics, { topic: '', description: '' }])} style={{ alignSelf: 'flex-start', background: 'none', border: '1.5px dashed var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add Topic</button>
                                         {modTopics.length===0 && modTopicsText ? (
                                           <label style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Bulk topics (fallback — one per line)
                                             <textarea value={modTopicsText} onChange={e=>setModTopicsText(e.target.value)} rows={2} placeholder="One topic per line (fallback) — or use Add Topic above" style={{ width: '100%', padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px', marginTop: '3px' }} />
@@ -2682,9 +2724,7 @@ export default function Home() {
                                                 <input type="checkbox" checked={modCo.includes(o.code)} onChange={e => {
                                                   const next = e.target.checked ? [...modCo, o.code] : modCo.filter(c=>c!==o.code);
                                                   setModCo(next);
-                                                  const last = e.target.checked ? o.code : next[next.length-1];
-                                                  const hit = coList.find(x=>x.code===last);
-                                                  setModCoDetail(hit ? `${hit.code}: ${hit.text}` : '');
+                                                  setModCoDetail(next.map(c=>{ const h=coList.find(x=>x.code===c); return h?`${h.code}: ${h.text}`:c; }).join('\n'));
                                                 }} style={{ accentColor: 'var(--primary)' }} />{o.code}
                                               </label>
                                             ))}
