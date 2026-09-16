@@ -455,6 +455,7 @@ export default function Home() {
   const progMins = (() => { const v = Number(selectedDisc?.period_minutes); return Number.isFinite(v) && v>=10 && v<=120 ? v : 45; })();
   const derivedPeriods = (() => { const h = Number(courseHours); if (!Number.isFinite(h)||h<=0) return ''; return Math.round(h*60/progMins); })();
   const pedagogyOptions = (() => {
+    if (activeSyllabusCourse?.pedagogy) { const t=String(activeSyllabusCourse.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); if(t.length) return t; }
     if (coursePedagogyList.length) return coursePedagogyList.filter(s=>String(s).trim());
     const t = String(coursePedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
     return t;
