@@ -403,6 +403,8 @@ export default function Home() {
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const academicYearFor = (d=new Date()) => { const y=d.getFullYear(), m=d.getMonth()+1; const s=m>=4?y:y-1; return `${s}-${String(s+1).slice(2)}`; };
   const [syllModAcademicYear, setSyllModAcademicYear] = useState(academicYearFor());
+  const [pendingSyllMods, setPendingSyllMods] = useState([]); // queued modules for one-version batch save
+  const [viewCourse, setViewCourse] = useState(null); // readOnly view (eye) — course+syllabus
   const RBT_OPTS = [
     { v: 'L1', label: 'L1 — Remember' }, { v: 'L2', label: 'L2 — Understand' }, { v: 'L3', label: 'L3 — Apply' },
     { v: 'L4', label: 'L4 — Analyze' }, { v: 'L5', label: 'L5 — Evaluate' }, { v: 'L6', label: 'L6 — Create' },
@@ -470,6 +472,8 @@ export default function Home() {
 
   useEffect(() => { if (!courseDisc && dbData.curriculum.length) setCourseDisc(dbData.curriculum[0].id); }, [dbData.curriculum]);
   useEffect(() => { const opts = semestersForSelectedYear; if (opts.length && !opts.includes(courseSem)) setCourseSem(opts[0]); }, [courseDisc, courseYearLabel]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (selectedDiscStructure !== 'semester' || !courseSem) return; const idx = courseSemesters.indexOf(courseSem); if (idx < 0) return; const per = Number(selectedDisc?.semesters_per_year) || 2; const want = `Year ${ROMAN[Math.floor(idx / per)] || 'I'}`; if (want !== courseYearLabel) setCourseYearLabel(want); }, [courseSem]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (activeModule === 'curriculum') { setShowAddCourse(false); setShowAddSyllabus(false); } }, [activeModule]);
   useEffect(() => {
     if (!selectedDisc) return;
     const mode = selectedDisc.structure_mode || 'semester';
@@ -1259,7 +1263,8 @@ export default function Home() {
       if (!res.ok) { setSyllabusParseErr(j.error || 'Parse failed'); return; }
       setSyllabusParsed(j);
       const papers = Array.isArray(j.papers) && j.papers.length ? j.papers : (j.parsed ? [j.parsed] : []);
-      setSyllabusDrafts(papers.map((p, i) => ({ ...p, _idx: i, _include: true, _verified: false, _expanded: i === 0 })));
+      const shred = (s)=>{ const m=String(s||'').match(/(\d+)\s*h/i), n=String(s||'').match(/(\d+)\s*m/i); return {h:m?m[1]:'',mm:n?n[1]:''}; };
+      setSyllabusDrafts(papers.map((p, i) => { const a=shred(p.examinationHoursCie), b=shred(p.examinationHoursSee); return { ...p, _idx: i, _include: true, _verified: false, _expanded: i === 0, _cieH: a.h, _cieM: a.mm, _seeH: b.h, _seeM: b.mm }; }));
       const prog = j.parsed?.programName || papers[0]?.programName;
       if (prog) {
         const hit = dbData.curriculum.find(d => d.name.toLowerCase() === String(prog).trim().toLowerCase());
@@ -1283,18 +1288,24 @@ export default function Home() {
     for (const d of toSave) {
       const matched = (dbData.examination_types || []).find(t => t.name.toLowerCase() === String(d.examinationType || '').toLowerCase());
       const examTypeId = matched?.id || courseExamTypeId || null;
-      const th = d.teachingHours != null ? d.teachingHours : (d.teachingPeriods != null ? Math.round(d.teachingPeriods * 45 / 60 * 100) / 100 : null);
-      const tp = d.teachingPeriods ?? (d.teachingHours != null ? Math.round(d.teachingHours * 60 / 45) : null);
+      const vM = Number(disc?.period_minutes); const minsEff = Number.isFinite(vM)&&vM>=10&&vM<=120?vM:45;
+      const thRaw = d.teachingHours; const th = thRaw!=null && thRaw!=='' ? Number(thRaw) : (d.teachingPeriods!=null ? Math.round(Number(d.teachingPeriods)*minsEff/60*100)/100 : null);
+      const tp = th!=null && Number.isFinite(th) && th>0 ? Math.round(th*60/minsEff) : null;
       const objectives = (d.objectives || []).filter(Boolean);
       const outcomes = (d.outcomes || []).filter(Boolean).map((t, i) => ({ code: `CO${i + 1}`, text: t }));
       const pedagogy = String(d.pedagogy || '').trim() || null;
+      const cieH = d._cieH, cieM = d._cieM, seeH = d._seeH, seeM = d._seeM;
+      const cieStr = (cieH!==''&&cieH!=null)||(cieM!==''&&cieM!=null) ? `${cieH||0}h ${cieM||0}m` : (d.examinationHoursCie || null);
+      const seeStr = (seeH!==''&&seeH!=null)||(seeM!==''&&seeM!=null) ? `${seeH||0}h ${seeM||0}m` : (d.examinationHoursSee || null);
       const payload = {
         discipline_id: discId, code: String(d.code).trim(), name: String(d.courseName).trim(),
         type: d.type || courseKind, credits: d.credits ?? 0, teaching_hours: th, teaching_periods: tp,
         cie_marks: d.cieMarks ?? 0, see_marks: d.seeMarks ?? 0,
         examination_type: d.examinationType || null, examination_type_id: examTypeId,
-        examination_hours_cie: d.examinationHoursCie || null, examination_hours_see: d.examinationHoursSee || null,
-        cie_duration: d.examinationHoursCie || null, see_duration: d.examinationHoursSee || null,
+        cie_hours: cieH===''?null:(cieH!=null?Number(cieH):null), cie_mins: cieM===''?null:(cieM!=null?Number(cieM):null),
+        see_hours: seeH===''?null:(seeH!=null?Number(seeH):null), see_mins: seeM===''?null:(seeM!=null?Number(seeM):null),
+        examination_hours_cie: cieStr, examination_hours_see: seeStr,
+        cie_duration: cieStr, see_duration: seeStr,
         objectives_json: objectives, outcomes_json: outcomes, pedagogy,
         semester: d.semester || courseSem, year_label: d.yearLabel || (mode === 'yearly' ? courseYearLabel : null),
         year_number: d.yearLabel ? (ROMAN.indexOf(String(d.yearLabel).replace('Year ', '').trim()) + 1 || null) : null,
@@ -1344,7 +1355,7 @@ export default function Home() {
     if (p.type) setCourseKind(p.type);
     if (p.credits != null) setCourseCredits(p.credits);
     if (p.teachingHours != null) setCourseHours(String(p.teachingHours));
-    else if (p.teachingPeriods != null) setCourseHours(String(Math.round(p.teachingPeriods * 45 / 60 * 100)/100));
+    else if (p.teachingPeriods != null) { const dd=dbData.curriculum.find(x=>x.id===(syllabusTargetDisc||courseDisc))||null; const mm2=(()=>{const v=Number(dd?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45;})(); setCourseHours(String(Math.round(Number(p.teachingPeriods)*mm2/60*100)/100)); }
     if (p.cieMarks != null) setCourseCie(p.cieMarks);
     if (p.seeMarks != null) setCourseSee(p.seeMarks);
     if (p.examinationType) setCourseExamType(p.examinationType);
@@ -1367,20 +1378,28 @@ export default function Home() {
     if (!p.courseName || !p.code) { alert('Course Name and Code required — edit preview or course form.'); return; }
     const matched = (dbData.examination_types||[]).find(t => t.name.toLowerCase()===String(p.examinationType||'').toLowerCase());
     const examTypeId = matched?.id || courseExamTypeId || null;
-    const th = p.teachingHours != null ? p.teachingHours : (p.teachingPeriods != null ? Math.round(p.teachingPeriods * 45 / 60 * 100)/100 : null);
-    const tp = p.teachingPeriods ?? (p.teachingHours != null ? Math.round(p.teachingHours * 60 / 45) : null);
+    const minsEff2 = (()=>{ const v=Number(dbData.curriculum.find(x=>x.id===discId)?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45; })();
+    const thRaw2 = p.teachingHours; const th = thRaw2!=null && thRaw2!=='' ? Number(thRaw2) : (p.teachingPeriods!=null ? Math.round(Number(p.teachingPeriods)*minsEff2/60*100)/100 : null);
+    const tp = th!=null && Number.isFinite(th) && th>0 ? Math.round(th*60/minsEff2) : null;
     const objectives = (p.objectives||[]).filter(Boolean);
     const outcomes = (p.outcomes||[]).filter(Boolean).map((t,i)=>({code:`CO${i+1}`, text:t}));
     const pedagogy = String(p.pedagogy||'').trim() || null;
     const disc = dbData.curriculum.find(d=>d.id===discId);
     const mode = disc?.structure_mode || 'semester';
+    const _shred2=(s)=>{const m=String(s||'').match(/(\d+)\s*h/i), n=String(s||'').match(/(\d+)\s*m/i); return {h:m?m[1]:'', mm:n?n[1]:''};};
+    const _a2 = p._cieH!=null||p._cieM!=null ? {h:p._cieH||'',mm:p._cieM||''} : _shred2(p.examinationHoursCie);
+    const _b2 = p._seeH!=null||p._seeM!=null ? {h:p._seeH||'',mm:p._seeM||''} : _shred2(p.examinationHoursSee);
+    const cieStr2 = (_a2.h!==''||_a2.mm!=='')?`${_a2.h||0}h ${_a2.mm||0}m`:(p.examinationHoursCie||null);
+    const seeStr2 = (_b2.h!==''||_b2.mm!=='')?`${_b2.h||0}h ${_b2.mm||0}m`:(p.examinationHoursSee||null);
     const coursePayload = {
       discipline_id: discId, code: String(p.code).trim(), name: String(p.courseName).trim(),
       type: p.type || courseKind, credits: p.credits ?? 0, teaching_hours: th, teaching_periods: tp,
       cie_marks: p.cieMarks ?? 0, see_marks: p.seeMarks ?? 0,
       examination_type: p.examinationType || null, examination_type_id: examTypeId,
-      examination_hours_cie: p.examinationHoursCie || null, examination_hours_see: p.examinationHoursSee || null,
-      cie_duration: p.examinationHoursCie || null, see_duration: p.examinationHoursSee || null,
+      cie_hours: _a2.h===''?null:(_a2.h!=null?Number(_a2.h):null), cie_mins: _a2.mm===''?null:(_a2.mm!=null?Number(_a2.mm):null),
+      see_hours: _b2.h===''?null:(_b2.h!=null?Number(_b2.h):null), see_mins: _b2.mm===''?null:(_b2.mm!=null?Number(_b2.mm):null),
+      examination_hours_cie: cieStr2, examination_hours_see: seeStr2,
+      cie_duration: cieStr2, see_duration: seeStr2,
       objectives_json: objectives, outcomes_json: outcomes, pedagogy,
       semester: p.semester || courseSem, year_label: p.yearLabel || (mode==='yearly' ? courseYearLabel : null),
       year_number: p.yearLabel ? (ROMAN.indexOf(String(p.yearLabel).replace('Year ','').trim())+1 || null) : null,
@@ -1433,42 +1452,54 @@ export default function Home() {
       const a = document.createElement('a'); a.href = url; a.download = 'NadaGurukulam_Curriculum_Import_Template.xlsx'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     } catch (e) { alert(String(e.message||e)); }
   };
-  const handleAddModule = async () => {
-    if (!activeSyllabusCourse?.id || !modTitle.trim()) { alert('Enter Module Name'); return; }
-    const all = dbData.course_modules.filter(m=>m.course_id===activeSyllabusCourse.id);
-    const maxNum = all.reduce((m,x)=>Math.max(m, Number(x.module_number)||0), 0);
-    const disc = dbData.curriculum.find(d=>d.id===activeSyllabusCourse.discipline_id);
+  const clearModuleForm = () => { setModTitle(''); setModHours(''); setModPeriods(''); setModRbtList([]); setModMethodList([]); setModMethod(''); setModTopics([]); setModTopicsText(''); setModCo([]); setModCoDetail(''); };
+  const collectCurrentModule = () => {
+    if (!modTitle.trim()) return null;
+    const disc = dbData.curriculum.find(d=>d.id===activeSyllabusCourse?.discipline_id);
     const mins = (()=>{ const v=Number(disc?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45; })();
     let hrs = null;
     if (modHours !== '' && modHours != null) hrs = Number(modHours);
     else if (modPeriods !== '' && modPeriods != null) hrs = Math.round(Number(modPeriods) * mins / 60 * 100)/100;
-    let syllId = null;
-    const existingSyll = (dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
-    if (existingSyll) syllId = existingSyll.id;
-    else if (syllModAcademicYear) {
-      const rr = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, academic_year: syllModAcademicYear, status: 'draft' }) });
-      if (rr.ok) { const j=await rr.json().catch(()=>null); if (j?.id) syllId = j.id; }
-    }
     const rbtLevels = modRbtList.length ? modRbtList : (modRbt ? [modRbt] : []);
     const methList = modMethodList.length ? modMethodList : (modMethod ? modMethod.split('\n').map(s=>s.trim()).filter(Boolean) : []);
-    const r = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, syllabus_id: syllId, module_number: maxNum+1, title: modTitle.trim(), hours: hrs, rbt_level: rbtLevels[0]||null, rbt_levels: rbtLevels, methodology: methList.join('\n')||null, methodology_list: methList, co_mapping: modCo.join(', ')||null }) });
-    if (!r.ok) { const e=await r.json().catch(()=>({})); alert(e.error||'Add module failed'); return; }
-    const created = await r.json().catch(()=>null);
-    const modId = created?.id;
-    if (modId) {
-      if (modTopics.length) {
-        for (let i=0;i<modTopics.length;i++) {
-          const t = modTopics[i];
-          if (!t.topic?.trim()) continue;
-          await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: t.topic.trim(), description: t.description?.trim()||null, sort_order: i }) });
-        }
-      } else if (modTopicsText.trim()) {
-        const topics = modTopicsText.split('\n').map(s=>s.trim()).filter(Boolean);
-        for (let i=0;i<topics.length;i++) { await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: topics[i], sort_order: i }) }); }
+    const topicsArr = modTopics.length ? modTopics.filter(t=>String(t.topic||'').trim()).map((t,i)=>({ topic: String(t.topic).trim(), description: String(t.description||'').trim()||null, sort_order: i })) : (modTopicsText.trim() ? modTopicsText.split('\n').map(s=>s.trim()).filter(Boolean).map((topic,i)=>({ topic, description:null, sort_order:i })) : []);
+    return { title: modTitle.trim(), hours: hrs, rbt_level: rbtLevels[0]||null, rbt_levels: rbtLevels, methodology: methList.join('\n')||null, methodology_list: methList, co_mapping: modCo.join(', ')||null, topicsArr };
+  };
+  const handleQueueModule = () => {
+    const cur = collectCurrentModule();
+    if (!cur) { alert('Enter Module Name'); return; }
+    setPendingSyllMods(prev=>[...prev, cur]);
+    clearModuleForm();
+  };
+  const handleSaveSyllabusBatch = async () => {
+    if (!activeSyllabusCourse?.id) return;
+    const toSave = [...pendingSyllMods];
+    const cur = collectCurrentModule();
+    if (cur) toSave.push(cur);
+    if (!toSave.length) { alert('Add at least one module (fill Module Name and click + Add Module, or fill and Save directly).'); return; }
+    let syllId = null;
+    const existingForYear = (dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id && s.academic_year===syllModAcademicYear).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
+    const anyExisting = (dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
+    if (existingForYear) syllId = existingForYear.id;
+    else if (anyExisting && !syllModAcademicYear) syllId = anyExisting.id;
+    else if (syllModAcademicYear) {
+      const rr = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, academic_year: syllModAcademicYear, status: 'draft' }) });
+      if (!rr.ok) { const e=await rr.json().catch(()=>({})); alert(e.error||'Create syllabus version failed'); return; }
+      const j=await rr.json().catch(()=>null); if (j?.id) syllId = j.id;
+    }
+    const all = dbData.course_modules.filter(m=>m.course_id===activeSyllabusCourse.id);
+    let nextNum = all.reduce((m,x)=>Math.max(m, Number(x.module_number)||0), 0) + 1;
+    for (const entry of toSave) {
+      const r = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: activeSyllabusCourse.id, syllabus_id: syllId, module_number: nextNum++, title: entry.title, hours: entry.hours, rbt_level: entry.rbt_level, rbt_levels: entry.rbt_levels, methodology: entry.methodology, methodology_list: entry.methodology_list, co_mapping: entry.co_mapping }) });
+      if (!r.ok) { const e=await r.json().catch(()=>({})); alert(e.error||'Add module failed'); return; }
+      const created = await r.json().catch(()=>null); const modId=created?.id;
+      if (modId && entry.topicsArr?.length) {
+        for (let i=0;i<entry.topicsArr.length;i++) { const t=entry.topicsArr[i]; await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: t.topic, description: t.description||null, sort_order: t.sort_order }) }); }
       }
     }
-    setModTitle(''); setModHours(''); setModPeriods(''); setModRbtList([]); setModMethodList([]); setModMethod(''); setModTopics([]); setModTopicsText(''); setModCo([]); setModCoDetail(''); fetchData();
+    setPendingSyllMods([]); clearModuleForm(); fetchData();
   };
+  const handleAddModule = handleQueueModule;
   const handleDeleteModule = async (id) => {
     if (!confirm('Delete module?')) return;
     await apiCall(`${apiUrl}/api/course_modules/${id}`, { method:'DELETE' }); fetchData();
@@ -2108,7 +2139,7 @@ export default function Home() {
                               <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px' }}>
                                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                               </select>
-                              <select value={courseSem} onChange={e => setCourseSem(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px' }}>
+                              <select value={courseSem} onChange={e => { const v=e.target.value; setCourseSem(v); if(selectedDiscStructure==='semester'){ const per=Number(selectedDisc?.semesters_per_year)||2; const idx=(courseSemesters||[]).indexOf(v); if(idx>=0){ const yIdx=Math.floor(idx/per); const want=`Year ${ROMAN[yIdx]||'I'}`; if(want!==courseYearLabel) setCourseYearLabel(want); } } }} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px' }}>
                                 {semestersForSelectedYear.map(s => <option key={s} value={s}>{s}</option>)}
                               </select>
                               <span style={{ fontSize: '11px', color: 'var(--text-faint)', alignSelf: 'center' }}>Year {courseYearLabel.replace('Year ', '')} → {semestersForSelectedYear.join(', ')}</span>
@@ -2290,17 +2321,26 @@ export default function Home() {
                                       <input value={d.semester || ''} onChange={e => updateDraft(idx, { semester: e.target.value })} placeholder="Semester" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '130px', fontSize: '13px' }} />
                                       <input value={d.yearLabel || ''} onChange={e => updateDraft(idx, { yearLabel: e.target.value })} placeholder="Year" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px', fontSize: '13px' }} />
                                     </div>
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Periods <input type="number" value={d.teachingPeriods ?? ''} onChange={e => updateDraft(idx, { teachingPeriods: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '13px' }} /></label>
-                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Hours <input type="number" value={d.teachingHours ?? ''} onChange={e => updateDraft(idx, { teachingHours: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '13px' }} /></label>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                                      {(() => { const v=Number((dbData.curriculum.find(x=>x.id===(syllabusTargetDisc||courseDisc))||{}).period_minutes); const mins=Number.isFinite(v)&&v>=10&&v<=120?v:45; const hh=Number(d.teachingHours); const per=(Number.isFinite(hh)&&hh>0)?Math.round(hh*60/mins):''; return <>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Hours <input type="number" min="0" step="0.5" value={d.teachingHours ?? ''} onChange={e => updateDraft(idx, { teachingHours: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '13px' }} /></label>
+                                      <span style={{ fontSize: '16px', color: 'var(--text-faint)', paddingBottom: '6px' }}>→</span>
+                                      <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Periods (auto) <input type="text" value={per===''? '': String(per)} readOnly placeholder="auto" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '90px', fontSize: '13px', background: 'var(--bg)', color: 'var(--text-faint)' }} title={`auto: hours × 60 / ${mins} min`} /></label>
+                                      <span style={{ fontSize: '11px', color: 'var(--text-faint)', paddingBottom: '8px' }}>{mins} min/period</span>
+                                      </>; })()}
                                       <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>Credits <input type="number" value={d.credits ?? ''} onChange={e => updateDraft(idx, { credits: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '80px', fontSize: '13px' }} /></label>
                                       <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>CIE <input type="number" value={d.cieMarks ?? ''} onChange={e => updateDraft(idx, { cieMarks: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /></label>
                                       <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', color: 'var(--text-soft)', gap: '2px' }}>SEE <input type="number" value={d.seeMarks ?? ''} onChange={e => updateDraft(idx, { seeMarks: e.target.value === '' ? null : Number(e.target.value) })} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /></label>
                                       <input value={d.examinationType || ''} onChange={e => updateDraft(idx, { examinationType: e.target.value })} placeholder="Exam type" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
                                     </div>
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                      <input value={d.examinationHoursCie || ''} onChange={e => updateDraft(idx, { examinationHoursCie: e.target.value })} placeholder="CIE hours" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
-                                      <input value={d.examinationHoursSee || ''} onChange={e => updateDraft(idx, { examinationHoursSee: e.target.value })} placeholder="SEE hours" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
+                                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-soft)' }}>CIE Duration</span>
+                                      <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="99" value={d._cieH ?? ''} onChange={e=>updateDraft(idx,{_cieH:e.target.value})} placeholder="hrs" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /> hrs</label>
+                                      <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="59" value={d._cieM ?? ''} onChange={e=>updateDraft(idx,{_cieM:e.target.value})} placeholder="mins" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /> mins</label>
+                                      <span style={{ width:'12px' }} />
+                                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-soft)' }}>SEE Duration</span>
+                                      <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="99" value={d._seeH ?? ''} onChange={e=>updateDraft(idx,{_seeH:e.target.value})} placeholder="hrs" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /> hrs</label>
+                                      <label style={{ display: 'flex', gap: '3px', alignItems: 'center', fontSize: '11px', color: 'var(--text-soft)' }}><input type="number" min="0" max="59" value={d._seeM ?? ''} onChange={e=>updateDraft(idx,{_seeM:e.target.value})} placeholder="mins" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '13px' }} /> mins</label>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>Objectives — per item</label><button type="button" onClick={() => updateDraft(idx, { objectives: [...(d.objectives || []), ''] })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>+ Add Objective</button></div>
@@ -2354,7 +2394,7 @@ export default function Home() {
                                       <button type="button" onClick={() => updateDraft(idx, { modules: [{ module_number: 1, title: '', hours: null, rbt_level: '', methodology: '', co_mapping: '', topics: [] }] })} style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add module</button>
                                     )}
                                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
-                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingHours != null) setCourseHours(String(p.teachingHours)); else if (p.teachingPeriods != null) setCourseHours(String(Math.round(p.teachingPeriods * 45 / 60 * 100)/100)); if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p.examinationHoursCie){ const m=String(p.examinationHoursCie).match(/(\d+)\s*h/i), n=String(p.examinationHoursCie).match(/(\d+)\s*m/i); setCourseCieH(m?m[1]:''); setCourseCieM(n?n[1]:''); } if (p.examinationHoursSee){ const m=String(p.examinationHoursSee).match(/(\d+)\s*h/i), n=String(p.examinationHoursSee).match(/(\d+)\s*m/i); setCourseSeeH(m?m[1]:''); setCourseSeeM(n?n[1]:''); } if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) { const lines=String(p.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); setCoursePedagogyList(lines); setCoursePedagogy(String(p.pedagogy)); } setShowAddCourse(true); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
+                                      <button type="button" onClick={() => { const p = d; if (p.courseName) setCourseName(p.courseName); if (p.code) setCourseCode(p.code); if (p.type) setCourseKind(p.type); if (p.credits != null) setCourseCredits(p.credits); if (p.teachingHours != null) setCourseHours(String(p.teachingHours)); else if (p.teachingPeriods != null) { const dd=dbData.curriculum.find(x=>x.id===(syllabusTargetDisc||courseDisc))||null; const mm2=(()=>{const v=Number(dd?.period_minutes); return Number.isFinite(v)&&v>=10&&v<=120?v:45;})(); setCourseHours(String(Math.round(Number(p.teachingPeriods)*mm2/60*100)/100)); } if (p.cieMarks != null) setCourseCie(p.cieMarks); if (p.seeMarks != null) setCourseSee(p.seeMarks); if (p.examinationType) setCourseExamType(p.examinationType); if (p._cieH!=null||p._cieM!=null){ setCourseCieH(p._cieH||''); setCourseCieM(p._cieM||''); } else if (p.examinationHoursCie){ const m=String(p.examinationHoursCie).match(/(\d+)\s*h/i), n=String(p.examinationHoursCie).match(/(\d+)\s*m/i); setCourseCieH(m?m[1]:''); setCourseCieM(n?n[1]:''); } if (p._seeH!=null||p._seeM!=null){ setCourseSeeH(p._seeH||''); setCourseSeeM(p._seeM||''); } else if (p.examinationHoursSee){ const m=String(p.examinationHoursSee).match(/(\d+)\s*h/i), n=String(p.examinationHoursSee).match(/(\d+)\s*m/i); setCourseSeeH(m?m[1]:''); setCourseSeeM(n?n[1]:''); } if (p.semester) setCourseSem(p.semester); if (p.yearLabel) setCourseYearLabel(p.yearLabel); if (p.objectives?.length) setCourseObjectives(p.objectives); if (p.outcomes?.length) setCourseOutcomes(p.outcomes.map((t, i) => ({ code: `CO${i + 1}`, text: t }))); if (p.pedagogy) { const lines=String(p.pedagogy).split('\n').map(s=>s.trim()).filter(Boolean); setCoursePedagogyList(lines); setCoursePedagogy(String(p.pedagogy)); } if(p.modules?.length) setSyllabusParsed(prev=>({...prev,_pendingModules:p.modules})); setShowAddCourse(true); alert('Filled into Add Course form — review and submit single.'); }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>Fill Add Course form ↓</button>
                                       <label style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11.5px', color: d._verified ? 'var(--primary)' : 'var(--text-faint)', cursor: 'pointer', marginLeft: 'auto' }}><input type="checkbox" checked={!!d._verified} onChange={e => updateDraft(idx, { _verified: e.target.checked })} /> Mark verified</label>
                                     </div>
                                   </div>
@@ -2413,7 +2453,7 @@ export default function Home() {
                                 <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.type || 'DSC'} onChange={e => setEditCourse({ ...editCourse, type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.year_label || ''} onChange={e => setEditCourse({ ...editCourse, year_label: e.target.value || null, year_number: e.target.value ? ROMAN.indexOf(e.target.value.replace('Year ', '')) + 1 : null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="">—</option>{ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}</select></td>
-                                <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => setEditCourse({ ...editCourse, semester: e.target.value || null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => { const v=e.target.value||null; const dDisc=dbData.curriculum.find(x=>x.id===(editCourse.discipline_id||'')); const per=Number(dDisc?.semesters_per_year)||2; const all=Array.from({length:per*10},(_,i)=>`Semester ${ROMAN[i]}`); const idx=all.indexOf(v); let patch={semester:v}; if(idx>=0){ const yIdx=Math.floor(idx/per); patch.year_label=`Year ${ROMAN[yIdx]||'I'}`; patch.year_number=yIdx+1; } setEditCourse({ ...editCourse, ...patch }); }} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.credits ?? ''} onChange={e => setEditCourse({ ...editCourse, credits: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} /></td>
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.teaching_hours ?? ''} onChange={e => setEditCourse({ ...editCourse, teaching_hours: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} placeholder="Hrs" /></td>
                                 <td style={{ padding: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -2456,6 +2496,7 @@ export default function Home() {
                             <td style={{ padding: '10px 8px' }}>{c.credits ?? '—'}</td>
                             <td style={{ padding: '10px 8px', fontSize: '12.5px', color: 'var(--text-soft)' }}>{c.teaching_hours != null ? `${c.teaching_hours}${c.teaching_periods ? ` / ${c.teaching_periods}` : ''}` : '—'}</td>
                             <td style={{ padding: '10px 8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {perm('curriculum') && <button onClick={() => setViewCourse(c)} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="View course & syllabus">👁 View</button>}
                               {canAdmin('curriculum') && <button onClick={() => hydrateEditCourse(c)} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('courses', c.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                               <button onClick={() => { setActiveSyllabusCourse(c); setShowAddSyllabus(true); setSyllModAcademicYear(academicYearFor()); setTimeout(()=>document.getElementById('add-syllabus-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),120); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Syllabus</button>
@@ -2468,6 +2509,38 @@ export default function Home() {
                   </table>
                 </div>
 
+                {/* View (eye) — readOnly course + syllabus (no edit controls) */}
+                {viewCourse && (() => {
+                  const vProg = dbData.curriculum.find(d=>d.id===viewCourse.discipline_id)?.name||'—';
+                  const vObjs = (()=>{ try{const j=viewCourse.objectives_json; if(Array.isArray(j)) return j; if(typeof j==='string') return JSON.parse(j);}catch{} return []; })();
+                  const vOuts = (()=>{ try{const j=viewCourse.outcomes_json; if(Array.isArray(j)) return j.map(o=>typeof o==='string'?o:(o.text||'')); if(typeof j==='string'){const a=JSON.parse(j); return a.map(o=>typeof o==='string'?o:(o.text||''));}}catch{} return []; })();
+                  const vPed = String(viewCourse.pedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
+                  const vMods = (dbData.course_modules||[]).filter(m=>m.course_id===viewCourse.id).sort((a,b)=>(a.module_number||0)-(b.module_number||0));
+                  return (
+                    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-xl)', marginTop:'24px', overflow:'hidden' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg-saffron)' }}>
+                        <h3 style={{ fontSize:'18px', color:'var(--primary-deep)', margin:0 }}>{viewCourse.code} — {viewCourse.name} <span style={{ fontSize:'11px', background:'var(--primary)', color:'#fff', padding:'2px 8px', borderRadius:'99px' }}>View</span></h3>
+                        <button onClick={()=>setViewCourse(null)} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-faint)', padding:'6px 12px', borderRadius:'4px', cursor:'pointer' }}>✕ Close</button>
+                      </div>
+                      <div style={{ padding:'16px 20px' }}>
+                        <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden', fontSize:'13.5px' }}>
+                          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 140px 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Program</div><div style={{ padding:'9px 12px', gridColumn:'span 3', fontWeight:600, color:'var(--primary-deep)' }}>{vProg}</div></div>
+                          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 140px 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Course</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)' }}>{viewCourse.name}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Type</div><div style={{ padding:'9px 12px' }}>{viewCourse.type||'—'}</div></div>
+                          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 140px 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Code</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)', fontWeight:600 }}>{viewCourse.code}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Semester</div><div style={{ padding:'9px 12px' }}>{viewCourse.semester||'—'}{viewCourse.year_label?` · ${viewCourse.year_label}`:''}</div></div>
+                          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 140px 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)', fontSize:'12.5px' }}>Teaching Hours / Periods</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)' }}>{viewCourse.teaching_hours??'—'}{viewCourse.teaching_periods?` / ${viewCourse.teaching_periods}`:''}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>CIE Marks</div><div style={{ padding:'9px 12px' }}>{viewCourse.cie_marks??50}</div></div>
+                          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 140px 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Credits</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)' }}>{viewCourse.credits??'—'}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>SEE Marks</div><div style={{ padding:'9px 12px' }}>{viewCourse.see_marks??50}</div></div>
+                          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 140px 110px' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)', fontSize:'12.5px' }}>Examination Type</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)' }}>{viewCourse.examination_type||'—'}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)', fontSize:'12px' }}>Examination Hours<br/><span style={{ fontWeight:400, fontSize:'11px', color:'var(--text-soft)' }}>CIE / SEE</span></div><div style={{ padding:'9px 12px', fontSize:'12.5px' }}>{viewCourse.examination_hours_cie?`CIE: ${viewCourse.examination_hours_cie}`:'—'}{viewCourse.examination_hours_see?` · SEE: ${viewCourse.examination_hours_see}`:''}</div></div>
+                        </div>
+                      </div>
+                      <div style={{ padding:'0 20px 20px', display:'grid', gap:'14px' }}>
+                        {vObjs.length? <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--bg)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)' }}>OBJECTIVES:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vObjs.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{typeof o==='string'?o:(o.text||JSON.stringify(o))}</li>)}</ol></div> : <div style={{ padding:'14px', border:'1px dashed var(--border)', borderRadius:'8px', color:'var(--text-faint)', textAlign:'center', fontSize:'13px' }}>No objectives.</div>}
+                        {vOuts.length? <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--bg)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)' }}>OUTCOMES:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vOuts.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
+                        {vPed.length? <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--bg)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)' }}>Pedagogy:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vPed.map((p,i)=><li key={i}>{p}</li>)}</ol></div> : null}
+                        {vMods.length? vMods.map(mod=>{ const topics=(dbData.course_module_topics||[]).filter(t=>t.module_id===mod.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)); return (<div key={mod.id} style={{ border:'1.5px solid var(--primary)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'9px 14px', background:'var(--primary)', color:'#fff', fontWeight:700, fontSize:'13.5px' }}>Module {mod.module_number} — {mod.title}</div><div style={{ display:'grid', gridTemplateColumns:'110px 1fr 110px 120px', fontSize:'13px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Hours:</div><div style={{ padding:'8px 12px', borderRight:'1px solid var(--border)' }}>{mod.hours??'—'}</div><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>RBT Level:</div><div style={{ padding:'8px 12px' }}>{mod.rbt_level||'—'}</div></div>{mod.methodology && <div style={{ display:'grid', gridTemplateColumns:'160px 1fr', fontSize:'13px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Teaching Methodology</div><div style={{ padding:'8px 12px', color:'var(--text-soft)', whiteSpace:'pre-wrap' }}>{mod.methodology}</div></div>}{topics.length? <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)' }}><ol style={{ margin:0, paddingLeft:'20px', color:'var(--text)', fontSize:'13.5px', lineHeight:1.6 }}>{topics.map(t=><li key={t.id}>{t.topic}</li>)}</ol></div> : null}<div style={{ padding:'8px 14px', background:'var(--bg-saffron)', fontSize:'12.5px' }}><b>CO Mapping:</b> <span style={{ color:'var(--text-soft)' }}>{mod.co_mapping||'—'}</span></div></div>); }) : <div style={{ padding:'14px', border:'1px dashed var(--border)', borderRadius:'8px', color:'var(--text-faint)', textAlign:'center', fontSize:'13px' }}>No modules yet.</div>}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* SYLLABUS DETAIL — structured exactly like the BPA document (BCVP310) */}
                 {activeSyllabusCourse && (() => {
                   const progName = dbData.curriculum.find(d => d.id === activeSyllabusCourse.discipline_id)?.name || '—';
@@ -2522,11 +2595,19 @@ export default function Home() {
 
                     {/* Syllabus body — Objectives / Outcomes / Pedagogy / Modules */}
                     <div style={{ padding: '0 20px 20px', display: 'grid', gap: '14px' }}>
-                      {!syllabusContent ? (
-                        <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px', border: '1px dashed var(--border)', borderRadius: '8px' }}>
-                          No detailed syllabus yet. Click <b>Add Syllabus</b> below to create it from the document.
-                        </div>
-                      ) : (
+                      {!syllabusContent ? (() => {
+                        const fbObjs = (()=>{ try{const j=activeSyllabusCourse.objectives_json; if(Array.isArray(j)) return j.filter(Boolean).map(o=>typeof o==='string'?o:(o.text||String(o))); if(typeof j==='string'){const a=JSON.parse(j); return (Array.isArray(a)?a:[]).filter(Boolean).map(o=>typeof o==='string'?o:(o.text||String(o)));} }catch{} return []; })();
+                        const fbOuts = (()=>{ try{const j=activeSyllabusCourse.outcomes_json; if(Array.isArray(j)) return j.filter(Boolean).map(o=>typeof o==='string'?o:(o.text||'')); if(typeof j==='string'){const a=JSON.parse(j); return (Array.isArray(a)?a:[]).filter(Boolean).map(o=>typeof o==='string'?o:(o.text||''));} }catch{} return []; })();
+                        const fbPed = String(activeSyllabusCourse.pedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
+                        const hasFb = fbObjs.length || fbOuts.length || fbPed.length;
+                        if (!hasFb) return <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px', border: '1px dashed var(--border)', borderRadius: '8px' }}>No detailed syllabus yet. Click <b>Add Syllabus</b> below to create it from the document.</div>;
+                        return (<>
+                          <div style={{ background: 'var(--primary-deep)', color: '#fff', textAlign: 'center', padding: '9px', borderRadius: '6px', fontSize: '13px', letterSpacing: '0.06em', fontWeight: 700 }}>COURSE OBJECTIVES AND OUTCOMES</div>
+                          {fbObjs.length ? <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>OBJECTIVES:</div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbObjs.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
+                          {fbOuts.length ? <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>OUTCOMES: <span style={{ fontWeight:400, color:'var(--text-soft)' }}>At the end of the course, the student will be able to:</span></div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbOuts.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
+                          {fbPed.length ? <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>Pedagogy:</div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbPed.map((p,i)=><li key={i}>{p}</li>)}</ol></div> : null}
+                        </>);
+                      })() : (
                         <>
                           <div style={{ background: 'var(--primary-deep)', color: '#fff', textAlign: 'center', padding: '9px', borderRadius: '6px', fontSize: '13px', letterSpacing: '0.06em', fontWeight: 700 }}>COURSE OBJECTIVES AND OUTCOMES</div>
 
@@ -2750,7 +2831,22 @@ export default function Home() {
                                         </div>
                                       </div>
                                     )}
-                                    <button type="button" onClick={handleAddModule} style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>Save Syllabus</button>
+                                    {pendingSyllMods.length > 0 && (
+                                      <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                                        <div style={{ padding: '7px 10px', background: 'var(--bg)', fontWeight: 700, fontSize: '12px', borderBottom: '1px solid var(--border)' }}>Queued modules — {pendingSyllMods.length} (single version V{(() => { const v=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear).reduce((m,s)=>Math.max(m,Number(s.version_number)||0),0)+1; return v; })()} · {syllModAcademicYear})</div>
+                                        {pendingSyllMods.map((q, qi) => (
+                                          <div key={qi} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderBottom: qi===pendingSyllMods.length-1?'none':'1px solid var(--border)', fontSize: '12.5px' }}>
+                                            <span><b>{qi+1}.</b> {q.title} <span style={{ color:'var(--text-faint)' }}>{q.hours!=null?`· ${q.hours} hrs`:''}{q.topicsArr?.length?` · ${q.topicsArr.length} topic${q.topicsArr.length===1?'':'s'}`:''}</span></span>
+                                            <button type="button" onClick={()=>setPendingSyllMods(prev=>prev.filter((_,j)=>j!==qi))} style={{ background:'none', border:'1px solid var(--border)', padding:'3px 8px', borderRadius:'4px', cursor:'pointer', fontSize:'11px' }}>Remove</button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <button type="button" onClick={handleQueueModule} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>+ Add Module</button>
+                                      <button type="button" onClick={handleSaveSyllabusBatch} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>{(() => { const cur=modTitle.trim()?1:0; const n=pendingSyllMods.length+cur; return n?`Save Syllabus — ${n} module${n===1?'':'s'} (V${(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear).reduce((m,s)=>Math.max(m,Number(s.version_number)||0),0)+1})`:'Save Syllabus'; })()}</button>
+                                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>+ Add Module queues — Save creates one syllabus version with all queued modules.</span>
+                                    </div>
                                   </div>
                                 </div>
                               )}
