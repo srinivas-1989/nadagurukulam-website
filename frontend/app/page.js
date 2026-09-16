@@ -418,9 +418,13 @@ export default function Home() {
   const [editPedagogyList, setEditPedagogyList] = useState([]);
   const [editPedagogy, setEditPedagogy] = useState('');
   const [filterDisc, setFilterDisc] = useState('');
+  const [filterCat, setFilterCat] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterSem, setFilterSem] = useState('');
   const [filterYear, setFilterYear] = useState('');
+  const [showProgCats, setShowProgCats] = useState(false);
+  const [showAddProgram, setShowAddProgram] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   const selectedDisc = dbData.curriculum.find(d => d.id === courseDisc) || null;
@@ -479,6 +483,12 @@ export default function Home() {
     const t = String(coursePedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
     return t;
   })();
+  const filterCatOptions = (dbData.program_categories||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const filterDiscOptions = (() => {
+    const all = dbData.curriculum||[];
+    if (filterCat) return all.filter(d=>d.category_id===filterCat);
+    return all;
+  })();
   const filterYearOptions = (() => {
     const ord = v => ROMAN.indexOf(String(v).replace('Year ','').trim());
     if (filterDisc) {
@@ -489,6 +499,13 @@ export default function Home() {
       const n = Math.min(Number(d.year_count)||0, lim);
       if (n>0) return Array.from({length:n},(_,i)=>`Year ${ROMAN[i]}`);
       return [...new Set((dbData.courses||[]).filter(c=>c.discipline_id===filterDisc).map(c=>c.year_label).filter(Boolean))].sort((a,b)=>ord(a)-ord(b));
+    }
+    if (filterCat) {
+      const discs = (dbData.curriculum||[]).filter(d=>d.category_id===filterCat);
+      const s=new Set();
+      for(const d of discs){ const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id); const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10; const n=Math.min(Number(d.year_count)||0, lim); for(let i=0;i<n;i++) s.add(`Year ${ROMAN[i]}`); }
+      for(const c of dbData.courses||[]){ const pd=(dbData.curriculum||[]).find(d=>d.id===c.discipline_id); if(pd?.category_id===filterCat && c.year_label) s.add(c.year_label); }
+      return [...s].sort((a,b)=>ord(a)-ord(b));
     }
     const s=new Set();
     for(const d of dbData.curriculum){ const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id); const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10; const n=Math.min(Number(d.year_count)||0, lim); for(let i=0;i<n;i++) s.add(`Year ${ROMAN[i]}`); }
@@ -507,12 +524,24 @@ export default function Home() {
       if(yrs>0&&per>0){ if((d.structure_mode||'semester')==='semester') return Array.from({length:yrs*per},(_,i)=>`Semester ${ROMAN[i]||i+1}`); return Array.from({length:per},(_,i)=>`Semester ${ROMAN[i]}`); }
       return [...new Set((dbData.courses||[]).filter(c=>c.discipline_id===filterDisc).map(c=>c.semester).filter(Boolean))].sort((a,b)=>ord(a)-ord(b));
     }
+    if (filterCat) {
+      const discs=(dbData.curriculum||[]).filter(d=>d.category_id===filterCat);
+      const s=new Set();
+      for(const d of discs){ const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id); const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10; const yrs=Math.min(Number(d.year_count)||0, lim); const per=Number(d.semesters_per_year)||0; if(yrs>0&&per>0){ const arr=(d.structure_mode||'semester')==='semester'?Array.from({length:yrs*per},(_,i)=>`Semester ${ROMAN[i]||i+1}`):Array.from({length:per},(_,i)=>`Semester ${ROMAN[i]}`); arr.forEach(v=>s.add(v)); } }
+      for(const c of dbData.courses||[]){ const pd=(dbData.curriculum||[]).find(d=>d.id===c.discipline_id); if(pd?.category_id===filterCat && c.semester) s.add(c.semester); }
+      return [...s].sort((a,b)=>ord(a)-ord(b));
+    }
     const s=new Set();
     for(const d of dbData.curriculum){ const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id); const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10; const yrs=Math.min(Number(d.year_count)||0, lim); const per=Number(d.semesters_per_year)||0; if(yrs>0&&per>0){ const arr=(d.structure_mode||'semester')==='semester'?Array.from({length:yrs*per},(_,i)=>`Semester ${ROMAN[i]||i+1}`):Array.from({length:per},(_,i)=>`Semester ${ROMAN[i]}`); arr.forEach(v=>s.add(v)); } }
     for(const c of dbData.courses||[]) if(c.semester) s.add(c.semester);
     return [...s].sort((a,b)=>ord(a)-ord(b));
   })();
-  const filterTypeOptions = [...new Set((dbData.courses||[]).map(c=>c.type).filter(Boolean))].sort();
+  const filterTypeOptions = (() => {
+    let cs=(dbData.courses||[]);
+    if (filterDisc) cs=cs.filter(c=>c.discipline_id===filterDisc);
+    else if (filterCat) { const ids=new Set((dbData.curriculum||[]).filter(d=>d.category_id===filterCat).map(d=>d.id)); cs=cs.filter(c=>ids.has(c.discipline_id)); }
+    return [...new Set(cs.map(c=>c.type).filter(Boolean))].sort();
+  })();
   const editYearOptions = (() => {
     const d=dbData.curriculum.find(x=>x.id===(editCourse.discipline_id||''));
     if(!d) return [];
@@ -537,15 +566,21 @@ export default function Home() {
   useEffect(() => { const opts = semestersForSelectedYear; if (opts.length && !opts.includes(courseSem)) setCourseSem(opts[0]); }, [courseDisc, courseYearLabel]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedDiscStructure !== 'semester' || !courseSem) return; const per = Number(selectedDisc?.semesters_per_year) || 0; if (!per) return; const idx = courseSemesters.indexOf(courseSem); if (idx < 0) return; const want = `Year ${ROMAN[Math.floor(idx / per)] || 'I'}`; if (want !== courseYearLabel) setCourseYearLabel(want); }, [courseSem]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (filterDisc && filterCat) {
+      const d=dbData.curriculum.find(x=>x.id===filterDisc);
+      if (d && d.category_id!==filterCat) setFilterDisc('');
+    }
+  }, [filterCat]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (filterYear && filterYearOptions.length && !filterYearOptions.includes(filterYear)) setFilterYear('');
-  }, [filterDisc, dbData.curriculum, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filterDisc, filterCat, dbData.curriculum, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (filterSem && filterSemOptions.length && !filterSemOptions.includes(filterSem)) setFilterSem('');
-  }, [filterDisc, dbData.curriculum, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filterDisc, filterCat, dbData.curriculum, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (filterType && filterTypeOptions.length && !filterTypeOptions.includes(filterType)) setFilterType('');
-  }, [dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (activeModule === 'curriculum') { setShowAddCourse(false); setShowAddSyllabus(false); } }, [activeModule]);
+  }, [filterDisc, filterCat, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (activeModule === 'curriculum') { setShowAddCourse(false); setShowAddSyllabus(false); setShowProgCats(false); setShowAddProgram(false); setShowImport(false); } }, [activeModule]);
   useEffect(() => {
     if (!selectedDisc) return;
     const mode = selectedDisc.structure_mode || 'semester';
@@ -2031,8 +2066,16 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="ndg-om-divider" style={{ margin: '0 0 18px', fontSize: '13px' }}>ॐ</div>
-                {/* Program categories — centrally managed (UG/PG/Diploma…) */}
                 {canCreate('curriculum') && (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                    <button type="button" onClick={() => setShowProgCats(v=>!v)} style={{ background: showProgCats ? 'var(--primary-deep)' : 'var(--primary)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontWeight: 700, fontSize: '13px', boxShadow: 'var(--shadow-sm)' }}>{showProgCats ? '× Close Categories' : '+ Program Categories'}</button>
+                    <button type="button" onClick={() => setShowAddProgram(v=>!v)} style={{ background: showAddProgram ? 'var(--primary-deep)' : 'var(--surface)', color: showAddProgram ? '#fff' : 'var(--primary)', border: showAddProgram ? 'none' : '1.5px solid var(--primary)', padding: '10px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontWeight: 700, fontSize: '13px', boxShadow: 'var(--shadow-sm)' }}>{showAddProgram ? '× Close Program' : '+ Add Program'}</button>
+                    <button type="button" onClick={() => setShowAddCourse(v=>!v)} style={{ background: showAddCourse ? 'var(--primary-deep)' : 'var(--accent)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontWeight: 700, fontSize: '13px', boxShadow: 'var(--shadow-sm)' }}>{showAddCourse ? '× Close Course' : '+ Add Course'}</button>
+                    <button type="button" onClick={() => setShowImport(v=>!v)} style={{ background: showImport ? 'var(--primary-deep)' : 'var(--surface)', color: showImport ? '#fff' : 'var(--primary)', border: showImport ? 'none' : '1.5px solid var(--border)', padding: '10px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontWeight: 700, fontSize: '13px', boxShadow: 'var(--shadow-sm)' }}>{showImport ? '× Close Import' : '⬆ Upload Syllabus'}</button>
+                  </div>
+                )}
+                {/* Program categories — centrally managed (UG/PG/Diploma…) */}
+                {canCreate('curriculum') && showProgCats && (
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '18px', boxShadow: 'var(--shadow-sm)' }}>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <b style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Program Categories</b>
@@ -2068,8 +2111,9 @@ export default function Home() {
                     )}
                   </div>
                 )}
-                {canCreate('curriculum') && (
+                {canCreate('curriculum') && showAddProgram && (
                   <form onSubmit={handleAddDiscipline} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '18px', boxShadow: 'var(--shadow-sm)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><b style={{ fontSize:'14px', color:'var(--primary-deep)' }}>Add Program</b><button type="button" onClick={()=>setShowAddProgram(false)} style={{ background:'none', border:'1px solid var(--border)', padding:'5px 12px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>Close</button></div>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '2 1 220px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.02em', color: 'var(--text-soft)' }}>Program Name
                         <input placeholder="Program / Discipline name" value={newDiscName} onChange={e => setNewDiscName(e.target.value)} style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }} required />
@@ -2185,13 +2229,8 @@ export default function Home() {
                   </table>
                 </div>
 
-                {canCreate('curriculum') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                    {/* Add Course — collapsible, 15 ordered fields with side headings */}
-                    {!showAddCourse ? (
-                      <button type="button" onClick={() => setShowAddCourse(true)} style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontWeight: 700, fontSize: '14px', boxShadow: 'var(--shadow-sm)' }}>+ Add Course</button>
-                    ) : (
-                    <form onSubmit={handleAddCourse} style={{ position: 'relative', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: 'var(--shadow-sm)' }}>
+                {canCreate('curriculum') && showAddCourse && (
+                  <form onSubmit={handleAddCourse} style={{ position: 'relative', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: 'var(--shadow-sm)', marginBottom: '18px' }}>
                       <div className="ndg-corner" style={{ top: '-20px', right: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: 'var(--primary)', opacity: 0.05 }} />
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <b style={{ fontSize: '15px', color: 'var(--primary-deep)' }}>Add Course</b>
@@ -2272,7 +2311,7 @@ export default function Home() {
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: 'var(--text-soft)' }}>Periods (auto)
                             <input type="text" value={derivedPeriods === '' ? '' : String(derivedPeriods)} readOnly placeholder="auto" style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', width: '110px', background: 'var(--bg)', color: 'var(--text-faint)' }} />
                           </label>
-                          <span style={{ fontSize: '11px', color: 'var(--text-faint)', paddingTop: '14px' }}>hours × 60 / {progMins} min — periods auto</span>
+                          <span title={`${progMins} min per period — periods = hours × 60 ÷ ${progMins}`} style={{ fontSize: '11px', color: 'var(--primary-deep)', background: 'var(--bg)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '99px', marginTop: '14px' }}>{progMins} min/period · auto</span>
                         </div>
                       </div>
                       {/* 8. CIE Marks */}
@@ -2359,10 +2398,11 @@ export default function Home() {
                     </form>
                     )}
 
-                    {/* Import syllabus file — DOCX/PDF/XLSX/CSV/HTML/TXT/PPTX parsed preview then verified save */}
+                    {/* Import syllabus file — preview then verified publish */}
+                    {canCreate('curriculum') && showImport && (
                     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: 'var(--shadow-sm)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <b style={{ fontSize: '14px', color: 'var(--primary-deep)' }}>Import from file</b>
+                        <div style={{ display:'flex', gap:'10px', alignItems:'center' }}><b style={{ fontSize: '14px', color: 'var(--primary-deep)' }}>Import from file</b><button type="button" onClick={()=>setShowImport(false)} style={{ background:'none', border:'1px solid var(--border)', padding:'5px 12px', borderRadius:'6px', fontSize:'12px', cursor:'pointer' }}>Close</button></div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>DOCX / PDF / XLSX / CSV / HTML / TXT / MD / PPTX</span>
                           <button type="button" onClick={downloadTemplate} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12px', fontWeight: 700, boxShadow: 'var(--shadow-sm)' }}>⬇ Download Import Template</button>
@@ -2498,19 +2538,18 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                  </div>
                 )}
 
                 {/* Select Course — filtered list */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-deep)' }}>Select Course:</span>
+                  <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
+                    <option value="">All Categories</option>
+                    {filterCatOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                   <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
                     <option value="">All Programs</option>
-                    {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                  <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
-                    <option value="">All Types</option>
-                    {filterTypeOptions.map(t=> <option key={t} value={t}>{t}</option>)}
+                    {filterDiscOptions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
                     <option value="">All Years</option>
@@ -2520,20 +2559,24 @@ export default function Home() {
                     <option value="">All Semesters</option>
                     {filterSemOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  {(filterDisc || filterType || filterSem || filterYear) && <button onClick={() => { setFilterDisc(''); setFilterType(''); setFilterSem(''); setFilterYear(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '12px' }}>Clear</button>}
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear)).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
+                  <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
+                    <option value="">All Types</option>
+                    {filterTypeOptions.map(t=> <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  {(filterCat || filterDisc || filterType || filterSem || filterYear) && <button onClick={() => { setFilterCat(''); setFilterDisc(''); setFilterType(''); setFilterSem(''); setFilterYear(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '12px' }}>Clear Filters</button>}
+                  <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => { const cat=dbData.curriculum.find(d=>d.id===c.discipline_id)?.category_id; return (!filterCat || cat===filterCat) && (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear); }).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
                 </div>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflowX: 'auto', boxShadow: 'var(--shadow-sm)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '820px' }}>
-                    <thead>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'auto', maxHeight: '520px', boxShadow: 'var(--shadow-sm)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '980px' }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Program</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Course</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Code</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Type</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Year</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Semester</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Credits</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Hours</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Actions</th>
+                        <th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Category</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Program</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Course</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Code</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Type</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Year</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Semester</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Credits</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Hours</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(() => {
-                        const filtered = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear));
-                        if (filtered.length === 0) return <tr><td colSpan="9" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>{dbData.courses.length === 0 ? 'No courses yet — use Add Course above.' : 'No courses match filters.'}</td></tr>;
+                        const filtered = dbData.courses.filter(c => { const cat=dbData.curriculum.find(d=>d.id===c.discipline_id)?.category_id; return (!filterCat || cat===filterCat) && (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear); });
+                        if (filtered.length === 0) return <tr><td colSpan="10" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>{dbData.courses.length === 0 ? 'No courses yet — use Add Course above.' : 'No courses match filters.'}</td></tr>;
                         return filtered.map(c => {
                           const prog = dbData.curriculum.find(d => d.id === c.discipline_id);
                           const isEditing = editingCourse === c.id;
@@ -2541,6 +2584,7 @@ export default function Home() {
                             return (
                               <>
                               <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
+                                <td style={{ padding: '6px', fontSize:'11.5px', color:'var(--text-soft)' }} className="edit-cat-cell">{(() => { const catId=dbData.curriculum.find(d=>d.id===(editCourse.discipline_id||''))?.category_id; return (dbData.program_categories||[]).find(x=>x.id===catId)?.name || '—'; })()}</td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.discipline_id || ''} onChange={e => setEditCourse({ ...editCourse, discipline_id: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', fontSize: '12px' }}>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px' }} placeholder="Name" /></td>
                                 <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /></td>
@@ -2555,7 +2599,7 @@ export default function Home() {
                                 </td>
                               </tr>
                               <tr key={`${c.id}-edit-extra`} style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-                                <td colSpan={9} style={{ padding: '14px 12px' }}>
+                                <td colSpan={10} style={{ padding: '14px 12px' }}>
                                   <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
                                     <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
                                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><b style={{ fontSize:'12.5px', color:'var(--primary-deep)' }}>Objectives</b><button type="button" onClick={()=>setEditObjectives([...editObjectives,''])} style={{ background:'var(--accent)', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'4px', cursor:'pointer', fontSize:'11.5px' }}>+ Add Objective</button></div>
@@ -2580,9 +2624,10 @@ export default function Home() {
                           }
                           return (
                           <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 8px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{(dbData.program_categories||[]).find(cat=>cat.id===prog?.category_id)?.name || '—'}</td>
                             <td style={{ padding: '10px 8px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{prog?.name || '—'}</td>
-                            <td style={{ padding: '10px 8px' }}><span style={{ color:'var(--primary)', textDecoration:'underline', fontWeight:600 }}>{c.name}</span></td>
-                            <td style={{ padding: '10px 8px' }}><button onClick={() => setActiveSyllabusCourse(c)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}><b style={{ color:'var(--primary)', textDecoration:'underline' }}>{c.code}</b></button></td>
+                            <td style={{ padding: '10px 8px' }}><button onClick={() => setViewCourse(c)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}><span style={{ color:'var(--primary)', textDecoration:'underline', fontWeight:600 }}>{c.name}</span></button></td>
+                            <td style={{ padding: '10px 8px' }}><span style={{ fontWeight:600 }}>{c.code}</span></td>
                             <td style={{ padding: '10px 8px' }}>{c.type || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.year_label || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.semester || '—'}</td>
