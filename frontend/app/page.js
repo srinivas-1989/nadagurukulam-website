@@ -2361,7 +2361,7 @@ export default function Home() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '820px' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '10px 8px' }}>Program</th><th style={{ padding: '10px 8px' }}>Code &amp; Course</th><th style={{ padding: '10px 8px' }}>Type</th><th style={{ padding: '10px 8px' }}>Year</th><th style={{ padding: '10px 8px' }}>Semester</th><th style={{ padding: '10px 8px' }}>Credits</th><th style={{ padding: '10px 8px' }}>Hours</th><th style={{ padding: '10px 8px' }}>Actions</th>
+                        <th style={{ padding: '10px 8px' }}>Program</th><th style={{ padding: '10px 8px' }}>Course</th><th style={{ padding: '10px 8px' }}>Code</th><th style={{ padding: '10px 8px' }}>Type</th><th style={{ padding: '10px 8px' }}>Year</th><th style={{ padding: '10px 8px' }}>Semester</th><th style={{ padding: '10px 8px' }}>Credits</th><th style={{ padding: '10px 8px' }}>Hours</th><th style={{ padding: '10px 8px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
