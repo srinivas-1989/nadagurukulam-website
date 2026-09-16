@@ -326,21 +326,8 @@ create policy "Document access log readable by accessor"
   using (accessor_id = public.my_user_id());
 
 -- ============================================================================
--- COURSE TYPES & COURSE MODULES (structured MPA format)
+-- COURSE MODULES (structured MPA format)
 -- ============================================================================
-drop policy if exists "Course types are readable by all authenticated" on public.course_types;
-create policy "Course types are readable by all authenticated"
-  on public.course_types for select
-  to authenticated
-  using (true);
-
-drop policy if exists "Super Admin can manage course types" on public.course_types;
-create policy "Super Admin can manage course types"
-  on public.course_types for all
-  to authenticated
-  using (public.has_permission('curriculum', array['Full']))
-  with check (public.has_permission('curriculum', array['Full']));
-
 drop policy if exists "Course modules are readable by all authenticated" on public.course_modules;
 create policy "Course modules are readable by all authenticated"
   on public.course_modules for select

@@ -258,7 +258,7 @@ const API_TO_MODULE = {
   assignments: 'assignments', feedback: 'feedback', events: 'events',
   jobs: 'jobs', enquiries: 'enquiries', activities: 'activities',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
-  course_types: 'curriculum', examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
+  examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   timetable_periods: 'timetable',
   roles: 'roles', role_permissions: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
@@ -270,7 +270,7 @@ const TABLE_TO_MODULE = {
   disciplines: 'curriculum', timetable_slots: 'timetable', timetable_periods: 'timetable',
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
-  course_types: 'curriculum', examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
+  examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
@@ -995,9 +995,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', course_types: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'course_types', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);

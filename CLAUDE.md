@@ -32,7 +32,7 @@ Security 2026-09-11: every `/api/*` behind `authMiddleware` + `role_permissions`
 | Files | Supabase Storage `attachments` + signed URLs | `POST /api/upload` base64 JSON (15 MB); swap to R2/B2 later |
 | Domain | Subdomains now; nadagurukulam.org later | DNS Srinivas open |
 
-Hybrid: structured→Postgres+FK; flexible→Mongo doc. First: `disciplines.syllabus_content_id→curriculum_content`. Postgres ~34: `roles, users, user_otps, role_permissions, program_categories, disciplines, courses, course_syllabi, course_modules, course_module_topics, course_types, examination_types, batches, batch_faculty, enrollments, timetable_slots, timetable_periods, live_sessions, session_attendance, documents, document_access_log, events, event_rsvps, jobs, job_applicants, enquiries, class_entries, class_confirmations, assignment_submissions, projects, certificates`.
+Hybrid: structured→Postgres+FK; flexible→Mongo doc. First: `disciplines.syllabus_content_id→curriculum_content`. Postgres ~33: `roles, users, user_otps, role_permissions, program_categories, disciplines, courses, course_syllabi, course_modules, course_module_topics, examination_types, batches, batch_faculty, enrollments, timetable_slots, timetable_periods, live_sessions, session_attendance, documents, document_access_log, events, event_rsvps, jobs, job_applicants, enquiries, class_entries, class_confirmations, assignment_submissions, projects, certificates`.
 Columns:
 - `timetable_slots`: `subjects jsonb`+`course_ids uuid[]` (backfilled from `subject`); `period_number` legacy; `room` nullable
 - `timetable_periods`: dynamic grid; fallback `FIXED_TT` in `page.js:612` (P1 08:15-09:00 … STUDY 14:30-16:00)

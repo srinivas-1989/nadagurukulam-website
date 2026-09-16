@@ -85,7 +85,7 @@ export default function Home() {
   // API Data State
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
-    events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], course_types: [], examination_types: [],
+    events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
     class_entries: [], class_confirmations: []
   });
@@ -218,7 +218,7 @@ export default function Home() {
       const endpoints = [
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'], ['timetable_periods', 'timetable_periods'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
-        ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['course_types', 'course_types'], ['examination_types', 'examination_types'], ['program_categories', 'program_categories'], ['course_syllabi', 'course_syllabi'], ['liveclasses', 'live_sessions'],
+        ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['examination_types', 'examination_types'], ['program_categories', 'program_categories'], ['course_syllabi', 'course_syllabi'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
         ['role_permissions', 'role_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
       ];
@@ -1288,9 +1288,20 @@ export default function Home() {
         const created = await res.json().catch(() => null);
         const courseId = created?.id;
         const mods = d.modules || [];
+        // ensure modules land in versioned syllabus (like handleAddModule)
+        let bulkSyllId = null;
+        if (courseId && mods.length) {
+          const existingSyll = (dbData.course_syllabi||[]).filter(s=>s.course_id===courseId).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
+          if (existingSyll) bulkSyllId = existingSyll.id;
+          else {
+            const ay = syllModAcademicYear || `${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(2)}`;
+            const rr2 = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: courseId, academic_year: ay, status: 'draft' }) });
+            if (rr2.ok) { const j2=await rr2.json().catch(()=>null); if (j2?.id) bulkSyllId=j2.id; }
+          }
+        }
         if (courseId && mods.length) {
           for (const mm of mods) {
-            const rr = await apiCall(`${apiUrl}/api/course_modules`, { method: 'POST', body: JSON.stringify({ course_id: courseId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
+            const rr = await apiCall(`${apiUrl}/api/course_modules`, { method: 'POST', body: JSON.stringify({ course_id: courseId, syllabus_id: bulkSyllId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
             const mc = await rr.json().catch(() => null);
             const modId = mc?.id;
             if (modId && mm.topics?.length) for (let i = 0; i < mm.topics.length; i++) await apiCall(`${apiUrl}/api/course_module_topics`, { method: 'POST', body: JSON.stringify({ module_id: modId, topic: mm.topics[i], sort_order: i }) });
@@ -1364,9 +1375,19 @@ export default function Home() {
       const created = await res.json().catch(()=>null);
       const courseId = created?.id;
       const mods = syllabusParsed._pendingModules || p.modules || [];
+      let singleSyllId = null;
+      if (courseId && mods.length) {
+        const existingSyll2 = (dbData.course_syllabi||[]).filter(s=>s.course_id===courseId).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
+        if (existingSyll2) singleSyllId = existingSyll2.id;
+        else {
+          const ay2 = syllModAcademicYear || `${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(2)}`;
+          const rr2 = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: courseId, academic_year: ay2, status: 'draft' }) });
+          if (rr2.ok) { const j2=await rr2.json().catch(()=>null); if (j2?.id) singleSyllId=j2.id; }
+        }
+      }
       if (courseId && mods.length) {
         for (const mm of mods) {
-          const rr = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: courseId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
+          const rr = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: courseId, syllabus_id: singleSyllId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
           const mc = await rr.json().catch(()=>null);
           const modId = mc?.id;
           if (modId && mm.topics?.length) {
@@ -1439,36 +1460,6 @@ export default function Home() {
     const res = await apiCall(`${apiUrl}/api/courses/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
     setEditingCourse(null); fetchData();
-  };
-
-  // Course types are data — Super Admin/Admin add, edit (rename / change semester count) and delete them.
-  const [newCourseTypeName, setNewCourseTypeName] = useState('');
-  const [newCourseTypeSemesters, setNewCourseTypeSemesters] = useState(4);
-  const [editingCourseType, setEditingCourseType] = useState(null);
-  const [ctEditName, setCtEditName] = useState('');
-  const [ctEditSems, setCtEditSems] = useState(4);
-
-  const handleAddCourseType = async () => {
-    if (!newCourseTypeName) return;
-    await apiCall(`${apiUrl}/api/course_types`, {
-      method: 'POST',
-      body: JSON.stringify({ name: newCourseTypeName, semester_count: Number(newCourseTypeSemesters) || 4 })
-    });
-    setNewCourseTypeName(''); setNewCourseTypeSemesters(4); fetchData();
-  };
-
-  const handleUpdateCourseType = async (t, payload) => {
-    await apiCall(`${apiUrl}/api/course_types/${t.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-    if (payload.name && payload.name !== t.name) {
-      const affected = dbData.courses.filter(c => c.course_type === t.name);
-      await Promise.all(affected.map(c => apiCall(`${apiUrl}/api/courses/${c.id}`, {
-        method: 'PUT', body: JSON.stringify({ course_type: payload.name })
-      })));
-    }
-    setEditingCourseType(null); fetchData();
   };
 
   const currentModules = role ? MODULES.filter(m => perm(m.key)) : [];
@@ -2278,9 +2269,36 @@ export default function Home() {
                                       <input value={d.examinationHoursCie || ''} onChange={e => updateDraft(idx, { examinationHoursCie: e.target.value })} placeholder="CIE hours" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
                                       <input value={d.examinationHoursSee || ''} onChange={e => updateDraft(idx, { examinationHoursSee: e.target.value })} placeholder="SEE hours" style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 120px', fontSize: '13px' }} />
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Objectives (one per line)</label><textarea value={(d.objectives || []).join('\n')} onChange={e => updateDraft(idx, { objectives: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })} rows={3} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /></div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Outcomes (one per line → CO1, CO2…)</label><textarea value={(d.outcomes || []).join('\n')} onChange={e => updateDraft(idx, { outcomes: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })} rows={3} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /></div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-soft)' }}>Pedagogy (one per line)</label><textarea value={d.pedagogy || ''} onChange={e => updateDraft(idx, { pedagogy: e.target.value })} rows={2} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit', fontSize: '13px' }} /></div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>Objectives — per item</label><button type="button" onClick={() => updateDraft(idx, { objectives: [...(d.objectives || []), ''] })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>+ Add Objective</button></div>
+                                      {(d.objectives || []).length === 0 ? <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No objectives — click Add.</span> : (d.objectives || []).map((txt, oi) => (
+                                        <div key={oi} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '18px' }}>{oi + 1}.</span>
+                                          <input value={txt} onChange={e => { const a = [...(d.objectives || [])]; a[oi] = e.target.value; updateDraft(idx, { objectives: a }); }} placeholder={`Objective ${oi + 1}`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                          <button type="button" onClick={() => { const a = (d.objectives || []).filter((_, j) => j !== oi); updateDraft(idx, { objectives: a }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>Outcomes — per item (→ CO1, CO2…)</label><button type="button" onClick={() => updateDraft(idx, { outcomes: [...(d.outcomes || []), ''] })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>+ Add Outcome</button></div>
+                                      {(d.outcomes || []).length === 0 ? <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No outcomes — click Add.</span> : (d.outcomes || []).map((txt, oi) => (
+                                        <div key={oi} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                          <span style={{ background: 'var(--primary)', color: '#fff', padding: '3px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, minWidth: '38px', textAlign: 'center' }}>{`CO${oi + 1}`}</span>
+                                          <input value={txt} onChange={e => { const a = [...(d.outcomes || [])]; a[oi] = e.target.value; updateDraft(idx, { outcomes: a }); }} placeholder={`Outcome CO${oi + 1} text`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                          <button type="button" onClick={() => { const a = (d.outcomes || []).filter((_, j) => j !== oi); updateDraft(idx, { outcomes: a }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)' }}>Pedagogy — per item</label><button type="button" onClick={() => { const cur = String(d.pedagogy || ''); updateDraft(idx, { pedagogy: cur ? cur + '\n' : '' }); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11.5px' }}>+ Add Pedagogy</button></div>
+                                      {(() => { const lines = d.pedagogy ? String(d.pedagogy).split('\n') : []; if (lines.length === 0) return <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No pedagogy — click Add.</span>; return lines.map((txt, pi) => (
+                                        <div key={pi} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '18px' }}>{pi + 1}.</span>
+                                          <input value={txt} onChange={e => { const a = String(d.pedagogy || '').split('\n'); a[pi] = e.target.value; updateDraft(idx, { pedagogy: a.join('\n') }); }} placeholder={`Pedagogy ${pi + 1}`} style={{ flex: 1, padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
+                                          <button type="button" onClick={() => { const a = String(d.pedagogy || '').split('\n').filter((_, j) => j !== pi); updateDraft(idx, { pedagogy: a.join('\n') }); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                                        </div>
+                                      )); })()}
+                                    </div>
                                     {d.modules?.length > 0 && (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         <b style={{ fontSize: '12px', color: 'var(--primary-deep)' }}>Modules ({d.modules.length})</b>
@@ -2311,36 +2329,6 @@ export default function Home() {
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Course types are data too — add, edit and delete freely. */}
-                    <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <input placeholder="New course type (e.g. Diploma)" value={newCourseTypeName} onChange={e => setNewCourseTypeName(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                        <input type="number" min="1" max="12" title="How many semesters this program runs" value={newCourseTypeSemesters} onChange={e => setNewCourseTypeSemesters(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', width: '110px' }} />
-                        <button type="button" onClick={handleAddCourseType} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Type</button>
-                      </div>
-                      {dbData.course_types.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {dbData.course_types.map(t => (
-                            editingCourseType === t.id ? (
-                              <div key={t.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <input value={ctEditName} onChange={e => setCtEditName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 150px' }} />
-                                <input type="number" min="1" max="12" title="Semesters" value={ctEditSems} onChange={e => setCtEditSems(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', width: '90px' }} />
-                                <button type="button" onClick={() => handleUpdateCourseType(t, { name: ctEditName, semester_count: Number(ctEditSems) })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Save</button>
-                                <button type="button" onClick={() => setEditingCourseType(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Cancel</button>
-                              </div>
-                            ) : (
-                              <div key={t.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <b style={{ minWidth: '150px' }}>{t.name}</b>
-                                <span style={{ color: 'var(--text-soft)', fontSize: '13px' }}>{t.semester_count} semester{t.semester_count === 1 ? '' : 's'}</span>
-                                <button type="button" onClick={() => { setEditingCourseType(t.id); setCtEditName(t.name); setCtEditSems(t.semester_count); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
-                                {isFull('curriculum') && <button type="button" title="Delete course type" onClick={() => handleDelete('course_types', t.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>}
-                              </div>
-                            )
-                          ))}
                         </div>
                       )}
                     </div>
@@ -2389,13 +2377,13 @@ export default function Home() {
                                 <td style={{ padding: '6px' }}><select value={editCourse.discipline_id || ''} onChange={e => setEditCourse({ ...editCourse, discipline_id: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '100%', fontSize: '12px' }}>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px' }} placeholder="Name" /></td>
                                 <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /></td>
-                                <td style={{ padding: '6px' }}><select value={editCourse.course_type || ''} onChange={e => setEditCourse({ ...editCourse, course_type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}>{dbData.course_types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}</select><select value={editCourse.type || 'DSC'} onChange={e => setEditCourse({ ...editCourse, type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '70px', marginTop: '4px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.type || 'DSC'} onChange={e => setEditCourse({ ...editCourse, type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.year_label || ''} onChange={e => setEditCourse({ ...editCourse, year_label: e.target.value || null, year_number: e.target.value ? ROMAN.indexOf(e.target.value.replace('Year ', '')) + 1 : null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="">—</option>{ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => setEditCourse({ ...editCourse, semester: e.target.value || null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.credits ?? ''} onChange={e => setEditCourse({ ...editCourse, credits: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} /></td>
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.teaching_hours ?? ''} onChange={e => setEditCourse({ ...editCourse, teaching_hours: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} placeholder="Hrs" /></td>
                                 <td style={{ padding: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                  <button onClick={() => handleUpdateCourse(c.id, { code: editCourse.code, name: editCourse.name, discipline_id: editCourse.discipline_id, course_type: editCourse.course_type, type: editCourse.type, semester: editCourse.semester || null, year_label: editCourse.year_label || null, year_number: editCourse.year_number || null, credits: editCourse.credits === '' ? null : Number(editCourse.credits), teaching_hours: editCourse.teaching_hours === '' ? null : Number(editCourse.teaching_hours) })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                                  <button onClick={() => handleUpdateCourse(c.id, { code: editCourse.code, name: editCourse.name, discipline_id: editCourse.discipline_id, type: editCourse.type, semester: editCourse.semester || null, year_label: editCourse.year_label || null, year_number: editCourse.year_number || null, credits: editCourse.credits === '' ? null : Number(editCourse.credits), teaching_hours: editCourse.teaching_hours === '' ? null : Number(editCourse.teaching_hours) })} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                                   <button onClick={() => setEditingCourse(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                                 </td>
                               </tr>
@@ -2406,7 +2394,7 @@ export default function Home() {
                             <td style={{ padding: '10px 8px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{prog?.name || '—'}</td>
                             <td style={{ padding: '10px 8px' }}><span style={{ color:'var(--primary)', textDecoration:'underline', fontWeight:600 }}>{c.name}</span></td>
                             <td style={{ padding: '10px 8px' }}><button onClick={() => setActiveSyllabusCourse(c)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}><b style={{ color:'var(--primary)', textDecoration:'underline' }}>{c.code}</b></button></td>
-                            <td style={{ padding: '10px 8px' }}>{c.type || c.course_type || '—'}</td>
+                            <td style={{ padding: '10px 8px' }}>{c.type || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.year_label || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.semester || '—'}</td>
                             <td style={{ padding: '10px 8px' }}>{c.credits ?? '—'}</td>
@@ -2447,7 +2435,7 @@ export default function Home() {
                           <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Course Name</div>
                           <div style={{ padding: '9px 12px', borderRight: '1px solid var(--border)' }}>{activeSyllabusCourse.name}</div>
                           <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Type</div>
-                          <div style={{ padding: '9px 12px' }}>{activeSyllabusCourse.type || activeSyllabusCourse.course_type || '—'}</div>
+                          <div style={{ padding: '9px 12px' }}>{activeSyllabusCourse.type || '—'}</div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px 110px', borderBottom: '1px solid var(--border)' }}>
                           <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Code</div>
