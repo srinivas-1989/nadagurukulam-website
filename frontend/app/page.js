@@ -437,29 +437,39 @@ export default function Home() {
   const editDiscCatLimit = editDiscSelCat?.duration_value ? { v: editDiscSelCat.duration_value, u: editDiscSelCat.duration_unit } : null;
   const editDiscMaxYears = editDiscCatLimit ? (editDiscCatLimit.u==='months' ? Math.floor(editDiscCatLimit.v/12)||1 : editDiscCatLimit.v) : 10;
   const yearOptions = (() => {
-    const n = Math.min(Number(selectedDisc?.year_count) || 2, maxYearsForProgram);
+    if (!selectedDisc) return [];
+    const n = Math.min(Number(selectedDisc.year_count) || 0, maxYearsForProgram);
+    if (n <= 0) return [];
     return Array.from({ length: Math.min(n, 10) }, (_, i) => `Year ${ROMAN[i]}`);
   })();
   const monthOptions = (() => {
-    const n = Math.min(Number(selectedDisc?.month_count) || 12, categoryLimit?.u==='months' ? categoryLimit.v : 24);
+    if (!selectedDisc || selectedDiscStructure !== 'monthly') return [];
+    const n = Math.min(Number(selectedDisc.month_count) || 0, categoryLimit?.u==='months' ? categoryLimit.v : 24);
+    if (n <= 0) return [];
     return Array.from({ length: n }, (_, i) => `Month ${i+1}`);
   })();
   const semestersPerProgram = (() => {
-    const yrs = Number(selectedDisc?.year_count) || (categoryLimit?.u==='months'? Math.floor((Number(selCat?.duration_value)||24)/6) : categoryLimit?.v || 2);
-    const perYear = Number(selectedDisc?.semesters_per_year) || 2;
-    return yrs * perYear;
+    if (!selectedDisc) return 0;
+    const perYear = Number(selectedDisc.semesters_per_year) || 0;
+    if (!perYear) return 0;
+    const yrs = Number(selectedDisc.year_count) || 0;
+    if (yrs) return yrs * perYear;
+    if (categoryLimit?.u==='months') { const m=Math.floor((Number(selCat?.duration_value)||0)/6); return m?m*perYear:0; }
+    const catYrs = Number(categoryLimit?.v) || 0;
+    return catYrs ? catYrs * perYear : 0;
   })();
   const courseSemesters = (() => {
-    if (selectedDiscStructure==='semester') return Array.from({ length: semestersPerProgram }, (_, i) => `Semester ${ROMAN[i] || i+1}`);
-    return Array.from({ length: Number(selectedDisc?.semesters_per_year)||2 }, (_, i) => `Semester ${ROMAN[i]}`);
+    if (!selectedDisc) return [];
+    if (selectedDiscStructure==='semester') return semestersPerProgram ? Array.from({ length: semestersPerProgram }, (_, i) => `Semester ${ROMAN[i] || i+1}`) : [];
+    const per = Number(selectedDisc.semesters_per_year)||0;
+    return per ? Array.from({ length: per }, (_, i) => `Semester ${ROMAN[i]}`) : [];
   })();
-  // year→semester mapping: 4yr 2/yr → Yr3 gets Sem5,6
   const semestersForSelectedYear = (() => {
     if (selectedDiscStructure!=='semester' || !courseYearLabel) return courseSemesters;
+    const perYear = Number(selectedDisc?.semesters_per_year) || 0;
+    if (!perYear) return courseSemesters;
     const yi = ROMAN.indexOf(courseYearLabel.replace('Year ','').trim()); if (yi<0) return courseSemesters;
-    const perYear = Number(selectedDisc?.semesters_per_year)||2;
-    const start = yi*perYear;
-    return courseSemesters.slice(start, start+perYear);
+    return courseSemesters.slice(yi*perYear, yi*perYear+perYear);
   })();
   const progMins = (() => { const v = Number(selectedDisc?.period_minutes); return Number.isFinite(v) && v>=10 && v<=120 ? v : 45; })();
   const derivedPeriods = (() => { const h = Number(courseHours); if (!Number.isFinite(h)||h<=0) return ''; return Math.round(h*60/progMins); })();
@@ -469,10 +479,72 @@ export default function Home() {
     const t = String(coursePedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
     return t;
   })();
+  const filterYearOptions = (() => {
+    const ord = v => ROMAN.indexOf(String(v).replace('Year ','').trim());
+    if (filterDisc) {
+      const d = dbData.curriculum.find(x => x.id === filterDisc);
+      if (!d) return [];
+      const cat = (dbData.program_categories||[]).find(c=>c.id===d.category_id);
+      const lim = cat?.duration_value ? (cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value) : 10;
+      const n = Math.min(Number(d.year_count)||0, lim);
+      if (n>0) return Array.from({length:n},(_,i)=>`Year ${ROMAN[i]}`);
+      return [...new Set((dbData.courses||[]).filter(c=>c.discipline_id===filterDisc).map(c=>c.year_label).filter(Boolean))].sort((a,b)=>ord(a)-ord(b));
+    }
+    const s=new Set();
+    for(const d of dbData.curriculum){ const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id); const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10; const n=Math.min(Number(d.year_count)||0, lim); for(let i=0;i<n;i++) s.add(`Year ${ROMAN[i]}`); }
+    for(const c of dbData.courses||[]) if(c.year_label) s.add(c.year_label);
+    return [...s].sort((a,b)=>ord(a)-ord(b));
+  })();
+  const filterSemOptions = (() => {
+    const ord=v=>ROMAN.indexOf(String(v).replace('Semester ','').trim());
+    if (filterDisc) {
+      const d=dbData.curriculum.find(x=>x.id===filterDisc);
+      if(!d) return [];
+      const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id);
+      const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10;
+      const yrs=Math.min(Number(d.year_count)||0, lim);
+      const per=Number(d.semesters_per_year)||0;
+      if(yrs>0&&per>0){ if((d.structure_mode||'semester')==='semester') return Array.from({length:yrs*per},(_,i)=>`Semester ${ROMAN[i]||i+1}`); return Array.from({length:per},(_,i)=>`Semester ${ROMAN[i]}`); }
+      return [...new Set((dbData.courses||[]).filter(c=>c.discipline_id===filterDisc).map(c=>c.semester).filter(Boolean))].sort((a,b)=>ord(a)-ord(b));
+    }
+    const s=new Set();
+    for(const d of dbData.curriculum){ const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id); const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10; const yrs=Math.min(Number(d.year_count)||0, lim); const per=Number(d.semesters_per_year)||0; if(yrs>0&&per>0){ const arr=(d.structure_mode||'semester')==='semester'?Array.from({length:yrs*per},(_,i)=>`Semester ${ROMAN[i]||i+1}`):Array.from({length:per},(_,i)=>`Semester ${ROMAN[i]}`); arr.forEach(v=>s.add(v)); } }
+    for(const c of dbData.courses||[]) if(c.semester) s.add(c.semester);
+    return [...s].sort((a,b)=>ord(a)-ord(b));
+  })();
+  const filterTypeOptions = [...new Set((dbData.courses||[]).map(c=>c.type).filter(Boolean))].sort();
+  const editYearOptions = (() => {
+    const d=dbData.curriculum.find(x=>x.id===(editCourse.discipline_id||''));
+    if(!d) return [];
+    const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id);
+    const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10;
+    const n=Math.min(Number(d.year_count)||0, lim);
+    if(n>0) return Array.from({length:n},(_,i)=>`Year ${ROMAN[i]}`);
+    return [...new Set((dbData.courses||[]).filter(c=>c.discipline_id===d.id).map(c=>c.year_label).filter(Boolean))].sort((a,b)=>ROMAN.indexOf(a.replace('Year ','').trim())-ROMAN.indexOf(b.replace('Year ','').trim()));
+  })();
+  const editSemOptions = (() => {
+    const d=dbData.curriculum.find(x=>x.id===(editCourse.discipline_id||''));
+    if(!d) return [];
+    const cat=(dbData.program_categories||[]).find(c=>c.id===d.category_id);
+    const lim=cat?.duration_value?(cat.duration_unit==='months'?Math.floor(cat.duration_value/12)||1:cat.duration_value):10;
+    const yrs=Math.min(Number(d.year_count)||0, lim);
+    const per=Number(d.semesters_per_year)||0;
+    if(yrs>0&&per>0){ if((d.structure_mode||'semester')==='semester') return Array.from({length:yrs*per},(_,i)=>`Semester ${ROMAN[i]||i+1}`); return Array.from({length:per},(_,i)=>`Semester ${ROMAN[i]}`); }
+    return [...new Set((dbData.courses||[]).filter(c=>c.discipline_id===d.id).map(c=>c.semester).filter(Boolean))].sort((a,b)=>ROMAN.indexOf(a.replace('Semester ','').trim())-ROMAN.indexOf(b.replace('Semester ','').trim()));
+  })();
 
   useEffect(() => { if (!courseDisc && dbData.curriculum.length) setCourseDisc(dbData.curriculum[0].id); }, [dbData.curriculum]);
   useEffect(() => { const opts = semestersForSelectedYear; if (opts.length && !opts.includes(courseSem)) setCourseSem(opts[0]); }, [courseDisc, courseYearLabel]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (selectedDiscStructure !== 'semester' || !courseSem) return; const idx = courseSemesters.indexOf(courseSem); if (idx < 0) return; const per = Number(selectedDisc?.semesters_per_year) || 2; const want = `Year ${ROMAN[Math.floor(idx / per)] || 'I'}`; if (want !== courseYearLabel) setCourseYearLabel(want); }, [courseSem]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (selectedDiscStructure !== 'semester' || !courseSem) return; const per = Number(selectedDisc?.semesters_per_year) || 0; if (!per) return; const idx = courseSemesters.indexOf(courseSem); if (idx < 0) return; const want = `Year ${ROMAN[Math.floor(idx / per)] || 'I'}`; if (want !== courseYearLabel) setCourseYearLabel(want); }, [courseSem]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (filterYear && filterYearOptions.length && !filterYearOptions.includes(filterYear)) setFilterYear('');
+  }, [filterDisc, dbData.curriculum, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (filterSem && filterSemOptions.length && !filterSemOptions.includes(filterSem)) setFilterSem('');
+  }, [filterDisc, dbData.curriculum, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (filterType && filterTypeOptions.length && !filterTypeOptions.includes(filterType)) setFilterType('');
+  }, [dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (activeModule === 'curriculum') { setShowAddCourse(false); setShowAddSyllabus(false); } }, [activeModule]);
   useEffect(() => {
     if (!selectedDisc) return;
@@ -2154,7 +2226,7 @@ export default function Home() {
                               <select value={courseYearLabel} onChange={e => setCourseYearLabel(e.target.value)} style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', flex: '1 1 120px' }}>
                                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                               </select>
-                              <select value={courseSem} onChange={e => { const v=e.target.value; setCourseSem(v); if(selectedDiscStructure==='semester'){ const per=Number(selectedDisc?.semesters_per_year)||2; const idx=(courseSemesters||[]).indexOf(v); if(idx>=0){ const yIdx=Math.floor(idx/per); const want=`Year ${ROMAN[yIdx]||'I'}`; if(want!==courseYearLabel) setCourseYearLabel(want); } } }} style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', flex: '1 1 120px' }}>
+                              <select value={courseSem} onChange={e => { const v=e.target.value; setCourseSem(v); if(selectedDiscStructure==='semester'){ const per=Number(selectedDisc?.semesters_per_year)||0; if(!per) return; const idx=(courseSemesters||[]).indexOf(v); if(idx>=0){ const yIdx=Math.floor(idx/per); const want=`Year ${ROMAN[yIdx]||'I'}`; if(want!==courseYearLabel) setCourseYearLabel(want); } } }} style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', flex: '1 1 120px' }}>
                                 {semestersForSelectedYear.map(s => <option key={s} value={s}>{s}</option>)}
                               </select>
                               <span style={{ fontSize: '11px', color: 'var(--text-faint)', alignSelf: 'center' }}>Year {courseYearLabel.replace('Year ', '')} → {semestersForSelectedYear.join(', ')}</span>
@@ -2438,15 +2510,15 @@ export default function Home() {
                   </select>
                   <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
                     <option value="">All Types</option>
-                    <option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option>
+                    {filterTypeOptions.map(t=> <option key={t} value={t}>{t}</option>)}
                   </select>
                   <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
                     <option value="">All Years</option>
-                    {ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}
+                    {filterYearOptions.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                   <select value={filterSem} onChange={e => setFilterSem(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
                     <option value="">All Semesters</option>
-                    {Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}
+                    {filterSemOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                   {(filterDisc || filterType || filterSem || filterYear) && <button onClick={() => { setFilterDisc(''); setFilterType(''); setFilterSem(''); setFilterYear(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '12px' }}>Clear</button>}
                   <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear)).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
@@ -2473,8 +2545,8 @@ export default function Home() {
                                 <td style={{ padding: '6px' }}><input value={editCourse.name || ''} onChange={e => setEditCourse({ ...editCourse, name: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '140px', fontSize: '12px' }} placeholder="Name" /></td>
                                 <td style={{ padding: '6px' }}><input value={editCourse.code || ''} onChange={e => setEditCourse({ ...editCourse, code: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} placeholder="Code" /></td>
                                 <td style={{ padding: '6px' }}><select value={editCourse.type || 'DSC'} onChange={e => setEditCourse({ ...editCourse, type: e.target.value })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="DSC">DSC</option><option value="SEC">SEC</option><option value="DSE">DSE</option><option value="AECC">AECC</option><option value="GE">GE</option><option value="Core">Core</option></select></td>
-                                <td style={{ padding: '6px' }}><select value={editCourse.year_label || ''} onChange={e => setEditCourse({ ...editCourse, year_label: e.target.value || null, year_number: e.target.value ? ROMAN.indexOf(e.target.value.replace('Year ', '')) + 1 : null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="">—</option>{ROMAN.slice(0, 8).map(r => <option key={r} value={`Year ${r}`}>Year {r}</option>)}</select></td>
-                                <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => { const v=e.target.value||null; const dDisc=dbData.curriculum.find(x=>x.id===(editCourse.discipline_id||'')); const per=Number(dDisc?.semesters_per_year)||2; const all=Array.from({length:per*10},(_,i)=>`Semester ${ROMAN[i]}`); const idx=all.indexOf(v); let patch={semester:v}; if(idx>=0){ const yIdx=Math.floor(idx/per); patch.year_label=`Year ${ROMAN[yIdx]||'I'}`; patch.year_number=yIdx+1; } setEditCourse({ ...editCourse, ...patch }); }} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{Array.from({ length: 8 }, (_, i) => `Semester ${ROMAN[i]}`).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.year_label || ''} onChange={e => setEditCourse({ ...editCourse, year_label: e.target.value || null, year_number: e.target.value ? ROMAN.indexOf(e.target.value.replace('Year ', '')) + 1 : null })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '90px' }}><option value="">—</option>{(editYearOptions.length?editYearOptions:filterYearOptions).map(r => <option key={r} value={r}>{r}</option>)}</select></td>
+                                <td style={{ padding: '6px' }}><select value={editCourse.semester || ''} onChange={e => { const v=e.target.value||null; const dDisc=dbData.curriculum.find(x=>x.id===(editCourse.discipline_id||'')); const per=Number(dDisc?.semesters_per_year)||2; const all=Array.from({length:per*10},(_,i)=>`Semester ${ROMAN[i]}`); const idx=all.indexOf(v); let patch={semester:v}; if(idx>=0){ const yIdx=Math.floor(idx/per); patch.year_label=`Year ${ROMAN[yIdx]||'I'}`; patch.year_number=yIdx+1; } setEditCourse({ ...editCourse, ...patch }); }} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', width: '110px' }}><option value="">—</option>{(editSemOptions.length?editSemOptions:filterSemOptions).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.credits ?? ''} onChange={e => setEditCourse({ ...editCourse, credits: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} /></td>
                                 <td style={{ padding: '6px' }}><input type="number" value={editCourse.teaching_hours ?? ''} onChange={e => setEditCourse({ ...editCourse, teaching_hours: e.target.value === '' ? '' : Number(e.target.value) })} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '56px', fontSize: '12px' }} placeholder="Hrs" /></td>
                                 <td style={{ padding: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
