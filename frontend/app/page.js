@@ -425,6 +425,7 @@ export default function Home() {
   const [showProgCats, setShowProgCats] = useState(false);
   const [showAddProgram, setShowAddProgram] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showPrograms, setShowPrograms] = useState(false);
 
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   const selectedDisc = dbData.curriculum.find(d => d.id === courseDisc) || null;
@@ -580,7 +581,7 @@ export default function Home() {
   useEffect(() => {
     if (filterType && filterTypeOptions.length && !filterTypeOptions.includes(filterType)) setFilterType('');
   }, [filterDisc, filterCat, dbData.courses]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (activeModule === 'curriculum') { setShowAddCourse(false); setShowAddSyllabus(false); setShowProgCats(false); setShowAddProgram(false); setShowImport(false); } }, [activeModule]);
+  useEffect(() => { if (activeModule === 'curriculum') { setShowAddCourse(false); setShowAddSyllabus(false); setShowProgCats(false); setShowAddProgram(false); setShowImport(false); setShowPrograms(false); } }, [activeModule]);
   useEffect(() => {
     if (!selectedDisc) return;
     const mode = selectedDisc.structure_mode || 'semester';
@@ -2059,9 +2060,9 @@ export default function Home() {
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', letterSpacing: '-0.01em', marginBottom: '6px' }}>Curriculum & Syllabus</h2>
                     <p style={{ color: 'var(--text-soft)', fontSize: '13px', lineHeight: 1.5, margin: 0, maxWidth: '640px' }}>Dynamic university syllabus structure — Programs, Semesters and Courses in the MPA document format. Manage categories, programs, courses and syllabus versions in one place.</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginTop: '14px' }}>
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '12px 14px', boxShadow: 'var(--shadow-sm)' }}><div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Programs</div><div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', lineHeight: 1 }}>{dbData.curriculum.length}</div><div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>active disciplines</div></div>
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '12px 14px', boxShadow: 'var(--shadow-sm)' }}><div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Categories</div><div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', lineHeight: 1 }}>{(dbData.program_categories||[]).length}</div><div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>UG / PG / Diploma</div></div>
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '12px 14px', boxShadow: 'var(--shadow-sm)' }}><div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Courses</div><div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', lineHeight: 1 }}>{(dbData.courses||[]).length}</div><div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>across all programs</div></div>
+                      <div role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); setShowPrograms(v=>!v);}}} onClick={()=>setShowPrograms(v=>!v)} title={showPrograms?'Hide programs':'Show programs'} style={{ background: 'var(--surface)', border: `1.5px solid ${showPrograms?'var(--primary)':'var(--border)'}`, borderRadius: 'var(--radius-xl-sm)', padding: '12px 14px', boxShadow: 'var(--shadow-sm)', cursor:'pointer', userSelect:'none' }}><div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Programs ▸</div><div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', lineHeight: 1 }}>{dbData.curriculum.length}</div><div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{showPrograms?'tap to hide':'tap to view'}</div></div>
+                      <div role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); setShowProgCats(v=>!v);}}} onClick={()=>setShowProgCats(v=>!v)} title={showProgCats?'Hide categories':'Show categories'} style={{ background: 'var(--surface)', border: `1.5px solid ${showProgCats?'var(--primary)':'var(--border)'}`, borderRadius: 'var(--radius-xl-sm)', padding: '12px 14px', boxShadow: 'var(--shadow-sm)', cursor:'pointer', userSelect:'none' }}><div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Categories ▸</div><div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', lineHeight: 1 }}>{(dbData.program_categories||[]).length}</div><div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{showProgCats?'tap to hide':'UG / PG / Diploma'}</div></div>
+                      <div role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); document.getElementById('courses-anchor')?.scrollIntoView({behavior:'smooth',block:'start'});}}} onClick={()=>document.getElementById('courses-anchor')?.scrollIntoView({behavior:'smooth',block:'start'})} title="Go to courses" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '12px 14px', boxShadow: 'var(--shadow-sm)', cursor:'pointer', userSelect:'none' }}><div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Courses ▸</div><div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-deep)', lineHeight: 1 }}>{(dbData.courses||[]).length}</div><div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>apply filter to view</div></div>
                     </div>
                   </div>
                 </div>
@@ -2174,7 +2175,8 @@ export default function Home() {
                   </form>
                 )}
 
-                {/* Programs list — grouped by category; category + structure + period */}
+                {/* Programs list — hidden by default; open via Overview ▸ Programs */}
+                {showPrograms && (
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: '24px', boxShadow: 'var(--shadow-sm)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                     <thead>
@@ -2228,6 +2230,7 @@ export default function Home() {
                     </tbody>
                   </table>
                 </div>
+                )}
 
                 {canCreate('curriculum') && showAddCourse && (
                   <form onSubmit={handleAddCourse} style={{ position: 'relative', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: 'var(--shadow-sm)', marginBottom: '18px' }}>
@@ -2540,8 +2543,8 @@ export default function Home() {
                     </div>
                 )}
 
-                {/* Select Course — filtered list */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
+                {/* Select Course — filtered list (courses visible only when a filter is applied; vertical scroll only) */}
+                <div id="courses-anchor" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-deep)' }}>Select Course:</span>
                   <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px' }}>
                     <option value="">All Categories</option>
@@ -2566,17 +2569,19 @@ export default function Home() {
                   {(filterCat || filterDisc || filterType || filterSem || filterYear) && <button onClick={() => { setFilterCat(''); setFilterDisc(''); setFilterType(''); setFilterSem(''); setFilterYear(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '12px' }}>Clear Filters</button>}
                   <span style={{ fontSize: '12px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{(() => { const n = dbData.courses.filter(c => { const cat=dbData.curriculum.find(d=>d.id===c.discipline_id)?.category_id; return (!filterCat || cat===filterCat) && (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear); }).length; return n === dbData.courses.length ? `${n} course${n===1?'':'s'}` : `${n} / ${dbData.courses.length} shown`; })()}</span>
                 </div>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'auto', maxHeight: '520px', boxShadow: 'var(--shadow-sm)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', minWidth: '980px' }}>
+                {(() => { const hasFilter=!!(filterCat||filterDisc||filterYear||filterSem||filterType); if(!hasFilter) return <div style={{ background:'var(--surface)', border:'1px dashed var(--border)', borderRadius:'var(--radius-xl)', padding:'18px 14px', textAlign:'center', color:'var(--text-faint)', fontSize:'13px' }}>{(dbData.courses||[]).length===0?'No courses yet — use Add Course above.':'Apply a filter above to see courses — choose Category, Program, Year, Semester or Type.'}{` · ${(dbData.courses||[]).length} course${(dbData.courses||[]).length===1?'':'s'} in total`}</div>; return null; })()}
+                {(() => { const hasFilter=!!(filterCat||filterDisc||filterYear||filterSem||filterType); if(!hasFilter) return null; return (
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflowX: 'hidden', overflowY: 'auto', maxHeight: '520px', boxShadow: 'var(--shadow-sm)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', tableLayout: 'fixed' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Category</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Program</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Course</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Code</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Type</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Year</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Semester</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Credits</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Hours</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)' }}>Actions</th>
+                        <th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'12%' }}>Category</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'12%' }}>Program</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'20%' }}>Course</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'9%' }}>Code</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'7%' }}>Type</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'7%' }}>Year</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'10%' }}>Semester</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'6%' }}>Credits</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'7%' }}>Hours</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'10%' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(() => {
                         const filtered = dbData.courses.filter(c => { const cat=dbData.curriculum.find(d=>d.id===c.discipline_id)?.category_id; return (!filterCat || cat===filterCat) && (!filterDisc || c.discipline_id === filterDisc) && (!filterType || (c.type||'') === filterType) && (!filterSem || c.semester === filterSem) && (!filterYear || c.year_label === filterYear); });
-                        if (filtered.length === 0) return <tr><td colSpan="10" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>{dbData.courses.length === 0 ? 'No courses yet — use Add Course above.' : 'No courses match filters.'}</td></tr>;
+                        if (filtered.length === 0) return <tr><td colSpan="10" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No courses match filters.</td></tr>;
                         return filtered.map(c => {
                           const prog = dbData.curriculum.find(d => d.id === c.discipline_id);
                           const isEditing = editingCourse === c.id;
@@ -2646,6 +2651,7 @@ export default function Home() {
                     </tbody>
                   </table>
                 </div>
+                ); })()}
 
                 {/* View (eye) — readOnly course + syllabus (no edit controls) */}
                 {viewCourse && (() => {
