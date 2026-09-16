@@ -585,6 +585,9 @@ const crud = (table, orderCol = 'created_at') => ({
         if (payload.month_count === '') payload.month_count = null;
         if (payload.year_count !== undefined && payload.year_count !== '' && payload.year_count !== null) { const v=Number(payload.year_count); if(!Number.isFinite(v)||v<1||v>10) return res.status(400).json({ error: 'year_count 1..10' }); payload.year_count=Math.round(v); }
         if (payload.semesters_per_year !== undefined && payload.semesters_per_year !== '' && payload.semesters_per_year !== null) { const v=Number(payload.semesters_per_year); if(!Number.isFinite(v)||v<1||v>4) return res.status(400).json({ error: 'semesters_per_year 1..4' }); payload.semesters_per_year=Math.round(v); }
+        if (payload.structure_mode==='semester') { if (!payload.year_count || !payload.semesters_per_year) return res.status(400).json({ error: 'Semester programs require years and semesters per year' }); }
+        if (payload.structure_mode==='monthly' && !payload.month_count) return res.status(400).json({ error: 'Monthly programs require month_count' });
+        if (payload.structure_mode==='yearly' && !payload.year_count) return res.status(400).json({ error: 'Yearly programs require year_count' });
         if (payload.period_minutes !== undefined && payload.period_minutes !== '' && payload.period_minutes !== null) {
           const v = Number(payload.period_minutes); payload.period_minutes = Number.isFinite(v) ? Math.min(120, Math.max(10, Math.round(v))) : 45;
         } else if (payload.period_minutes === '') payload.period_minutes = 45;
@@ -763,6 +766,8 @@ const crud = (table, orderCol = 'created_at') => ({
         if (updateData.month_count === '') updateData.month_count = null;
         if (updateData.year_count !== undefined && updateData.year_count !== '' && updateData.year_count !== null) { const v=Number(updateData.year_count); if(!Number.isFinite(v)||v<1||v>10) return res.status(400).json({ error: 'year_count 1..10' }); updateData.year_count=Math.round(v); }
         if (updateData.semesters_per_year !== undefined && updateData.semesters_per_year !== '' && updateData.semesters_per_year !== null) { const v=Number(updateData.semesters_per_year); if(!Number.isFinite(v)||v<1||v>4) return res.status(400).json({ error: 'semesters_per_year 1..4' }); updateData.semesters_per_year=Math.round(v); }
+        // semester mapping bound to program — keep y*perYear divisible (inherent) and require both
+        const _sm = updateData.structure_mode; if (_sm==='semester') { const yc=updateData.year_count, sp=updateData.semesters_per_year; if (yc!=null&&sp!=null&&!Number.isFinite(Number(yc)*Number(sp))) return res.status(400).json({ error: 'Semester program needs valid years and per-year' }); }
         if (updateData.period_minutes !== undefined && updateData.period_minutes !== '' && updateData.period_minutes !== null) {
           const v = Number(updateData.period_minutes); updateData.period_minutes = Number.isFinite(v) ? Math.min(120, Math.max(10, Math.round(v))) : 45;
         } else if (updateData.period_minutes === '') updateData.period_minutes = 45;
