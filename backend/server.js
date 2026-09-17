@@ -1024,6 +1024,38 @@ app.post('/api/roles', authMiddleware, rolesCreate);
 app.put('/api/roles/:id', authMiddleware, rolesUpdate);
 app.delete('/api/roles/:id', authMiddleware, rolesDelete);
 
+// Admin: user password/OTP management
+app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res) => {
+  try {
+    if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can reset passwords' });
+    const { data: user } = await supabase.from('users').select('auth_user_id, email, id').eq('id', req.params.id).single();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const tempPassword = genTempPassword();
+    const { error: authErr } = await supabase.auth.admin.updateUserById(user.auth_user_id, { password: tempPassword });
+    if (authErr) throw authErr;
+    await supabase.from('users').update({ must_change_password: true }).eq('id', user.id);
+    const otp = genOTP();
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
+    await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
+    const emailed = await sendOTPEmail(user.email, otp, tempPassword);
+    res.json({ ok: true, emailSent: emailed, tempPassword: (process.env.NODE_ENV !== 'production' || !emailed) ? tempPassword : undefined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/admin/users/:id/generate-otp', authMiddleware, async (req, res) => {
+  try {
+    if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can generate OTPs' });
+    const { data: user } = await supabase.from('users').select('id, email').eq('id', req.params.id).single();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
+    const otp = genOTP();
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
+    const emailed = await sendOTPEmail(user.email, otp, null);
+    res.json({ ok: true, emailSent: emailed, otp: (process.env.NODE_ENV !== 'production' || !emailed) ? otp : undefined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // MongoDB — the flexible half of the hybrid model (CMS blocks, and later lesson plans, feedback forms, activity logs).
 // Connection is optional: Postgres/Supabase modules keep working if Mongo is unreachable.
 let cmsReady = false;

@@ -1248,6 +1248,34 @@ export default function Home() {
     fetchData();
   };
 
+  const handleAdminResetPassword = async (userId, userName) => {
+    if (!confirm(`Reset password for user "${userName}"? This will generate a new temporary password and OTP.`)) return;
+    const res = await apiCall(`${apiUrl}/api/admin/users/${userId}/reset-password`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'Password reset failed'); return; }
+    setUserNotice({
+      tempPassword: data.tempPassword,
+      email: userName,
+      emailSent: data.emailSent,
+      noticeTitle: `Password reset successfully for ${userName}`
+    });
+    fetchData();
+  };
+
+  const handleAdminGenerateOtp = async (userId, userName) => {
+    if (!confirm(`Generate a temporary OTP for user "${userName}"?`)) return;
+    const res = await apiCall(`${apiUrl}/api/admin/users/${userId}/generate-otp`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'OTP generation failed'); return; }
+    setUserNotice({
+      otp: data.otp,
+      email: userName,
+      emailSent: data.emailSent,
+      noticeTitle: `Temporary OTP generated for ${userName}`
+    });
+    fetchData();
+  };
+
   const handleAddDiscipline = async (e) => {
     e.preventDefault();
     if (!newDiscName.trim()) return;
@@ -1958,7 +1986,7 @@ export default function Home() {
               <div>
                 {userNotice && (
                   <div style={{ background: 'var(--bg-saffron)', border: '1.5px solid var(--accent)', padding: '14px 16px', borderRadius: '10px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '13.5px' }}>User created — credentials{userNotice.emailSent ? ' emailed' : ''}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '13.5px' }}>{userNotice.noticeTitle || `User created — credentials${userNotice.emailSent ? ' emailed' : ''}`}</div>
                     <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Email: <b>{userNotice.email}</b></div>
                     {userNotice.tempPassword && <div style={{ fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>Temp password: <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}>{userNotice.tempPassword}</code> <button onClick={() => navigator.clipboard.writeText(userNotice.tempPassword)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Copy</button></div>}
                     {userNotice.otp && <div style={{ fontSize: '13px' }}>OTP: <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}>{userNotice.otp}</code> <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>(expires 10 min)</span> <button onClick={() => navigator.clipboard.writeText(userNotice.otp)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginLeft: '6px' }}>Copy OTP</button></div>}
@@ -2038,6 +2066,12 @@ export default function Home() {
                             <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {canAdmin('users') && <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('users') && u.role_key !== 'super_admin' && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                              {role === 'super_admin' && u.role_key !== 'super_admin' && (
+                                <>
+                                  <button onClick={() => handleAdminResetPassword(u.id, u.name)} style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Reset Pwd</button>
+                                  <button onClick={() => handleAdminGenerateOtp(u.id, u.name)} style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Gen OTP</button>
+                                </>
+                              )}
                             </td>
                           </tr>
                         );
