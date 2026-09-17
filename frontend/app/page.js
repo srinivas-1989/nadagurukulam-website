@@ -228,7 +228,7 @@ export default function Home() {
       const mapped = {};
       endpoints.forEach(([ep, key], idx) => { mapped[key] = Array.isArray(results[idx]) ? results[idx] : []; });
       setDbData(mapped);
-      apiCall(`${apiUrl}/api/roles`).then(r => r.json()).then(setRoles).catch(() => {});
+      apiCall(`${apiUrl}/api/roles`).then(r => r.json()).then(d => Array.isArray(d) && setRoles(d)).catch(() => {});
     } catch (err) { console.error('Fetch error:', err); }
   };
 
@@ -291,7 +291,7 @@ export default function Home() {
   const [editUserYearComm, setEditUserYearComm] = useState('');
 
   const roleCategory = (key) => {
-    const found = roles.find(r => r.key === key);
+    const found = Array.isArray(roles) ? roles.find(r => r.key === key) : null;
     if (found?.category) return found.category;
     if (key === 'student' || key === 'students') return 'student';
     if (key === 'super_admin') return 'system';
