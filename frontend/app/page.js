@@ -2,6 +2,62 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+const UserPersonalTab = ({ userId }) => {
+  const u = dbData.users.find(u => u.id === userId);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <img src={u.profile_pic_url || '/default-avatar.png'} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg)', border: '1px solid var(--border)' }} />
+        <div>
+          <h4 style={{ margin: '0 0 4px' }}>{u.name}</h4>
+          <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{u.designation || 'N/A'} · {u.role_key}</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+        <div><b>Email:</b> {u.email}</div>
+        <div><b>Alternate Email:</b> {u.alternate_email || 'N/A'}</div>
+        <div><b>Phone:</b> {u.phone || 'N/A'}</div>
+        <div><b>Blood Group:</b> {u.blood_group || 'N/A'}</div>
+        <div><b>DOB:</b> {u.date_of_birth || 'N/A'}</div>
+      </div>
+    </div>
+  );
+};
+
+const UserKycTab = ({ userId, kycDocs, onAddDoc, onDeleteDoc, docType, setDocType, docNumber, setDocNumber, fileUrl, setFileUrl }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+      <select value={docType} onChange={e => setDocType(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <option value="aadhar">Aadhar</option><option value="pan">PAN</option><option value="voter_id">Voter ID</option><option value="passport">Passport</option>
+      </select>
+      <input placeholder="Doc Number" value={docNumber} onChange={e => setDocNumber(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+      <input placeholder="File URL" value={fileUrl} onChange={e => setFileUrl(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+      <button onClick={() => onAddDoc(userId)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add</button>
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {kycDocs.map(d => (
+        <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg)', borderRadius: '4px', fontSize: '13px' }}>
+          <span>{d.doc_type.toUpperCase()}: {d.doc_number}</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <a href={d.file_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>View</a>
+            <button onClick={() => onDeleteDoc(d.id, userId)} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer' }}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const UserAdminTab = ({ userId }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <button onClick={() => handleAdminResetPassword(userId, 'User')} style={{ padding: '8px', cursor: 'pointer' }}>Reset Password</button>
+    <button onClick={() => handleAdminGenerateOtp(userId, 'User')} style={{ padding: '8px', cursor: 'pointer' }}>Generate OTP</button>
+    <hr style={{ width: '100%', border: '0', borderTop: '1px solid var(--border)' }} />
+    <button style={{ padding: '8px', cursor: 'pointer', color: 'red' }}>Deactivate User</button>
+    <button style={{ padding: '8px', cursor: 'pointer', color: 'red', fontWeight: 700 }}>Delete User</button>
+  </div>
+);
+
 export default function Home() {
   // Roles are data (the `roles` table, seeded by the Phase 4 schema) — the picker renders the API's response.
 
@@ -290,7 +346,42 @@ export default function Home() {
   const [editUserDateOfJoining, setEditUserDateOfJoining] = useState('');
   const [editUserYearComm, setEditUserYearComm] = useState('');
 
-  const roleCategory = (key) => {
+  const [usersFilterRole, setUsersFilterRole] = useState('');
+  const [usersFilterDesignation, setUsersFilterDesignation] = useState('');
+  const [usersSearch, setUsersSearch] = useState('');
+  const [viewProfileUser, setViewProfileUser] = useState(null); // user id
+  const [viewProfileTab, setViewProfileTab] = useState('personal'); // 'personal' | 'kyc' | 'admin'
+  const [userKycDocs, setUserKycDocs] = useState([]);
+  const [kycDocType, setKycDocType] = useState('aadhar');
+  const [kycDocNumber, setKycDocNumber] = useState('');
+  const [kycFileUrl, setKycFileUrl] = useState('');
+
+  const fetchUserKyc = async (userId) => {
+    try {
+      const res = await apiCall(`${apiUrl}/api/users/${userId}/kyc`);
+      if (res.ok) {
+        const d = await res.json();
+        setUserKycDocs(Array.isArray(d) ? d : []);
+      }
+    } catch {}
+  };
+
+  const handleAddKycDoc = async (userId) => {
+    if (!kycDocNumber || !kycFileUrl) { alert('Provide document number and file URL'); return; }
+    const res = await apiCall(`${apiUrl}/api/users/${userId}/kyc`, {
+      method: 'POST',
+      body: JSON.stringify({ doc_type: kycDocType, doc_number: kycDocNumber, file_url: kycFileUrl })
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || 'Failed to add KYC doc'); return; }
+    setKycDocNumber(''); setKycFileUrl(''); fetchUserKyc(userId);
+  };
+
+  const handleDeleteKycDoc = async (docId, userId) => {
+    if (!confirm('Delete this KYC document?')) return;
+    const res = await apiCall(`${apiUrl}/api/user-kyc-docs/${docId}`, { method: 'DELETE' });
+    if (res.ok) fetchUserKyc(userId);
+  };
+
     const found = Array.isArray(roles) ? roles.find(r => r.key === key) : null;
     if (found?.category) return found.category;
     if (key === 'student' || key === 'students') return 'student';
@@ -1981,7 +2072,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* USERS MODULE — expanded capture */}
+            {/* USERS MODULE — banner cards + tabbed View Profile */}
             {activeModule === 'users' && (
               <div>
                 {userNotice && (
@@ -2023,62 +2114,89 @@ export default function Home() {
                     </div>
                   </form>
                 )}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                        <th style={{ padding: '10px 12px' }}>Name</th><th style={{ padding: '10px 12px' }}>Email / Contact</th><th style={{ padding: '10px 12px' }}>Role / Identifiers</th><th style={{ padding: '10px 12px' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dbData.users.map(u => {
-                        const prog = dbData.curriculum.find(d => d.id === u.program_id);
-                        return editingUser === u.id ? (
-                          <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-saffron)' }}>
-                            <td colSpan={4} style={{ padding: '12px' }}>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                                <input value={editUserName} onChange={e => setEditUserName(e.target.value)} placeholder="Full name" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }} />
-                                <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
-                                <input value={editUserPhone} onChange={e => setEditUserPhone(e.target.value)} placeholder="Phone" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />
-                                <select value={editUserRoleKey} onChange={e => setEditUserRoleKey(e.target.value)} disabled={u.role_key === 'super_admin'} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', minWidth: '150px', opacity: u.role_key === 'super_admin' ? 0.6 : 1 }} title={u.role_key === 'super_admin' ? 'Super Admin cannot be changed' : undefined}>
-                                  {roles.filter(r => !(r.key === 'super_admin' && u.role_key !== 'super_admin' && hasSuperAdminUser)).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                                </select>
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                                {isStaffCat(editRoleCat) && <input value={editUserEmployeeId} onChange={e => setEditUserEmployeeId(e.target.value)} placeholder="Employee ID" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />}
-                                {isStudentCat(editRoleCat) && <input value={editUserRollNo} onChange={e => setEditUserRollNo(e.target.value)} placeholder="Roll No." style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 130px' }} />}
-                                {isStaffCat(editRoleCat) && <input value={editUserDesignation} onChange={e => setEditUserDesignation(e.target.value)} placeholder="Designation" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 150px' }} />}
-                                {isStudentCat(editRoleCat) && <select value={editUserProgramId} onChange={e => setEditUserProgramId(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 160px' }}><option value="">Program</option>{dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
-                                {isStaffCat(editRoleCat) && <input type="date" value={editUserDateOfJoining || ''} onChange={e => setEditUserDateOfJoining(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }} />}
-                                {isStudentCat(editRoleCat) && <input type="number" min="2000" max="2100" value={editUserYearComm || ''} onChange={e => setEditUserYearComm(e.target.value)} placeholder="Year" style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', width: '110px' }} />}
-                              </div>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                <button onClick={() => handleUpdateUser(u)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Save</button>
-                                <button onClick={() => setEditingUser(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '10px 12px' }}><div style={{ fontWeight: 600 }}>{u.name}</div><div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.designation || ''}{u.must_change_password ? <span style={{ marginLeft: '6px', background: 'var(--accent)', color: '#fff', padding: '1px 6px', borderRadius: '99px', fontSize: '10px' }}>password reset required</span> : ''}</div></td>
-                            <td style={{ padding: '10px 12px' }}><div style={{ color: 'var(--text-soft)', fontSize: '12.5px' }}>{u.email}</div><div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{u.phone || ''}</div></td>
-                            <td style={{ padding: '10px 12px' }}><div style={{ textTransform: 'capitalize' }}>{roles.find(r => r.key === u.role_key)?.name || u.role_key}</div><div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.employee_id ? `Emp: ${u.employee_id}` : ''}{u.employee_id && u.roll_no ? ' · ' : ''}{u.roll_no ? `Roll: ${u.roll_no}` : ''}</div><div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{prog ? prog.name : ''}{u.year_of_commencement ? ` · ${u.year_of_commencement}` : ''}{u.date_of_joining ? ` · Joined ${u.date_of_joining}` : ''}</div></td>
-                            <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {canAdmin('users') && <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
-                              {isFull('users') && u.role_key !== 'super_admin' && <button onClick={() => handleDelete('users', u.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
-                              {role === 'super_admin' && u.role_key !== 'super_admin' && (
-                                <>
-                                  <button onClick={() => handleAdminResetPassword(u.id, u.name)} style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Reset Pwd</button>
-                                  <button onClick={() => handleAdminGenerateOtp(u.id, u.name)} style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Gen OTP</button>
-                                </>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+
+                {/* Filters */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
+                    <select value={usersFilterRole || ''} onChange={e => setUsersFilterRole(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">All</option>
+                      {roles.filter(r => r.category === 'staff').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                      {roles.filter(r => r.category === 'student').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                      {roles.filter(r => r.category === 'system').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Designation:
+                    <select value={usersFilterDesignation || ''} onChange={e => setUsersFilterDesignation(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">All</option>
+                      {Array.from(new Set(dbData.users.map(u => u.designation).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Search:
+                    <input type="text" placeholder="Name / Email / ID" value={usersSearch || ''} onChange={e => setUsersSearch(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', width: '200px' }} />
+                  </label>
                 </div>
+
+                {/* Banner List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {dbData.users
+                    .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
+                    .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
+                    .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()))
+                    .map(u => (
+                      <div key={u.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: 'var(--shadow-sm)' }}>
+                        <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{u.name.charAt(0)}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600 }}>{u.name}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.designation || 'No designation'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
+                          <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
+                          <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* View Profile Modal */}
+                {viewProfileUser && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => { setViewProfileUser(null); setViewProfileTab('personal'); }}>
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', width: '100%', maxWidth: '800px', maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--shadow-xl)' }} onClick={e => e.stopPropagation()}>
+                      {/* Header */}
+                      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{dbData.users.find(u => u.id === viewProfileUser)?.name?.charAt(0) || '?'}</div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '18px' }}>{dbData.users.find(u => u.id === viewProfileUser)?.name || 'User'}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{dbData.users.find(u => u.id === viewProfileUser)?.designation || ''} · {roles.find(r => r.key === dbData.users.find(u => u.id === viewProfileUser)?.role_key)?.name || dbData.users.find(u => u.id === viewProfileUser)?.role_key}</div>
+                          </div>
+                        </div>
+                        <button onClick={() => { setViewProfileUser(null); setViewProfileTab('personal'); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Close</button>
+                      </div>
+
+                      {/* Tabs */}
+                      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+                        {['personal', 'kyc', 'admin'].map(t => (
+                          <button key={t} onClick={() => setViewProfileTab(t)} style={{ flex: 1, padding: '12px', border: 'none', background: viewProfileTab === t ? 'var(--surface)' : 'transparent', color: viewProfileTab === t ? 'var(--primary)' : 'var(--text-soft)', fontWeight: viewProfileTab === t ? 700 : 400, cursor: 'pointer', borderBottom: viewProfileTab === t ? '2px solid var(--primary)' : 'none', fontSize: '13px' }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+                        ))}
+                      </div>
+
+                      {/* Tab Content */}
+                      <div style={{ padding: '20px' }}>
+                        {viewProfileTab === 'personal' && (
+                          <UserPersonalTab userId={viewProfileUser} />
+                        )}
+                        {viewProfileTab === 'kyc' && (
+                          <UserKycTab userId={viewProfileUser} kycDocs={userKycDocs} onAddDoc={handleAddKycDoc} onDeleteDoc={handleDeleteKycDoc} docType={kycDocType} setDocType={setKycDocType} docNumber={kycDocNumber} setDocNumber={setKycDocNumber} fileUrl={kycFileUrl} setFileUrl={setKycFileUrl} />
+                        )}
+                        {viewProfileTab === 'admin' && (
+                          <UserAdminTab userId={viewProfileUser} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

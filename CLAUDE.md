@@ -8,9 +8,10 @@ Directory. Where things are, how they wire. Not docs.
 - Design: `NDG_Design Guidelines_V1_20260609.pdf`.
 
 ## 2. Status (2026-09-17)
-- Admin: added `/api/admin/users/:id/reset-password` (temp password + OTP) and `/api/admin/users/:id/generate-otp` (OTP only), protected by `super_admin` role.
-- Auth: first-login password change flow active.
-- Core: Phases 1–6 Done.
+- Admin: added `/api/admin/users/:id/reset-password` (temp password + OTP) and `/api/admin/users/:id/generate-otp` (OTP only).
+- Frontend: fixed `TypeError` (roles array check) and API 403 handling.
+- Core: Phases 1–6 (Auth, Users, Curriculum, Timetable, Logs, Assignments, Projects, Certs) Done.
+- Next: Production stability, Student Analytics, Educator Lesson Plans.
 
 ## 3. Roles & permissions
 - `super_admin` (Full, 17 modules): fixed, seeded, enforced.

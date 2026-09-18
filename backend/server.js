@@ -1056,6 +1056,33 @@ app.post('/api/admin/users/:id/generate-otp', authMiddleware, async (req, res) =
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// KYC endpoints
+app.get('/api/users/:id/kyc', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('user_kyc_docs').select('*').eq('user_id', req.params.id);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/users/:id/kyc', authMiddleware, async (req, res) => {
+  try {
+    const { doc_type, doc_number, file_url } = req.body;
+    if (!doc_type || !doc_number || !file_url) return res.status(400).json({ error: 'doc_type, doc_number, and file_url are required' });
+    const { data, error } = await supabase.from('user_kyc_docs').insert([{ user_id: req.params.id, doc_type, doc_number, file_url }]).select();
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/user-kyc-docs/:id', authMiddleware, async (req, res) => {
+  try {
+    const { error } = await supabase.from('user_kyc_docs').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // MongoDB — the flexible half of the hybrid model (CMS blocks, and later lesson plans, feedback forms, activity logs).
 // Connection is optional: Postgres/Supabase modules keep working if Mongo is unreachable.
 let cmsReady = false;
