@@ -577,8 +577,32 @@ export default function Home() {
   })();
   const filterCatOptions = (dbData.program_categories||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   const filterDiscOptions = (() => {
-    const all = dbData.curriculum||[];
-    if (filterCat) return all.filter(d=>d.category_id===filterCat);
+    let all = dbData.curriculum||[];
+    // Filter-gated courses: hide based on user permissions/role
+    if (session?.user?.role_key === 'student' && view === 'login') {
+      // Students see only enrolled courses or courses available to their program
+      if (myProfile?.program_id) {
+        all = all.filter(d => d.category_id === myProfile.program_id);
+      } else {
+        all = [];
+      }
+    } else if (session?.user?.role_key === 'faculty' && view === 'login') {
+      // Faculty see courses related to their assigned disciplines
+      if (myProfile?.discipline_id) {
+        all = all.filter(d => d.id === myProfile.discipline_id);
+      }
+    } else if (session?.user?.role_key === 'admin') {
+      // Admins see all courses
+    }
+    if (filterCat) {
+      // When filterCat is set, apply filter first, then role gating
+      let filtered = all.filter(d=>d.category_id===filterCat);
+      if (session?.user?.role_key === 'student' && view === 'login') {
+        // Students only see courses in their program
+        filtered = filtered.filter(d => d.category_id === myProfile?.program_id);
+      }
+      return filtered;
+    }
     return all;
   })();
   const filterYearOptions = (() => {
