@@ -31,3 +31,9 @@ dist/
 build/
 .vercel
 .env*
+
+# Backend test files
+backend/test-*.js
+backend/auth-system.js
+backend/test-super-admin-endpoints-simple.js
+backend/test-super-admin-endpoints.js
