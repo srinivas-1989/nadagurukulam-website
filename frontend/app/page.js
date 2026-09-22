@@ -48,15 +48,6 @@ const UserKycTab = ({ userId, kycDocs, onAddDoc, onDeleteDoc, docType, setDocTyp
   </div>
 );
 
-const UserAdminTab = ({ userId }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-    <button onClick={() => handleAdminResetPassword(userId, 'User')} style={{ padding: '8px', cursor: 'pointer' }}>Reset Password</button>
-    <button onClick={() => handleAdminGenerateOtp(userId, 'User')} style={{ padding: '8px', cursor: 'pointer' }}>Generate OTP</button>
-    <hr style={{ width: '100%', border: '0', borderTop: '1px solid var(--border)' }} />
-    <button style={{ padding: '8px', cursor: 'pointer', color: 'red' }}>Deactivate User</button>
-    <button style={{ padding: '8px', cursor: 'pointer', color: 'red', fontWeight: 700 }}>Delete User</button>
-  </div>
-);
 
 export default function Home() {
   // Roles are data (the `roles` table, seeded by the Phase 4 schema) — the picker renders the API's response.
@@ -83,6 +74,7 @@ export default function Home() {
     { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' }
   ];
 
+// All state declarations at top (fix: move undefined state hooks to prevent errors)
   const [view, setView] = useState('public'); // public | login | admin
   const [role, setRole] = useState(null);
   const [activeModule, setActiveModule] = useState('overview');
@@ -93,13 +85,29 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // API Data State
+  const [dbData, setDbData] = useState({
+    users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
+    events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
+    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
+    class_entries: [], class_confirmations: []
+  });
+  const [roles, setRoles] = useState([]);
+  const [myProfile, setMyProfile] = useState(null);
+  const [timetableBatch, setTimetableBatch] = useState(null);
+  const [otpMode, setOtpMode] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [uploadingKey, setUploadingKey] = useState(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+
   const resolveRole = (uid) =>
     supabase.from('users').select('role_key, id').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
     supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
 
-  // Load initial session
+  // Load initial session and data
   useEffect(() => {
+    // Load user session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       if (s) {
@@ -111,6 +119,7 @@ export default function Home() {
       }
     });
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       if (sess) {
@@ -128,6 +137,143 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load API data after session resolves
+  useEffect(() => {
+    if (session?.user?.id) {
+      // Load users data for UserPersonalTab component
+      const fetchData = async () => {
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          const sessionToken = await supabase.auth.getSession().then(({ data }) => data.session?.access_token);
+          if (!sessionToken) return;
+
+          headers.Authorization = `Bearer ${sessionToken}`;
+
+          // Fetch users data
+          const usersResponse = await fetch(`${apiUrl}/api/users`, { headers });
+          const usersData = usersResponse.ok ? await usersResponse.json() : [];
+          setDbData(prev => ({ ...prev, users: usersData }));
+
+          // Fetch roles data
+          const rolesResponse = await fetch(`${apiUrl}/api/roles`, { headers });
+          const rolesData = rolesResponse.ok ? await rolesResponse.json() : [];
+          setRoles(rolesData);
+
+          // Fetch role_permissions data
+          const rolePermsResponse = await fetch(`${apiUrl}/api/role_permissions`, { headers });
+          const rolePermsData = rolePermsResponse.ok ? await rolePermsResponse.json() : [];
+          setDbData(prev => ({ ...prev, role_permissions: rolePermsData }));
+        } catch (error) {
+          console.error('Failed to load API data:', error);
+        }
+      };
+
+      fetchData();
+    }
+  }, [session]);
+
+  // API Functions with proper error handling
+  const handleAdminResetPassword = async (userId, userType) => {
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      if (!sess?.access_token) throw new Error('No session token available');
+
+      const response = await fetch(`${apiUrl}/api/admin/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sess.access_token}`
+        },
+        body: JSON.stringify({ email: userType }) // UserType as email in this example
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to reset password');
+
+      console.log('Password reset successful:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in handleAdminResetPassword:', error);
+      throw error;
+    }
+  };
+
+  const handleAdminGenerateOtp = async (userId, userType) => {
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      if (!sess?.access_token) throw new Error('No session token available');
+
+      const response = await fetch(`${apiUrl}/api/admin/users/${userId}/generate-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sess.access_token}`
+        },
+        body: JSON.stringify({ email: userType }) // UserType as email in this example
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to generate OTP');
+
+      console.log('OTP generated successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in handleAdminGenerateOtp:', error);
+      throw error;
+    }
+  };
+
+  const handleAdminDeactivate = async (userId) => {
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      if (!sess?.access_token) throw new Error('No session token available');
+
+      const response = await fetch(`${apiUrl}/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sess.access_token}`
+        },
+        body: JSON.stringify({ is_active: false })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to deactivate user');
+
+      console.log('User deactivated successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in handleAdminDeactivate:', error);
+      throw error;
+    }
+  };
+
+  const handleAdminDelete = async (userId) => {
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      if (!sess?.access_token) throw new Error('No session token available');
+
+      const response = await fetch(`${apiUrl}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sess.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
+      }
+
+      console.log('User deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Error in handleAdminDelete:', error);
+      throw error;
+    }
+  };
 
   // Logout function
   const handleLogout = async () => {
@@ -382,6 +528,7 @@ export default function Home() {
     if (res.ok) fetchUserKyc(userId);
   };
 
+    const roleCategory = (key) => {
     const found = Array.isArray(roles) ? roles.find(r => r.key === key) : null;
     if (found?.category) return found.category;
     if (key === 'student' || key === 'students') return 'student';
