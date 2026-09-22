@@ -33,5 +33,5 @@ specs/*.sql                       Migrations
 ```
 
 ## 6. Admin Endpoints
-- `POST /api/admin/users/:id/reset-password`: `super_admin` only, triggers temp pwd update, `must_change_password=true`, generates OTP, invalidates prior OTP, emails user.
-- `POST /api/admin/users/:id/generate-otp`: `super_admin` only, generates OTP, invalidates prior OTP, emails user.
+- `POST /api/admin/users/:id/reset-password`: `super_admin` only, triggers temp password update via Supabase Auth, sets `must_change_password=true`, generates and sends OTP with temp password (email only in non-production or if email fails), invalidates prior OTPs.
+- `POST /api/admin/users/:id/generate-otp`: `super_admin` only, generates OTP, invalidates prior OTPs, emails user (OTP only, no temp password).
