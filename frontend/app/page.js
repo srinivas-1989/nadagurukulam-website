@@ -1620,7 +1620,7 @@ export default function Home() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { alert(data.error || 'OTP generation failed'); return; }
     setUserNotice({
-      otp: data.otp,
+      tempPassword: data.tempPassword,
       email: userName,
       emailSent: data.emailSent,
       noticeTitle: `Temporary OTP generated for ${userName}`
