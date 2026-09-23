@@ -617,7 +617,7 @@ export default function Home() {
     if (res.ok) fetchUserKyc(userId);
   };
 
-    const roleCategory = (key) => {
+  const roleCategory = (key) => {
     const found = Array.isArray(roles) ? roles.find(r => r.key === key) : null;
     if (found?.category) return found.category;
     if (key === 'student' || key === 'students') return 'student';
@@ -625,6 +625,7 @@ export default function Home() {
     if (key === 'teacher' || key === 'teaching_faculty') return 'staff';
     return 'staff';
   };
+
   const newRoleCat = roleCategory(newUserRole);
   const editRoleCat = roleCategory(editUserRoleKey);
   const isStudentCat = (c) => c === 'student' || c === 'both';
