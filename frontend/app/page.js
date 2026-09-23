@@ -263,22 +263,7 @@ export default function Home() {
   }, [session]);
 
   // API Functions with proper error handling
-  const handleAdminResetPassword = async (userId, userType) => {
-    try {
-      const { data: { session: sess } } = await supabase.auth.getSession();
-      if (!sess?.access_token) throw new Error('No session token available');
-
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sess.access_token}`
-        },
-        body: JSON.stringify({ email: userType }) // UserType as email in this example
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to reset password');
+        if (!response.ok) throw new Error(data.error || 'Failed to reset password');
 
       console.log('Password reset successful:', data);
       return data;
@@ -378,10 +363,43 @@ export default function Home() {
     users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
-    class_entries: [], class_confirmations: []
+    });
+
+  const resolveRole = (uid) =>
+    supabase.from('users').select('role_key, id').eq('auth_user_id', uid).single();
+  const loadMyProfile = (uid) =>
+    supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+
+  // Load initial session and data
+  useEffect(() => {
+    // Load user session
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (s) {
+        resolveRole(s.user.id).then(({ data }) => {
+          if (data) setRole(data.role_key);
+          setView('admin');
+        });
+        loadMyProfile(s.user.id);
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess) {
+        resolveRole(sess.user.id).then(({ data }) => {
+          if (data) setRole(data.role_key);
+          setView('admin');
+        });
+        loadMyProfile(sess.user.id);
+      } else {
+        setRole(null);
+        setMyProfile(null);
+        setView('public');
+      }
+    });
   });
-  const [roles, setRoles] = useState([]);
-  const [myProfile, setMyProfile] = useState(null);
 
   // Auth helper functions
   const apiCall = async (url, options = {}) => {
@@ -405,9 +423,6 @@ export default function Home() {
   const canCreate = (m) => ['Submits', 'Own', 'Manage', 'Full'].includes(perm(m));
   const canAdmin = (m) => ['Manage', 'Full'].includes(perm(m));
   const isFull = (m) => perm(m) === 'Full';
-
-  const [editing, setEditing] = useState(null);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
   const [uploadingKey, setUploadingKey] = useState(null);
   const uploadFile = async (file, onUrl) => {
     if (!file) return;
@@ -1602,31 +1617,6 @@ export default function Home() {
 
   const handleAdminResetPassword = async (userId, userName) => {
     if (!confirm(`Reset password for user "${userName}"? This will generate a new temporary password and OTP.`)) return;
-    const res = await apiCall(`${apiUrl}/api/admin/users/${userId}/reset-password`, { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { alert(data.error || 'Password reset failed'); return; }
-    setUserNotice({
-      tempPassword: data.tempPassword,
-      email: userName,
-      emailSent: data.emailSent,
-      noticeTitle: `Password reset successfully for ${userName}`
-    });
-    fetchData();
-  };
-
-  const handleAdminGenerateOtp = async (userId, userName) => {
-    if (!confirm(`Generate a temporary OTP for user "${userName}"?`)) return;
-    const res = await apiCall(`${apiUrl}/api/admin/users/${userId}/generate-otp`, { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { alert(data.error || 'OTP generation failed'); return; }
-    setUserNotice({
-      tempPassword: data.tempPassword,
-      email: userName,
-      emailSent: data.emailSent,
-      noticeTitle: `Temporary OTP generated for ${userName}`
-    });
-    fetchData();
-  };
 
   const handleAddDiscipline = async (e) => {
     e.preventDefault();
