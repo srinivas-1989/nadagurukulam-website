@@ -262,8 +262,6 @@ export default function Home() {
     }
   }, [session]);
 
-    };
-
   const handleAdminGenerateOtp = async (userId, userType) => {
     try {
       const { data: { session: sess } } = await supabase.auth.getSession();
@@ -372,49 +370,6 @@ export default function Home() {
     }
   };
 
-  // API Data State
-  const [dbData, setDbData] = useState({
-    users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
-    events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
-    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
-    });
-
-  const resolveRole = (uid) =>
-    supabase.from('users').select('role_key, id').eq('auth_user_id', uid).single();
-  const loadMyProfile = (uid) =>
-    supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
-
-  // Load initial session and data
-  useEffect(() => {
-    // Load user session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      if (s) {
-        resolveRole(s.user.id).then(({ data }) => {
-          if (data) setRole(data.role_key);
-          setView('admin');
-        });
-        loadMyProfile(s.user.id);
-      }
-    });
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      if (sess) {
-        resolveRole(sess.user.id).then(({ data }) => {
-          if (data) setRole(data.role_key);
-          setView('admin');
-        });
-        loadMyProfile(sess.user.id);
-      } else {
-        setRole(null);
-        setMyProfile(null);
-        setView('public');
-      }
-    });
-  });
-
   // Auth helper functions
   const apiCall = async (url, options = {}) => {
     const { data: { session: sess } } = await supabase.auth.getSession();
@@ -437,7 +392,6 @@ export default function Home() {
   const canCreate = (m) => ['Submits', 'Own', 'Manage', 'Full'].includes(perm(m));
   const canAdmin = (m) => ['Manage', 'Full'].includes(perm(m));
   const isFull = (m) => perm(m) === 'Full';
-  const [uploadingKey, setUploadingKey] = useState(null);
   const uploadFile = async (file, onUrl) => {
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) { alert('File too large (max 15 MB)'); return; }
@@ -675,7 +629,6 @@ export default function Home() {
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [otpMode, setOtpMode] = useState(false);
   const [otpMsg, setOtpMsg] = useState('');
 
   const [newDiscName, setNewDiscName] = useState('');
@@ -1274,7 +1227,6 @@ export default function Home() {
   const [editSlotSubjects, setEditSlotSubjects] = useState([]);
   const [editSlotInput, setEditSlotInput] = useState('');
   const [editSlotBatch, setEditSlotBatch] = useState('');
-  const [timetableBatch, setTimetableBatch] = useState('');
   const [timetableCombined, setTimetableCombined] = useState(false);
   const [editingPeriodId, setEditingPeriodId] = useState(null);
   const [periodKey, setPeriodKey] = useState('');
@@ -1628,29 +1580,6 @@ export default function Home() {
     setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewDesignation(''); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
     fetchData();
   };
-
-  const handleAdminResetPassword = async (userId, userName) => {
-    if (!confirm(`Reset password for user "${userName}"? This will generate a new temporary password and OTP.`)) return;
-    try {
-        const { data: { session: sess } } = await supabase.auth.getSession();
-        if (!sess?.access_token) throw new Error('No session token available');
-        const response = await fetch(`${apiUrl}/api/admin/users/${userId}/reset-password`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${sess.access_token}`,
-            },
-            body: JSON.stringify({ email: userName })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed reset password');
-        console.log('Password reset successful:', data);
-        return data;
-    } catch (error) {
-        console.error('Error in handleAdminResetPassword:', error);
-        throw error;
-    }
-};
 
 const handleAddDiscipline = async (e) => {
     e.preventDefault();
