@@ -2,24 +2,113 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-const UserPersonalTab = ({ userId }) => {
-  const u = dbData.users.find(u => u.id === userId);
+const UserPersonalTab = ({ userId, dbData }) => {
+  const u = dbData?.users?.find(user => user.id === userId);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-        <img src={u.profile_pic_url || '/default-avatar.png'} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg)', border: '1px solid var(--border)' }} />
+        <img src={u?.profile_pic_url || '/default-avatar.png'} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg)', border: '1px solid var(--border)' }} />
         <div>
-          <h4 style={{ margin: '0 0 4px' }}>{u.name}</h4>
-          <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{u.designation || 'N/A'} · {u.role_key}</div>
+          <h4 style={{ margin: '0 0 4px' }}>{u?.name}</h4>
+          <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{u?.designation || 'N/A'} · {u?.role_key}</div>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
-        <div><b>Email:</b> {u.email}</div>
-        <div><b>Alternate Email:</b> {u.alternate_email || 'N/A'}</div>
-        <div><b>Phone:</b> {u.phone || 'N/A'}</div>
-        <div><b>Blood Group:</b> {u.blood_group || 'N/A'}</div>
-        <div><b>DOB:</b> {u.date_of_birth || 'N/A'}</div>
+        <div><b>Email:</b> {u?.email}</div>
+        <div><b>Alternate Email:</b> {u?.alternate_email || 'N/A'}</div>
+        <div><b>Phone:</b> {u?.phone || 'N/A'}</div>
+        <div><b>Blood Group:</b> {u?.blood_group || 'N/A'}</div>
+        <div><b>DOB:</b> {u?.date_of_birth || 'N/A'}</div>
       </div>
+    </div>
+  );
+};
+
+const UserAdminTab = ({ userId, dbData }) => {
+  const user = dbData?.users?.find(u => u.id === userId);
+  const otpEntries = dbData?.user_otps?.filter(o => o.user_id === userId);
+  const recentOtp = otpEntries?.at(-1);
+  const passwordHistory = dbData?.user_password_history?.filter(h => h.user_id === userId);
+  const recentPassword = passwordHistory?.at(-1);
+
+  const getDaysAgo = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    const diff = Date.now() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    return days === 0 ? 'Today' : `${days} day${days === 1 ? '' : 's'} ago`;
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return '#10b981';
+      case 'inactive': return '#ef4444';
+      case 'suspended': return '#f59e0b';
+      default: return 'var(--text-soft)';
+    }
+  };
+
+  const formatRole = (role) => {
+    if (!role) return 'N/A';
+    const levelMap = { 0: '—', 1: 'View', 2: 'Self', 3: 'Submits', 4: 'Own', 5: 'Manage', 6: 'Full' };
+    return levelMap[role.level] || 'Unknown';
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+        <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>User Profile</h5>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+          <div><b>Name:</b> {user?.name}</div>
+          <div><b>Email:</b> {user?.email}</div>
+          <div><b>Role:</b> {user?.role_key}</div>
+          <div><b>Role Level:</b> {user?.role?.level || 'N/A'}</div>
+          <div><b>Status:</b> <span style={{ color: getStatusColor(user?.status), fontWeight: 600 }}>{user?.status}</span></div>
+          <div><b>Designation:</b> {user?.designation || 'N/A'}</div>
+          <div><b>Department:</b> {user?.department || 'N/A'}</div>
+          <div><b>Joined:</b> {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</div>
+        </div>
+      </div>
+
+      {recentOtp && (
+        <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+          <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Recent OTP</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
+            <div><b>OTP Code:</b> {recentOtp.otp_code}</div>
+            <div><b>Expires At:</b> {new Date(recentOtp.expires_at).toLocaleString()}</div>
+            <div><b>Used:</b> {recentOtp.used_at ? new Date(recentOtp.used_at).toLocaleString() : 'Not used'}</div>
+            <div><b>Created:</b> {new Date(recentOtp.created_at).toLocaleString()}</div>
+            <div><b>Invalidated:</b> {recentOtp.invalidated_at ? new Date(recentOtp.invalidated_at).toLocaleString() : 'No'}</div>
+            <div><b>Days Ago:</b> {getDaysAgo(recentOtp.created_at)}</div>
+          </div>
+        </div>
+      )}
+
+      {recentPassword && (
+        <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+          <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Recent Password Change</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
+            <div><b>Changed At:</b> {new Date(recentPassword.changed_at).toLocaleString()}</div>
+            <div><b>Must Change:</b> {recentPassword.must_change_password ? 'Yes' : 'No'}</div>
+            <div><b>Days Ago:</b> {getDaysAgo(recentPassword.changed_at)}</div>
+          </div>
+        </div>
+      )}
+
+      {passwordHistory?.length > 1 && (
+        <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+          <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Password History ({passwordHistory.length} entries)</h5>
+          <div style={{ maxHeight: '200px', overflow: 'auto', fontSize: '12px' }}>
+            {passwordHistory.slice(0, 5).map((hist, idx) => (
+              <div key={hist.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div><b>Changed:</b> {new Date(hist.changed_at).toLocaleString()}</div>
+                <div><b>Must Change:</b> {hist.must_change_password ? 'Yes' : 'No'}</div>
+                <div><b>Days Ago:</b> {getDaysAgo(hist.changed_at)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2247,7 +2336,7 @@ export default function Home() {
             {activeModule === 'users' && (
               <div>
                 {userNotice && (
-                  <div style={{ background: 'var(--bg-saffron)', border: '1.5px solid var(--accent)', padding: '14px 16px', borderRadius: '10px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ background: '#fdf3e0', border: '1.5px solid #dd9f3c', padding: '14px 16px', borderRadius: 'var(--radius-xl)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '13.5px' }}>{userNotice.noticeTitle || `User created — credentials${userNotice.emailSent ? ' emailed' : ''}`}</div>
                     <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Email: <b>{userNotice.email}</b></div>
                     {userNotice.tempPassword && <div style={{ fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>Temp password: <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '13px' }}>{userNotice.tempPassword}</code> <button onClick={() => navigator.clipboard.writeText(userNotice.tempPassword)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Copy</button></div>}
@@ -2257,7 +2346,7 @@ export default function Home() {
                   </div>
                 )}
                 {canCreate('users') && (
-                  <form onSubmit={handleAddUser} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <form onSubmit={handleAddUser} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       <input type="text" placeholder="Full name *" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} required />
                       <input type="email" placeholder="Official email *" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
@@ -2287,7 +2376,7 @@ export default function Home() {
                 )}
 
                 {/* Filters */}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
                     <select value={usersFilterRole || ''} onChange={e => setUsersFilterRole(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
                       <option value="">All</option>
@@ -2314,12 +2403,12 @@ export default function Home() {
                     .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
                     .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()))
                     .map(u => (
-                      <div key={u.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: 'var(--shadow-sm)' }}>
+                      <div key={u.id} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 2px 6px rgba(129, 23, 26, 0.05)' }}>
                         <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{u.name.charAt(0)}</div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600 }}>{u.name}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{u.designation || 'No designation'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
+                          <div style={{ fontWeight: 600, color: '#81171a' }}>{u.name}</div>
+                          <div style={{ fontSize: '12px', color: '#dd9f3c' }}>{u.designation || 'No designation'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
+                          <div style={{ fontSize: '11px', color: '#a09a8f' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
@@ -2347,22 +2436,22 @@ export default function Home() {
                       </div>
 
                       {/* Tabs */}
-                      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+                      <div style={{ display: 'flex', borderBottom: '1px solid #e0d6c0', background: '#fff' }}>
                         {['personal', 'kyc', 'admin'].map(t => (
-                          <button key={t} onClick={() => setViewProfileTab(t)} style={{ flex: 1, padding: '12px', border: 'none', background: viewProfileTab === t ? 'var(--surface)' : 'transparent', color: viewProfileTab === t ? 'var(--primary)' : 'var(--text-soft)', fontWeight: viewProfileTab === t ? 700 : 400, cursor: 'pointer', borderBottom: viewProfileTab === t ? '2px solid var(--primary)' : 'none', fontSize: '13px' }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+                          <button key={t} onClick={() => setViewProfileTab(t)} style={{ flex: 1, padding: '12px', border: 'none', background: viewProfileTab === t ? '#fdf3e0' : 'transparent', color: viewProfileTab === t ? '#81171a' : '#dd9f3c', fontWeight: viewProfileTab === t ? 700 : 500, cursor: 'pointer', borderBottom: viewProfileTab === t ? '2px solid #81171a' : 'none', fontSize: '13px' }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
                         ))}
                       </div>
 
                       {/* Tab Content */}
                       <div style={{ padding: '20px' }}>
                         {viewProfileTab === 'personal' && (
-                          <UserPersonalTab userId={viewProfileUser} />
+                          <UserPersonalTab userId={viewProfileUser} dbData={dbData} />
                         )}
                         {viewProfileTab === 'kyc' && (
                           <UserKycTab userId={viewProfileUser} kycDocs={userKycDocs} onAddDoc={handleAddKycDoc} onDeleteDoc={handleDeleteKycDoc} docType={kycDocType} setDocType={setKycDocType} docNumber={kycDocNumber} setDocNumber={setKycDocNumber} fileUrl={kycFileUrl} setFileUrl={setKycFileUrl} />
                         )}
                         {viewProfileTab === 'admin' && (
-                          <UserAdminTab userId={viewProfileUser} />
+                          <UserAdminTab userId={viewProfileUser} dbData={dbData} />
                         )}
                       </div>
                     </div>
