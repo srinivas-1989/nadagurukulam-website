@@ -263,8 +263,7 @@ export default function Home() {
   }, [session]);
 
   // API Functions with proper error handling
-        if (!response.ok) throw new Error(data.error || 'Failed to reset password');
-
+      if (!response.ok) throw new Error(data.error || 'Failed to reset password');
       console.log('Password reset successful:', data);
       return data;
     } catch (error) {
@@ -1617,8 +1616,28 @@ export default function Home() {
 
   const handleAdminResetPassword = async (userId, userName) => {
     if (!confirm(`Reset password for user "${userName}"? This will generate a new temporary password and OTP.`)) return;
+    try {
+        const { data: { session: sess } } = await supabase.auth.getSession();
+        if (!sess?.access_token) throw new Error('No session token available');
+        const response = await fetch(`${apiUrl}/api/admin/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${sess.access_token}`,
+            },
+            body: JSON.stringify({ email: userName })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed reset password');
+        console.log('Password reset successful:', data);
+        return data;
+    } catch (error) {
+        console.error('Error in handleAdminResetPassword:', error);
+        throw error;
+    }
+};
 
-  const handleAddDiscipline = async (e) => {
+const handleAddDiscipline = async (e) => {
     e.preventDefault();
     if (!newDiscName.trim()) return;
     if (!newDiscCat) { alert('Choose a Program Category first.'); return; }
