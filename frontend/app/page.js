@@ -2233,7 +2233,7 @@ const handleAddDiscipline = async (e) => {
           {/* Top Nav Bar */}
           <header className="portal-topbar">
             <div className="portal-topbar-left">
-              <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: '24px', width: 'auto' }} />
+              <a href="/" onClick={(e)=>{e.preventDefault();setView('public');}} style={{display:'flex',alignItems:'center',gap:'8px',textDecoration:'none'}}><img src="/logo-landscape.png" alt="Nada Gurukulam" style={{height:'24px',width:'auto'}} /><span className="portal-brand">Nada Gurukulam</span></a>
               <span className="portal-brand">Nada Gurukulam</span>
             </div>
             <div className="portal-topbar-right">
@@ -2261,7 +2261,7 @@ const handleAddDiscipline = async (e) => {
               </p>
             )}
             {currentModules.map(m => (
-              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'var(--primary)' : 'transparent', color: activeModule === m.key ? '#fff' : 'var(--text)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '13.5px' }}>
+              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'rgba(255,255,255,0.12)' : 'transparent', color: activeModule === m.key ? 'var(--accent)' : 'rgba(255,255,255,0.7)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '13.5px' }}>
                 <span>{m.name}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 6px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(129,23,26,0.08)', color: activeModule === m.key ? '#fff' : 'var(--text-faint)' }}>
                   {perm(m.key) || '—'}

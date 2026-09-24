@@ -141,12 +141,11 @@ input, select, textarea {
 }
 
 .portal-sidebar {
-  background: var(--bg);
-  border-right: 1px solid rgba(129,23,26,0.15);
-  padding: 20px 10px;
+  background: var(--primary-deep);
+  padding: 20px 12px;
   overflow-y: auto;
   position: fixed;
-  top: 60px;
+  top: 64px;
   left: 0;
   bottom: 0;
   width: 260px;
@@ -156,32 +155,27 @@ input, select, textarea {
 .portal-sidebar .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-radius: var(--radius);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: all 0.15s ease;
-  border-left: 3px solid transparent;
-  margin-bottom: 2px;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .portal-sidebar .sidebar-item:hover {
-  background: rgba(221,159,60,0.12);
-  color: var(--primary-deep);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
 }
 
 .portal-sidebar .sidebar-item.active {
-  background: var(--primary);
-  color: #fff;
-  border-left: 4px solid var(--accent);
-}
-
-.portal-sidebar .sidebar-item.active:hover {
-  background: var(--primary-deep);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--accent);
 }
 
 .portal-content {
@@ -821,6 +815,22 @@ input, select, textarea {
 }
 
 /* Utility spacing */
+
+/* Collapsible sidebar */
+.portal-sidebar.collapsed {
+  width: 80px;
+}
+
+.portal-sidebar.collapsed .sidebar-item span:first-child {
+  display: none;
+}
+
+.portal-sidebar.collapsed .sidebar-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .ndg-gap-sm { gap: 8px; }
 .ndg-gap-md { gap: 16px; }
 .ndg-gap-lg { gap: 24px; }
