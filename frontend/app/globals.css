@@ -3,26 +3,26 @@
    Light-only by design: cream grounds, never pitch black — dark mode is not
    defined by the guidelines and intentionally not implemented. */
 
-@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Amita:wght@400;700&family=Tiro+Devanagari+Sanskrit:ital@0;1&family=Gentium+Basic:ital@0;1&family=Petit+Formal+Script&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amita:wght@400;700&family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Gentium+Book+Plus:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Tiro+Devanagari+Sanskrit:ital@0;1&display=swap');
 
 :root {
-  /* PRIMARY (Guidelines p.3) */
+  /* PRIMARY (Dossiers design language) */
   --primary: #81171a;        /* Maroon */
-  --primary-deep: #591b17;   /* Deep Maroon — for texts */
-  --primary-light: #9c2428;
+  --primary-deep: #591617;   /* Deep Maroon */
+  --primary-light: #6b1215;
   --accent: #dd9f3c;         /* Saffron */
-  --accent-deep: #c58539;    /* Deep Saffron — for texts */
+  --accent-deep: #c58539;    /* Deep Saffron */
   --accent-light: #f5b759;
 
-  /* BACKGROUNDS: cream page, saffron band = cream + saffron @25% opacity */
+  /* BACKGROUNDS: cream page, cream-card for surfaces */
   --bg: #fdf3e0;             /* Cream */
-  --bg-saffron: #fbf0d7;
-  --surface: #fffdf6;
-  --surface-muted: #f8eee0;
-  --border: #e6d6c4;
+  --bg-saffron: #fbf0d9;
+  --surface: #fbf0d9;
+  --surface-muted: #faf0d7;
+  --border: #e8d5b7;
   --divider: #d9c5b2;
 
-  /* BODYCOPY greys (Guidelines p.3) */
+  /* BODYCOPY greys */
   --text: #3c3c3b;
   --text-soft: #4a4949;
   --text-faint: #575756;
@@ -31,11 +31,11 @@
   --shadow-sm: 0 1px 3px rgba(89, 27, 23, 0.06);
   --shadow-md: 0 4px 14px rgba(89, 27, 23, 0.08);
   --shadow-lg: 0 12px 28px rgba(89, 27, 23, 0.12);
-  --radius: 8px;
-  --radius-lg: 12px;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
   /* NDG signature shape: two-side-rounded (opposite corners rounded) */
-  --radius-xl: 26px 6px 26px 6px;
-  --radius-xl-sm: 14px 3px 14px 3px;
+  --radius-xl: 1.25rem 0.25rem 1.25rem 0.25rem;
+  --radius-xl-sm: 0.75rem 0.25rem 0.75rem 0.25rem;
 }
 
 * {
@@ -46,17 +46,17 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Nunito Sans', 'Gill Sans', 'Gill Sans MT', sans-serif;
-  font-size: 15.5px;
+  font-family: 'Inter', 'Cabin', sans-serif;
+  font-size: 16px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, .font-display {
-  font-family: 'Futura', 'Futura ND', 'Jost', sans-serif;
+  font-family: 'Poppins', sans-serif;
   color: var(--primary-deep);
-  font-weight: 500;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -64,11 +64,27 @@ h1, h2, h3, h4, .font-display {
 .font-devanagari { font-family: 'Tiro Devanagari Sanskrit', 'Amita', serif; }
 .font-devanagari-display { font-family: 'Amita', 'Tiro Devanagari Sanskrit', serif; }
 
-/* IAST / shloka romanisation (Guidelines p.5): Gentium Basic Italic */
-.font-iast { font-family: 'Gentium Basic', Georgia, serif; font-style: italic; }
+/* IAST / shloka romanisation (Guidelines p.5): Gentium Book Plus Italic */
+.font-iast { font-family: 'Gentium Book Plus', Georgia, serif; font-style: italic; }
 
 /* Informal script accent (taglines) */
 .font-script { font-family: 'Petit Formal Script', cursive; }
+
+/* Two-side-rounded corners (NDG signature shape) */
+.two-side-round {
+  border-top-left-radius: 1.25rem;
+  border-bottom-right-radius: 1.25rem;
+  border-top-right-radius: 0.25rem;
+  border-bottom-left-radius: 0.25rem;
+}
+
+/* Selection styling */
+::selection { background: rgba(221,159,60,0.4); color: var(--primary-deep); }
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: rgba(129,23,26,0.3); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 
 /* NDG brand elements */
 .ndg-watermark {
@@ -108,8 +124,8 @@ button {
 }
 
 input, select, textarea {
-  font-family: inherit;
-  font-size: 14.5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
 }
 
 /* Portal shared shell */
@@ -125,8 +141,8 @@ input, select, textarea {
 }
 
 .portal-sidebar {
-  background: var(--primary-deep);
-  border-right: 1px solid var(--border);
+  background: var(--bg);
+  border-right: 1px solid rgba(129,23,26,0.15);
   padding: 20px 10px;
   overflow-y: auto;
   position: fixed;
@@ -135,6 +151,37 @@ input, select, textarea {
   bottom: 0;
   width: 260px;
   z-index: 40;
+}
+
+.portal-sidebar .sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+  margin-bottom: 2px;
+}
+
+.portal-sidebar .sidebar-item:hover {
+  background: rgba(221,159,60,0.12);
+  color: var(--primary-deep);
+}
+
+.portal-sidebar .sidebar-item.active {
+  background: var(--primary);
+  color: #fff;
+  border-left: 4px solid var(--accent);
+}
+
+.portal-sidebar .sidebar-item.active:hover {
+  background: var(--primary-deep);
+  color: #fff;
 }
 
 .portal-content {
@@ -146,7 +193,7 @@ input, select, textarea {
 .portal-topbar {
   background: var(--primary-deep);
   padding: 0 28px;
-  height: 60px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -155,7 +202,7 @@ input, select, textarea {
   left: 0;
   right: 0;
   z-index: 50;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 14px rgba(89, 27, 23, 0.15);
 }
 
 .portal-topbar-left {
@@ -173,9 +220,9 @@ input, select, textarea {
 }
 
 .portal-brand {
-  font-family: 'Futura', 'Jost', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 18px;
   color: #fff;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -183,18 +230,19 @@ input, select, textarea {
 
 .portal-role-badge {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.12);
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 99px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: capitalize;
 }
 
 .portal-user-name {
-  font-size: 13px;
-  color: #f5b759;
+  font-size: 14px;
+  color: #fdf3e0;
   font-weight: 600;
+  font-family: 'Poppins', sans-serif;
 }
 
 .portal-action-group {
@@ -204,20 +252,21 @@ input, select, textarea {
 }
 
 .portal-action-btn {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 6px 14px;
-  border-radius: var(--radius-xl-sm);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fdf3e0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 16px;
+  border-radius: var(--radius);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.15s ease;
 }
 
 .portal-action-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 /* Settings dropdown anchor */
@@ -279,7 +328,7 @@ input, select, textarea {
 .ndg-metric-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 22px;
+  padding: 24px;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
 }
@@ -300,15 +349,22 @@ input, select, textarea {
 }
 
 .ndg-quick-action {
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
-  padding: 10px 14px;
-  border-radius: var(--radius-xl-sm);
+  padding: 12px 16px;
+  border-radius: var(--radius);
   cursor: pointer;
   text-align: left;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text);
   width: 100%;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.15s ease;
+}
+
+.ndg-quick-action:hover {
+  background: var(--surface-muted);
+  border-color: var(--primary);
 }
 
 .ndg-live-class-item {
@@ -375,18 +431,19 @@ input, select, textarea {
 }
 
 .ndg-card-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-soft);
   margin-bottom: 8px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-family: 'Inter', sans-serif;
 }
 
 .ndg-card-value {
   font-size: 32px;
   font-weight: 700;
-  font-family: 'Futura', 'Jost', sans-serif;
+  font-family: 'Poppins', sans-serif;
   color: var(--primary-deep);
 }
 
@@ -430,11 +487,11 @@ input, select, textarea {
 }
 
 .ndg-section-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--primary-deep);
   margin-bottom: 16px;
-  font-family: 'Futura', 'Jost', sans-serif;
+  font-family: 'Poppins', sans-serif;
 }
 
 .ndg-activity-bar {
@@ -505,15 +562,17 @@ input, select, textarea {
 }
 
 .ndg-live-item-title {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--primary-deep);
+  font-family: 'Poppins', sans-serif;
 }
 
 .ndg-live-item-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-faint);
   margin-top: 2px;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Form refinement */
@@ -523,6 +582,14 @@ input, select, textarea {
   border-radius: var(--radius-xl);
   padding: 24px;
   box-shadow: var(--shadow-sm);
+}
+
+.ndg-form-field input:focus,
+.ndg-form-field select:focus,
+.ndg-form-field textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(89, 27, 23, 0.1);
 }
 
 .ndg-form-group {
@@ -544,6 +611,7 @@ input, select, textarea {
   color: var(--text-soft);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  font-family: 'Inter', sans-serif;
 }
 
 .ndg-form-field input,
@@ -554,7 +622,8 @@ input, select, textarea {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
-  font-size: 14.5px;
+  font-size: 15px;
+  font-family: 'Inter', sans-serif;
   transition: border-color 0.15s ease;
 }
 
@@ -581,27 +650,29 @@ input, select, textarea {
 }
 
 .ndg-filter-bar label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-soft);
   display: flex;
   align-items: center;
   gap: 6px;
+  font-family: 'Inter', sans-serif;
 }
 
 .ndg-filter-bar select,
 .ndg-filter-bar input {
-  padding: 6px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--bg);
-  font-size: 13px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Data list items */
 .ndg-data-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl-sm);
+  border-radius: var(--radius);
   padding: 16px 20px;
   display: flex;
   align-items: center;
@@ -675,19 +746,21 @@ input, select, textarea {
 .ndg-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-xl-sm);
-  font-size: 13px;
-  font-weight: 600;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
   cursor: pointer;
-  border: none;
+  border: 1px solid transparent;
   transition: all 0.15s ease;
+  line-height: 1.5;
 }
 
 .ndg-btn-primary {
   background: var(--primary);
-  color: #fff;
+  color: #fdf3e0;
 }
 
 .ndg-btn-primary:hover {
@@ -695,7 +768,7 @@ input, select, textarea {
 }
 
 .ndg-btn-outline {
-  background: none;
+  background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
 }
@@ -707,7 +780,11 @@ input, select, textarea {
 
 .ndg-btn-accent {
   background: var(--accent);
-  color: #fff;
+  color: var(--primary-deep);
+}
+
+.ndg-btn-accent:hover {
+  background: var(--accent-deep);
 }
 
 /* Table-like list */
@@ -725,8 +802,9 @@ input, select, textarea {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 13.5px;
+  font-size: 14px;
   gap: 12px;
+  font-family: 'Inter', sans-serif;
 }
 
 .ndg-table-row:hover {

@@ -56,7 +56,7 @@ const UserAdminTab = ({ userId, dbData }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px' }}>
         <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>User Profile</h5>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
           <div><b>Name:</b> {user?.name}</div>
@@ -71,7 +71,7 @@ const UserAdminTab = ({ userId, dbData }) => {
       </div>
 
       {recentOtp && (
-        <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px' }}>
           <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Recent OTP</h5>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div><b>OTP Code:</b> {recentOtp.otp_code}</div>
@@ -85,7 +85,7 @@ const UserAdminTab = ({ userId, dbData }) => {
       )}
 
       {recentPassword && (
-        <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px' }}>
           <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Recent Password Change</h5>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div><b>Changed At:</b> {new Date(recentPassword.changed_at).toLocaleString()}</div>
@@ -96,7 +96,7 @@ const UserAdminTab = ({ userId, dbData }) => {
       )}
 
       {passwordHistory?.length > 1 && (
-        <div style={{ background: 'var(--surface)', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px' }}>
           <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Password History ({passwordHistory.length} entries)</h5>
           <div style={{ maxHeight: '200px', overflow: 'auto', fontSize: '12px' }}>
             {passwordHistory.slice(0, 5).map((hist, idx) => (
@@ -1980,7 +1980,7 @@ const handleAddDiscipline = async (e) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
             <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '44px' : '30px', width: 'auto', background: 'transparent', display: 'block' }} />
             {view !== 'public' && (
-              <span style={{ fontFamily: "'Futura', 'Jost', sans-serif", fontWeight: 700, fontSize: '16px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
+              <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '16px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -2111,7 +2111,7 @@ const handleAddDiscipline = async (e) => {
             <section style={{ marginTop: '48px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px' }}>
               <h3 style={{ fontSize: '18px', color: 'var(--primary-deep)', marginBottom: '6px' }}>Enquire</h3>
               <p style={{ fontSize: '13.5px', color: 'var(--text-soft)', marginBottom: '14px' }}>Admissions or general — we&apos;ll get back on the contact you share.</p>
-              {pubEnqSent && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>{pubEnqSent}</div>}
+              {pubEnqSent && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius)', fontSize: '13px', marginBottom: '12px' }}>{pubEnqSent}</div>}
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 if (!pubEnqName.trim() || !pubEnqContact.trim()) { setPubEnqSent('Name and contact required.'); return; }
@@ -2158,7 +2158,7 @@ const handleAddDiscipline = async (e) => {
           </p>
           {otpMode ? (
             <div style={{ background: 'var(--surface)', border: '1.5px solid var(--accent)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {otpMsg && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: '8px', fontSize: '13px', color: 'var(--text-soft)' }}>{otpMsg}</div>}
+              {otpMsg && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: 'var(--radius)', fontSize: '13px', color: 'var(--text-soft)' }}>{otpMsg}</div>}
               <input type="email" placeholder="Official email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input placeholder="6-digit OTP" value={otpCode} onChange={e => setOtpCode(e.target.value)} maxLength={6} style={{ flex: 1, padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px', letterSpacing: '0.12em' }} />
@@ -2249,21 +2249,21 @@ const handleAddDiscipline = async (e) => {
 
           {/* Sidebar */}
           <nav className="portal-sidebar">
-            <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', padding: '0 10px 16px', fontFamily: "'Futura', 'Jost', sans-serif", letterSpacing: '0.02em' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-deep)', padding: '0 10px 16px', fontFamily: "'Poppins', sans-serif", letterSpacing: '0.02em' }}>
               Nada Gurukulam
             </div>
-            <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', padding: '0 10px 10px', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '10px' }}>
+            <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-faint)', padding: '0 10px 10px', letterSpacing: '0.06em', borderBottom: '1px solid var(--border)', marginBottom: '10px' }}>
               Portal Modules
             </div>
             {currentModules.length === 0 && (
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', padding: '0 10px', margin: 0 }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '0 10px', margin: 0 }}>
                 No modules assigned to this role yet — set them in Roles &amp; Permissions as Super Admin.
               </p>
             )}
             {currentModules.map(m => (
-              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'var(--primary)' : 'transparent', color: activeModule === m.key ? '#fff' : 'rgba(255,255,255,0.8)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '13.5px' }}>
+              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'var(--primary)' : 'transparent', color: activeModule === m.key ? '#fff' : 'var(--text)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '13.5px' }}>
                 <span>{m.name}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 6px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)', color: activeModule === m.key ? '#fff' : 'rgba(255,255,255,0.5)' }}>
+                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 6px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(129,23,26,0.08)', color: activeModule === m.key ? '#fff' : 'var(--text-faint)' }}>
                   {perm(m.key) || '—'}
                 </span>
               </button>
@@ -2273,16 +2273,16 @@ const handleAddDiscipline = async (e) => {
               const todaySlots = dbData.timetable.filter(s => s.day_of_week === dayName).sort((a,b)=>toMinTT(a.start_time)-toMinTT(b.start_time));
               if (todaySlots.length===0) return null;
               return (
-                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', marginBottom: '8px' }}>My Timetable — {dayName.slice(0,3)}</div>
+                <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px' }}>My Timetable — {dayName.slice(0,3)}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {todaySlots.slice(0,5).map(s => {
                       const k = slotToKeys(s);
                       const lab = k.from===k.to ? FIXED_MAP[k.from]?.label : `${FIXED_MAP[k.from]?.label}→${FIXED_MAP[k.to]?.label}`;
-                      return <div key={s.id} style={{ fontSize: '12px', lineHeight: 1.35, color: 'rgba(255,255,255,0.9)' }}><span style={{ fontWeight: 700, color: '#f5b759' }}>{lab}</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</span><br /><span style={{ color: 'rgba(255,255,255,0.8)' }}>{s.subject || '—'}</span>{s.room ? <span style={{ color: 'rgba(255,255,255,0.5)' }}> · {s.room}</span> : null}</div>;
+                      return <div key={s.id} style={{ fontSize: '12px', lineHeight: 1.35, color: 'var(--text)' }}><span style={{ fontWeight: 700, color: 'var(--primary)' }}>{lab}</span> <span style={{ color: 'var(--text-faint)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</span><br /><span style={{ color: 'var(--text-soft)' }}>{s.subject || '—'}</span>{s.room ? <span style={{ color: 'var(--text-faint)' }}> · {s.room}</span> : null}</div>;
                     })}
                   </div>
-                  <button onClick={() => setActiveModule('timetable')} style={{ marginTop: '8px', background: 'none', border: '1px solid rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '11px', color: '#f5b759' }}>Open full timetable →</button>
+                  <button onClick={() => setActiveModule('timetable')} style={{ marginTop: '8px', background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '11px', color: 'var(--primary)' }}>Open full timetable →</button>
                 </div>
               );
             })()}
@@ -2307,7 +2307,7 @@ const handleAddDiscipline = async (e) => {
                   <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(221,159,60,0.12)' }} />
                   <div style={{ position: 'absolute', bottom: '-40px', left: '-20px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
                   <div style={{ position: 'relative' }}>
-                    <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#fff', marginBottom: '6px', fontFamily: "'Futura', 'Jost', sans-serif" }}>
+                    <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#fff', marginBottom: '6px', fontFamily: "'Poppins', sans-serif" }}>
                       Welcome back{myProfile?.name ? `, ${myProfile.name.split(' ')[0]}` : ''}
                     </h1>
                     <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', margin: 0 }}>
@@ -2990,7 +2990,7 @@ const handleAddDiscipline = async (e) => {
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         <b style={{ fontSize: '12px', color: 'var(--primary-deep)' }}>Modules ({d.modules.length})</b>
                                         {d.modules.map((m, mi) => (
-                                          <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg)' }}>
+                                          <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg)' }}>
                                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                                               <span style={{ fontSize: '11px', fontWeight: 700, background: 'var(--primary)', color: '#fff', padding: '2px 7px', borderRadius: '99px' }}>{m.module_number}</span>
                                               <input value={m.title || ''} onChange={e => { const mods = [...d.modules]; mods[mi] = { ...mods[mi], title: e.target.value }; updateDraft(idx, { modules: mods }); }} placeholder="Module title" style={{ flex: '1 1 180px', padding: '6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '13px' }} />
@@ -3145,7 +3145,7 @@ const handleAddDiscipline = async (e) => {
                         <button onClick={()=>setViewCourse(null)} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-faint)', padding:'6px 12px', borderRadius:'6px', cursor:'pointer' }}>✕ Close</button>
                       </div>
                       <div style={{ padding:'16px 20px' }}>
-                        <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden', fontSize:'13.5px' }}>
+                        <div style={{ border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden', fontSize:'13.5px' }}>
                           <div style={{ display:'grid', gridTemplateColumns:'minmax(120px,160px) 1fr minmax(110px,140px) 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Program</div><div style={{ padding:'9px 12px', gridColumn:'span 3', fontWeight:600, color:'var(--primary-deep)' }}>{vProg}</div></div>
                           <div style={{ display:'grid', gridTemplateColumns:'minmax(120px,160px) 1fr minmax(110px,140px) 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Course</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)' }}>{viewCourse.name}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Type</div><div style={{ padding:'9px 12px' }}>{viewCourse.type||'—'}</div></div>
                           <div style={{ display:'grid', gridTemplateColumns:'minmax(120px,160px) 1fr minmax(110px,140px) 110px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Code</div><div style={{ padding:'9px 12px', borderRight:'1px solid var(--border)', fontWeight:600 }}>{viewCourse.code}</div><div style={{ padding:'9px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Semester</div><div style={{ padding:'9px 12px' }}>{viewCourse.semester||'—'}{viewCourse.year_label?` · ${viewCourse.year_label}`:''}</div></div>
@@ -3155,10 +3155,10 @@ const handleAddDiscipline = async (e) => {
                         </div>
                       </div>
                       <div style={{ padding:'0 20px 20px', display:'grid', gap:'14px' }}>
-                        {vObjs.length? <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--surface-muted)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)', color:'var(--primary-deep)' }}>OBJECTIVES:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vObjs.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{typeof o==='string'?o:(o.text||JSON.stringify(o))}</li>)}</ol></div> : <div style={{ padding:'14px', border:'1px dashed var(--border)', borderRadius:'8px', color:'var(--text-faint)', textAlign:'center', fontSize:'13px' }}>No objectives.</div>}
-                        {vOuts.length? <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--surface-muted)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)', color:'var(--primary-deep)' }}>OUTCOMES:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vOuts.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
-                        {vPed.length? <div style={{ border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--surface-muted)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)', color:'var(--primary-deep)' }}>Pedagogy:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vPed.map((p,i)=><li key={i}>{p}</li>)}</ol></div> : null}
-                        {vMods.length? vMods.map(mod=>{ const topics=(dbData.course_module_topics||[]).filter(t=>t.module_id===mod.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)); return (<div key={mod.id} style={{ border:'1.5px solid var(--primary)', borderRadius:'12px', overflow:'hidden' }}><div style={{ padding:'9px 14px', background:'var(--primary)', color:'#fff', fontWeight:700, fontSize:'13.5px' }}>Module {mod.module_number} — {mod.title}</div><div style={{ display:'grid', gridTemplateColumns:'110px 1fr 110px 120px', fontSize:'13px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Hours:</div><div style={{ padding:'8px 12px', borderRight:'1px solid var(--border)' }}>{mod.hours??'—'}</div><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>RBT Level:</div><div style={{ padding:'8px 12px' }}>{mod.rbt_level||'—'}</div></div>{mod.methodology && <div style={{ display:'grid', gridTemplateColumns:'160px 1fr', fontSize:'13px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Teaching Methodology</div><div style={{ padding:'8px 12px', color:'var(--text-soft)', whiteSpace:'pre-wrap' }}>{mod.methodology}</div></div>}{topics.length? <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)' }}><ol style={{ margin:0, paddingLeft:'20px', color:'var(--text)', fontSize:'13.5px', lineHeight:1.6 }}>{topics.map(t=><li key={t.id}>{t.topic}</li>)}</ol></div> : null}<div style={{ padding:'8px 14px', background:'var(--bg-saffron)', fontSize:'12.5px' }}><b>CO Mapping:</b> <span style={{ color:'var(--text-soft)' }}>{mod.co_mapping||'—'}</span></div></div>); }) : <div style={{ padding:'14px', border:'1px dashed var(--border)', borderRadius:'8px', color:'var(--text-faint)', textAlign:'center', fontSize:'13px' }}>No modules yet.</div>}
+                        {vObjs.length? <div style={{ border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--surface-muted)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)', color:'var(--primary-deep)' }}>OBJECTIVES:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vObjs.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{typeof o==='string'?o:(o.text||JSON.stringify(o))}</li>)}</ol></div> : <div style={{ padding:'14px', border:'1px dashed var(--border)', borderRadius:'var(--radius)', color:'var(--text-faint)', textAlign:'center', fontSize:'13px' }}>No objectives.</div>}
+                        {vOuts.length? <div style={{ border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--surface-muted)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)', color:'var(--primary-deep)' }}>OUTCOMES:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vOuts.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
+                        {vPed.length? <div style={{ border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' }}><div style={{ padding:'8px 14px', background:'var(--surface-muted)', fontWeight:700, fontSize:'13px', borderBottom:'1px solid var(--border)', color:'var(--primary-deep)' }}>Pedagogy:</div><ol style={{ margin:0, padding:'12px 12px 12px 28px', color:'var(--text-soft)', fontSize:'13.5px', lineHeight:1.6 }}>{vPed.map((p,i)=><li key={i}>{p}</li>)}</ol></div> : null}
+                        {vMods.length? vMods.map(mod=>{ const topics=(dbData.course_module_topics||[]).filter(t=>t.module_id===mod.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)); return (<div key={mod.id} style={{ border:'1.5px solid var(--primary)', borderRadius:'12px', overflow:'hidden' }}><div style={{ padding:'9px 14px', background:'var(--primary)', color:'#fff', fontWeight:700, fontSize:'13.5px' }}>Module {mod.module_number} — {mod.title}</div><div style={{ display:'grid', gridTemplateColumns:'110px 1fr 110px 120px', fontSize:'13px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Hours:</div><div style={{ padding:'8px 12px', borderRight:'1px solid var(--border)' }}>{mod.hours??'—'}</div><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>RBT Level:</div><div style={{ padding:'8px 12px' }}>{mod.rbt_level||'—'}</div></div>{mod.methodology && <div style={{ display:'grid', gridTemplateColumns:'160px 1fr', fontSize:'13px', borderBottom:'1px solid var(--border)' }}><div style={{ padding:'8px 12px', background:'var(--bg)', fontWeight:600, borderRight:'1px solid var(--border)' }}>Teaching Methodology</div><div style={{ padding:'8px 12px', color:'var(--text-soft)', whiteSpace:'pre-wrap' }}>{mod.methodology}</div></div>}{topics.length? <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)' }}><ol style={{ margin:0, paddingLeft:'20px', color:'var(--text)', fontSize:'13.5px', lineHeight:1.6 }}>{topics.map(t=><li key={t.id}>{t.topic}</li>)}</ol></div> : null}<div style={{ padding:'8px 14px', background:'var(--bg-saffron)', fontSize:'12.5px' }}><b>CO Mapping:</b> <span style={{ color:'var(--text-soft)' }}>{mod.co_mapping||'—'}</span></div></div>); }) : <div style={{ padding:'14px', border:'1px dashed var(--border)', borderRadius:'var(--radius)', color:'var(--text-faint)', textAlign:'center', fontSize:'13px' }}>No modules yet.</div>}
                       </div>
                     </div>
                   );
@@ -3177,7 +3177,7 @@ const handleAddDiscipline = async (e) => {
 
                     {/* Header table — mirrors the image header */}
                     <div style={{ padding: '16px 20px' }}>
-                      <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', fontSize: '13.5px' }}>
+                      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', fontSize: '13.5px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,160px) 1fr minmax(110px,140px) 110px', borderBottom: '1px solid var(--border)' }}>
                           <div style={{ padding: '9px 12px', background: 'var(--bg)', fontWeight: 600, borderRight: '1px solid var(--border)' }}>Program Name</div>
                           <div style={{ padding: '9px 12px', gridColumn: 'span 3', fontWeight: 600, color: 'var(--primary-deep)' }}>{progName}</div>
@@ -3222,19 +3222,19 @@ const handleAddDiscipline = async (e) => {
                         const fbOuts = (()=>{ try{const j=activeSyllabusCourse.outcomes_json; if(Array.isArray(j)) return j.filter(Boolean).map(o=>typeof o==='string'?o:(o.text||'')); if(typeof j==='string'){const a=JSON.parse(j); return (Array.isArray(a)?a:[]).filter(Boolean).map(o=>typeof o==='string'?o:(o.text||''));} }catch{} return []; })();
                         const fbPed = String(activeSyllabusCourse.pedagogy||'').split('\n').map(s=>s.trim()).filter(Boolean);
                         const hasFb = fbObjs.length || fbOuts.length || fbPed.length;
-                        if (!hasFb) return <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px', border: '1px dashed var(--border)', borderRadius: '8px' }}>No detailed syllabus yet. Click <b>Add Syllabus</b> below to create it from the document.</div>;
+                        if (!hasFb) return <div style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px', border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>No detailed syllabus yet. Click <b>Add Syllabus</b> below to create it from the document.</div>;
                         return (<>
                           <div style={{ background: 'var(--primary-deep)', color: '#fff', textAlign: 'center', padding: '9px', borderRadius: '6px', fontSize: '13px', letterSpacing: '0.06em', fontWeight: 700 }}>COURSE OBJECTIVES AND OUTCOMES</div>
-                          {fbObjs.length ? <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>OBJECTIVES:</div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbObjs.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
-                          {fbOuts.length ? <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>OUTCOMES: <span style={{ fontWeight:400, color:'var(--text-soft)' }}>At the end of the course, the student will be able to:</span></div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbOuts.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
-                          {fbPed.length ? <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>Pedagogy:</div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbPed.map((p,i)=><li key={i}>{p}</li>)}</ol></div> : null}
+                          {fbObjs.length ? <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>OBJECTIVES:</div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbObjs.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
+                          {fbOuts.length ? <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>OUTCOMES: <span style={{ fontWeight:400, color:'var(--text-soft)' }}>At the end of the course, the student will be able to:</span></div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbOuts.map((o,i)=><li key={i} style={{ marginBottom:'6px' }}>{o}</li>)}</ol></div> : null}
+                          {fbPed.length ? <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}><div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>Pedagogy:</div><ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>{fbPed.map((p,i)=><li key={i}>{p}</li>)}</ol></div> : null}
                         </>);
                       })() : (
                         <>
                           <div style={{ background: 'var(--primary-deep)', color: '#fff', textAlign: 'center', padding: '9px', borderRadius: '6px', fontSize: '13px', letterSpacing: '0.06em', fontWeight: 700 }}>COURSE OBJECTIVES AND OUTCOMES</div>
 
                           {syllabusContent.objectives?.length > 0 && (
-                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                               <div style={{ padding: '8px 14px', background: 'var(--bg)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)' }}>OBJECTIVES:</div>
                               <ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>
                                 {syllabusContent.objectives.map((o, i) => <li key={i} style={{ marginBottom: '6px' }}>{o}</li>)}
@@ -3242,7 +3242,7 @@ const handleAddDiscipline = async (e) => {
                             </div>
                           )}
                           {syllabusContent.outcomes?.length > 0 && (
-                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                               <div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>OUTCOMES: <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}>At the end of the course, the student will be able to:</span></div>
                               <ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>
                                 {syllabusContent.outcomes.map((o, i) => <li key={i} style={{ marginBottom: '6px' }}>{o}</li>)}
@@ -3250,7 +3250,7 @@ const handleAddDiscipline = async (e) => {
                             </div>
                           )}
                           {syllabusContent.pedagogy?.length > 0 && (
-                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                               <div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>Pedagogy:</div>
                               <ol style={{ margin: 0, padding: '12px 12px 12px 28px', color: 'var(--text-soft)', fontSize: '13.5px', lineHeight: 1.6 }}>
                                 {syllabusContent.pedagogy.map((p, i) => <li key={i}>{p}</li>)}
@@ -3288,11 +3288,11 @@ const handleAddDiscipline = async (e) => {
                               </div>
                             </div>
                           )) : (
-                            <div style={{ padding: '14px', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-faint)', textAlign: 'center', fontSize: '13px' }}>No modules yet — add them in Edit Syllabus.</div>
+                            <div style={{ padding: '14px', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-faint)', textAlign: 'center', fontSize: '13px' }}>No modules yet — add them in Edit Syllabus.</div>
                           )}
 
                           {syllabusContent.assessments && (
-                            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                               <div style={{ padding: '8px 14px', background: 'var(--surface-muted)', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid var(--border)', color:'var(--primary-deep)' }}>Assessment Plan</div>
                               <pre style={{ margin: 0, padding: '12px 14px', whiteSpace: 'pre-wrap', color: 'var(--text-soft)', fontSize: '13px', fontFamily: 'inherit' }}>{syllabusContent.assessments}</pre>
                             </div>
@@ -3313,7 +3313,7 @@ const handleAddDiscipline = async (e) => {
                             <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--primary-deep)' }}>Modules (Postgres) — {pgModules.length} module{pgModules.length===1?'':'s'}{pgModules.length>0 ? ` · ${sumHrs} hrs` : ''}{warnHours ? <span style={{ marginLeft: '8px', background: 'var(--accent)', color: '#fff', padding: '2px 8px', borderRadius: '99px', fontSize: '11px' }}>≠ course hours {activeSyllabusCourse.teaching_hours}</span> : ''}</h4>
                           </div>
                           {pgModules.length === 0 ? (
-                            <div style={{ padding: '14px', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-faint)', textAlign: 'center', fontSize: '13px' }}>No Postgres modules yet — add one below.</div>
+                            <div style={{ padding: '14px', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-faint)', textAlign: 'center', fontSize: '13px' }}>No Postgres modules yet — add one below.</div>
                           ) : pgModules.map((mod) => {
                             const topics = (dbData.course_module_topics || []).filter(t => t.module_id === mod.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
                             return (
@@ -3412,7 +3412,7 @@ const handleAddDiscipline = async (e) => {
                                       <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', width: '150px', flexShrink: 0, paddingTop: '7px' }}>Topics</label>
                                       <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {modTopics.length === 0 ? <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>No topics yet — click Add Topic below (each topic has optional description).</span> : <>{modTopics.map((t, i) => (
-                                          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', background: '#fff', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px' }}>
+                                          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px' }}>
                                             <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', minWidth: '22px', paddingTop: '8px' }}>{i + 1}.</span>
                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                               <label style={{ fontSize: '11px', color: 'var(--text-soft)', fontWeight: 600 }}>Topic
@@ -3454,7 +3454,7 @@ const handleAddDiscipline = async (e) => {
                                       </div>
                                     )}
                                     {pendingSyllMods.length > 0 && (
-                                      <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                                      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                                         <div style={{ padding: '7px 10px', background: 'var(--bg)', fontWeight: 700, fontSize: '12px', borderBottom: '1px solid var(--border)' }}>Queued modules — {pendingSyllMods.length} (single version V{(() => { const v=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear).reduce((m,s)=>Math.max(m,Number(s.version_number)||0),0)+1; return v; })()} · {syllModAcademicYear})</div>
                                         {pendingSyllMods.map((q, qi) => (
                                           <div key={qi} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderBottom: qi===pendingSyllMods.length-1?'none':'1px solid var(--border)', fontSize: '12.5px' }}>
@@ -3509,7 +3509,7 @@ const handleAddDiscipline = async (e) => {
                             </div>
                             {(syllabusForm.modules || []).length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-faint)', padding: '10px', border: '1px dashed var(--border)', borderRadius: '6px' }}>No modules yet. Click + Add Module and fill as per the document.</div>}
                             {(syllabusForm.modules || []).map((mod, mi) => (
-                              <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', background: '#fff', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px', background: '#fff', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <b style={{ fontSize: '13px', color: 'var(--primary)' }}>Module {mi + 1}</b>
                                   <button type="button" onClick={() => setSyllabusForm({ ...syllabusForm, modules: (syllabusForm.modules || []).filter((_, i) => i !== mi) })} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
@@ -3603,7 +3603,7 @@ const handleAddDiscipline = async (e) => {
                   const subs = dbData.assignment_submissions || [];
                   const mine = myProfile ? subs.filter(s=>s.student_id===myProfile.id) : [];
                   const newCount = dbData.assignments.filter(a=> !mine.some(s=>s.assignment_id===a.id)).length;
-                  return newCount ? <div style={{ background: 'var(--accent-light)', border: '1px solid var(--accent)', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px', fontSize: '12.5px' }}>🔔 {newCount} new assignment{newCount>1?'s':''} — start to notify your teacher.</div> : null;
+                  return newCount ? <div style={{ background: 'var(--accent-light)', border: '1px solid var(--accent)', padding: '8px 12px', borderRadius: 'var(--radius)', marginBottom: '12px', fontSize: '12.5px' }}>🔔 {newCount} new assignment{newCount>1?'s':''} — start to notify your teacher.</div> : null;
                 })()}
                 {canCreate('assignments') && (
                   <form onSubmit={handleAddAssignment} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -3664,7 +3664,7 @@ const handleAddDiscipline = async (e) => {
                           <div key={a.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                               <div style={{ flex: '1 1 280px' }}>
-                                <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '14.5px' }}>{a.title} <span style={{ fontWeight: 400, color: 'var(--text-faint)', fontSize: '11.5px' }}>{a.type?.replace('_',' ') || ''} · {batch?.name || '—'}</span></div>
+                                <div style={{ fontWeight: 700, color: 'var(--primary-deep)', fontSize: '15px' }}>{a.title} <span style={{ fontWeight: 400, color: 'var(--text-faint)', fontSize: '11.5px' }}>{a.type?.replace('_',' ') || ''} · {batch?.name || '—'}</span></div>
                                 <div style={{ fontSize: '12px', color: 'var(--text-soft)', marginTop: '2px' }}>{course ? <span>{course.code} · {course.name} {mod ? '› ' + mod.title : ''} {top ? '› ' + top.topic : a.topic_text ? '› ' + a.topic_text : ''}</span> : topicLabel !== '—' ? topicLabel : ''} {a.attachment_url ? <a href={a.attachment_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', marginLeft: '8px' }}>📎 attachment</a> : null}</div>
                                 {a.description ? <div style={{ fontSize: '12.5px', color: 'var(--text-soft)', marginTop: '4px', whiteSpace: 'pre-wrap' }}>{a.description}</div> : null}
                                 <div style={{ fontSize: '11.5px', color: isOverdue ? '#b45309' : 'var(--text-faint)', marginTop: '4px' }}>Due: {a.due_date} {isOverdue ? '· overdue' : ''} · Status: {a.status || 'open'}</div>
@@ -3681,7 +3681,7 @@ const handleAddDiscipline = async (e) => {
                               </div>
                             </div>
                             {!isStudent ? (
-                              <div style={{ marginTop: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px' }}>
+                              <div style={{ marginTop: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 12px' }}>
                                 <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', marginBottom: '6px' }}>
                                   <b style={{ color: 'var(--text)' }}>{subs.length} submission{subs.length!==1?'s':''}</b> · <span style={{ color: '#b45309' }}>{started} started</span> · <span style={{ color: 'var(--primary)' }}>{onTime} on time</span> · <span style={{ color: '#991b1b' }}>{late} late</span> · {submitted} submitted · {graded} graded
                                   {/* ponytail: not-submitted count needs roster (enrollments) — add when enrollments fetched */}
@@ -4180,7 +4180,7 @@ const handleAddDiscipline = async (e) => {
                           <input type="number" placeholder="Order" value={periodSort} onChange={e=>setPeriodSort(e.target.value)} style={{ padding: '7px', border: '1px solid var(--border)', borderRadius: '4px', width: '70px', fontSize: '12px' }} title="sort_order" />
                           <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Add column</button>
                         </form>
-                        <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
                             <thead><tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}><th style={{ padding: '6px 8px' }}>Key/Label</th><th style={{ padding: '6px 8px' }}>Time</th><th style={{ padding: '6px 8px' }}>Kind</th><th style={{ padding: '6px 8px' }}>Order</th><th style={{ padding: '6px 8px' }}></th></tr></thead>
                             <tbody>
