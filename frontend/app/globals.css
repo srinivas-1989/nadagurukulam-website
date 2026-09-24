@@ -110,3 +110,91 @@ input, select, textarea {
   font-family: inherit;
   font-size: 14.5px;
 }
+
+/* Portal shared shell */
+.portal-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.portal-sidebar {
+  background: var(--primary-deep);
+  border-right: 1px solid var(--border);
+  padding: 20px 10px;
+  overflow-y: auto;
+}
+
+.portal-topbar {
+  background: var(--primary-deep);
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--shadow-md);
+}
+
+/* Dashboard components */
+.ndg-hero {
+  background: var(--primary-deep);
+  border-radius: var(--radius-xl);
+  padding: 28px 32px;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+}
+
+.ndg-metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 22px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.ndg-activity-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 100px;
+}
+
+.ndg-activity-bar > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ndg-quick-action {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: var(--radius-xl-sm);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13.5px;
+  color: var(--text);
+  width: 100%;
+}
+
+.ndg-live-class-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ndg-live-class-item:last-child {
+  border-bottom: none;
+}
+
+/* Responsive sidebar */
+@media (max-width: 768px) {
+  .portal-sidebar {
+    display: none;
+  }
+}

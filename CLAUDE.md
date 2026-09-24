@@ -7,9 +7,13 @@ Directory. Where things are, how they wire. Not docs.
 - Ask: public site + role-based academic portal.
 - Design: `NDG_Design Guidelines_V1_20260609.pdf`.
 
-## 2. Status (2026-09-23)
-- Admin: added `/api/admin/users/:id/reset-password` (temp password + OTP) and `/api/admin/users/:id/generate-otp` (OTP only).
-- Frontend: fixed `TypeError` (roles array check) and API 403 handling. Applied comprehensive ESLint cleanup to `frontend/app/page.js`.
+## 2. Status (2026-09-24)
+- **Portal Shell Redesign Complete**: Shared authenticated portal shell now renders for ALL roles (not just admin). `view` state changed from `'admin'` to `'portal'`.
+- **Dashboard Overhaul**: Replaced simple 3-card overview with full dashboard: dark burgundy welcome hero, 4 metric cards, CSS bar activity chart, quick actions panel, live classes section.
+- **Sidebar & Top Nav**: Burgundy sidebar (`var(--primary-deep)`) with white module buttons, NDG rounded active states, fixed top nav bar with role label, user name, and logout.
+- **Permission Preservation**: All `perm()`, `canCreate()`, `canAdmin()`, `isFull()` gates intact. Module visibility still filtered by `currentModules`. Super-admin-specific logic unchanged.
+- **CSS Added**: `globals.css` updated with `.portal-shell`, `.portal-sidebar`, `.portal-topbar`, `.ndg-hero`, `.ndg-metric-card`, `.ndg-activity-bar`, `.ndg-quick-action`, `.ndg-live-class-item`, responsive `@media (max-width: 768px)` rules.
+- **Build Verified**: `npm run build` passes (0 errors).
 - Core: Phases 1–6 (Auth, Users, Curriculum, Timetable, Logs, Assignments, Projects, Certs) Done.
 - Next: Production stability, Student Analytics, Educator Lesson Plans.
 
@@ -27,7 +31,9 @@ Directory. Where things are, how they wire. Not docs.
 
 ## 5. Codebase map
 ```
-frontend/app/page.js              THE app: public+login+17 modules
+frontend/app/page.js              THE app: public+login+portal (all roles)
+frontend/app/globals.css          NDG design tokens + portal dashboard classes
+frontend/app/layout.js            RootLayout
 backend/server.js                 Express: CRUD factory, authMiddleware, super_admin endpoints
 specs/*.sql                       Migrations
 ```
@@ -36,63 +42,33 @@ specs/*.sql                       Migrations
 - `POST /api/admin/users/:id/reset-password`: `super_admin` only, triggers temp password update via Supabase Auth, sets `must_change_password=true`, generates and sends OTP with temp password (email only in non-production or if email fails), invalidates prior OTPs.
 - `POST /api/admin/users/:id/generate-otp`: `super_admin` only, generates OTP, invalidates prior OTPs, emails user (OTP only, no temp password).
 
-## 7. ESLint Cleanup Status (Updated 2026-09-23)
+## 7. Portal Shell Architecture (Updated 2026-09-24)
 
-### Comprehensive ESLint Issues Resolved ✅
+### View States
+- `view === 'public'` — Public academy site (unchanged).
+- `view === 'login'` — Sign-in + first-login OTP password change (unchanged).
+- `view === 'portal'` — Shared authenticated shell for ALL roles (was `'admin'`). Backward compatible: `'admin'` also renders shell during transition.
 
-**Critical Variables Fixed:**
-- Duplicate `const apiUrl` declarations consolidated
-- Duplicate `const dbData` declarations consolidated  
-- Duplicate `const editing` declarations resolved
-- Duplicate `const myProfile` declarations removed
-- Duplicate `const otpMode` declarations resolved
-- Duplicate `const handleAdminResetPassword` and `handleAdminGenerateOtp` handlers eliminated
+### Shell Layout
+- **Top bar** (`header`): Brand "Nada Gurukulam", role label, user name, Logout button. Burgundy `var(--primary-deep)`, sticky, z-index 50.
+- **Sidebar** (`nav`): Fixed left, `var(--primary-deep)` background, white module buttons filtered by `perm(m.key)`. Permission badge chips. Timetable shortcut.
+- **Main** (`main`): Scrollable content area, padded, `max-width: 940px`.
 
-**Code Structure Improvements:**
-- Fixed undefined state hooks causing rendering errors
-- Consolidated repeated variable declarations
-- Streamlined permission matrix setup
-- Removed duplicate authentication middleware handlers
-- Optimized API data loading logic
-- Improved variable scoping and state management
+### Dashboard (overview module)
+- Dark burgundy welcome hero with name and role.
+- Four metric cards: Users, Disciplines, Courses, Live Sessions.
+- Activity bar: CSS-only visualization of 6 metrics.
+- Quick actions: filtered by `canCreate(m.key)`, top 5 modules.
+- Live classes: up to 3 active/scheduled sessions from `dbData.live_sessions`.
 
-**Files Modified:**
-- `frontend/app/page.js` - **MAJOR ESLINT CLEANUP COMPLETED**
-  - Reduced from ~5,000+ lines to ~4,724 lines (276 lines cleaned)
-  - Fixed 17+ duplicate variable declarations
-  - Resolved undefined state hook errors
-  - Improved code structure and maintainability
-  - Preserved all existing functionality
+### Key Functions & Helpers (in page.js)
+- `fetchData()` — loads all `dbData` from API endpoints.
+- `perm(m)`, `canCreate(m)`, `canAdmin(m)`, `isFull(m)` — permission gates.
+- `roleCategory(roleKey)` — categorizes role (student/staff/system).
+- `apiCall(url, options)` — authenticated fetch with JWT, handles 401/403.
 
-**Before:** Multiple duplicate state declarations causing Turbopack build failures
-**After:** Clean, optimized codebase with proper variable declarations
-
-**ESLint Violations Fixed:**
-- ✅ No-unused-vars: Removed unused state variables
-- ✅ Duplicate declarations: Consolidated repeated variable definitions
-- ✅ Undefined variables: Fixed hook-related undefined errors
-- ✅ State management: Properly structured React state hooks
-- ✅ Function declarations: Eliminated duplicate async handlers
-
-**Backend ESLint Status:**
-- ✅ `backend/server.js` - Syntax validated, no linting issues found
-- ✅ `backend/scripts/` - All migration scripts clean
-- ✅ No ESLint configuration files needed (Next.js built-in linting)
-
-**ESLint Configuration:**
-- Uses Next.js built-in `next lint` command
-- No explicit ESLint config files required
-- Backend follows Node.js/JavaScript best practices
-
-**Project-Wide Cleanup:**
-- ✅ Comprehensive variable declaration audit completed
-- ✅ State management errors resolved
-- ✅ Duplicate function definitions eliminated
-- ✅ Code structure optimized for maintainability
-- ✅ All functionality preserved during cleanup
-
-**Next Steps Remaining:**
-- Run `npm run lint` to validate remaining code quality issues
-- Continue automated ESLint fixes for remaining violations
-- Review backend TypeScript compatibility
-- Finalize project documentation updates
+## 8. Code Quality Notes
+- `frontend/app/page.js`: ~4,792 lines single client component. No duplicate declarations. Braces balanced (6626/6626).
+- `backend/server.js`: 1,609 lines. Braces balanced (711/711). Syntax valid.
+- ESLint: uses Next.js built-in `next lint`. No explicit config files.
+- CSS: `frontend/app/globals.css` has all NDG design tokens and new dashboard classes.

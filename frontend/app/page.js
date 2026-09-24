@@ -164,7 +164,7 @@ export default function Home() {
   ];
 
 // All state declarations at top (fix: move undefined state hooks to prevent errors)
-  const [view, setView] = useState('public'); // public | login | admin
+  const [view, setView] = useState('public'); // public | login | portal
   const [role, setRole] = useState(null);
   const [activeModule, setActiveModule] = useState('overview');
 
@@ -202,7 +202,7 @@ export default function Home() {
       if (s) {
         resolveRole(s.user.id).then(({ data }) => {
           if (data) setRole(data.role_key);
-          setView('admin');
+          setView('portal');
         });
         loadMyProfile(s.user.id);
       }
@@ -214,7 +214,7 @@ export default function Home() {
       if (sess) {
         resolveRole(sess.user.id).then(({ data }) => {
           if (data) setRole(data.role_key);
-          setView('admin');
+          setView('portal');
         });
         loadMyProfile(sess.user.id);
       } else {
@@ -514,7 +514,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (view === 'admin' && session) fetchData();
+    if ((view === 'portal' || view === 'admin') && session) fetchData();
   }, [view, activeModule, session]);
 
   useEffect(() => {
@@ -2216,23 +2216,45 @@ const handleAddDiscipline = async (e) => {
         </div>
       )}
 
-      {/* VIEW 3: ADMIN PORTAL SHELL */}
-      {view === 'admin' && role && (
-        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', flex: 1, minHeight: '75vh' }}>
+      {/* VIEW 3: AUTHENTICATED PORTAL SHELL (all roles) */}
+      {(view === 'portal' || view === 'admin') && role && (
+        <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+          {/* Top Nav Bar */}
+          <header style={{ background: 'var(--primary-deep)', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: 'var(--shadow-md)' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', fontFamily: "'Futura', 'Jost', sans-serif" }}>
+              Nada Gurukulam
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+                {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+              </span>
+              {myProfile?.name && (
+                <span style={{ fontSize: '13px', color: '#f5b759' }}>{myProfile.name}</span>
+              )}
+              <button onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }} style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                Logout
+              </button>
+            </div>
+          </header>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr' }}>
           {/* Sidebar */}
-          <nav style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)', padding: '24px 12px' }}>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-faint)', padding: '0 12px 10px', letterSpacing: '0.05em' }}>
+          <nav style={{ background: 'var(--primary-deep)', borderRight: '1px solid var(--border)', padding: '20px 10px', overflowY: 'auto' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', padding: '0 10px 16px', fontFamily: "'Futura', 'Jost', sans-serif", letterSpacing: '0.02em' }}>
+              Nada Gurukulam
+            </div>
+            <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', padding: '0 10px 10px', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '10px' }}>
               Portal Modules
             </div>
             {currentModules.length === 0 && (
-              <p style={{ fontSize: '12.5px', color: 'var(--text-faint)', padding: '0 12px', margin: 0 }}>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', padding: '0 10px', margin: 0 }}>
                 No modules assigned to this role yet — set them in Roles &amp; Permissions as Super Admin.
               </p>
             )}
             {currentModules.map(m => (
-              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: '6px', background: activeModule === m.key ? 'var(--primary)' : 'none', color: activeModule === m.key ? '#fff' : 'var(--text)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '14px' }}>
+              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'var(--primary)' : 'transparent', color: activeModule === m.key ? '#fff' : 'rgba(255,255,255,0.8)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '13.5px' }}>
                 <span>{m.name}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 6px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'var(--bg)', color: activeModule === m.key ? '#fff' : 'var(--text-faint)' }}>
+                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 6px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)', color: activeModule === m.key ? '#fff' : 'rgba(255,255,255,0.5)' }}>
                   {perm(m.key) || '—'}
                 </span>
               </button>
@@ -2242,23 +2264,23 @@ const handleAddDiscipline = async (e) => {
               const todaySlots = dbData.timetable.filter(s => s.day_of_week === dayName).sort((a,b)=>toMinTT(a.start_time)-toMinTT(b.start_time));
               if (todaySlots.length===0) return null;
               return (
-                <div style={{ marginTop: '18px', padding: '12px', background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px' }}>My Timetable — {dayName.slice(0,3)}</div>
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', marginBottom: '8px' }}>My Timetable — {dayName.slice(0,3)}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {todaySlots.slice(0,5).map(s => {
                       const k = slotToKeys(s);
                       const lab = k.from===k.to ? FIXED_MAP[k.from]?.label : `${FIXED_MAP[k.from]?.label}→${FIXED_MAP[k.to]?.label}`;
-                      return <div key={s.id} style={{ fontSize: '12.5px', lineHeight: 1.35 }}><span style={{ fontWeight: 700, color: 'var(--primary-deep)' }}>{lab}</span> <span style={{ color: 'var(--text-faint)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</span><br /><span style={{ color: 'var(--text)' }}>{s.subject || '—'}</span>{s.room ? <span style={{ color: 'var(--text-faint)' }}> · {s.room}</span> : null}</div>;
+                      return <div key={s.id} style={{ fontSize: '12px', lineHeight: 1.35, color: 'rgba(255,255,255,0.9)' }}><span style={{ fontWeight: 700, color: '#f5b759' }}>{lab}</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</span><br /><span style={{ color: 'rgba(255,255,255,0.8)' }}>{s.subject || '—'}</span>{s.room ? <span style={{ color: 'rgba(255,255,255,0.5)' }}> · {s.room}</span> : null}</div>;
                     })}
                   </div>
-                  <button onClick={() => setActiveModule('timetable')} style={{ marginTop: '8px', background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '11.5px', color: 'var(--primary)' }}>Open full timetable →</button>
+                  <button onClick={() => setActiveModule('timetable')} style={{ marginTop: '8px', background: 'none', border: '1px solid rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '11px', color: '#f5b759' }}>Open full timetable →</button>
                 </div>
               );
             })()}
           </nav>
 
           {/* Main Content Area */}
-          <main style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined }}>
+          <main style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined, gridColumn: 2 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
               <h2 style={{ fontSize: '24px', color: 'var(--primary-deep)' }}>
                 {MODULES.find(m => m.key === activeModule)?.name}
@@ -2268,20 +2290,101 @@ const handleAddDiscipline = async (e) => {
               </span>
             </div>
 
-            {/* OVERVIEW */}
+            {/* OVERVIEW — shared dashboard for all authenticated roles */}
             {activeModule === 'overview' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                  <div style={{ fontSize: '30px', fontWeight: 700, color: 'var(--primary)' }}>{dbData.users.length}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>System Users</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                {/* Dark burgundy welcome hero */}
+                <div style={{ background: 'var(--primary-deep)', borderRadius: 'var(--radius-xl)', padding: '28px 32px', boxShadow: 'var(--shadow-lg)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(221,159,60,0.12)' }} />
+                  <div style={{ position: 'absolute', bottom: '-40px', left: '-20px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+                  <div style={{ position: 'relative' }}>
+                    <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#fff', marginBottom: '6px', fontFamily: "'Futura', 'Jost', sans-serif" }}>
+                      Welcome back{myProfile?.name ? `, ${myProfile.name.split(' ')[0]}` : ''}
+                    </h1>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', margin: 0 }}>
+                      {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} · Level: {perm('overview') || 'View'}
+                    </p>
+                  </div>
                 </div>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                  <div style={{ fontSize: '30px', fontWeight: 700, color: 'var(--primary)' }}>{dbData.curriculum.length}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Disciplines / Programs</div>
+
+                {/* Four metric cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                  {[
+                    { label: 'System Users', value: dbData.users.length, color: 'var(--primary)' },
+                    { label: 'Disciplines', value: dbData.curriculum.length, color: 'var(--accent-deep)' },
+                    { label: 'Courses', value: dbData.courses.length, color: 'var(--primary)' },
+                    { label: 'Live Sessions', value: dbData.live_sessions.length, color: 'var(--accent-deep)' },
+                  ].map((m, i) => (
+                    <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
+                      <div style={{ fontSize: '30px', fontWeight: 700, color: m.color }}>{m.value}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{m.label}</div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                  <div style={{ fontSize: '30px', fontWeight: 700, color: 'var(--primary)' }}>{dbData.courses.length}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Dynamic Courses &amp; Syllabi</div>
+
+                {/* Platform activity panel + quick actions + live classes row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  {/* Activity visualization */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
+                    <h3 style={{ fontSize: '15px', color: 'var(--primary-deep)', marginBottom: '16px', fontWeight: 600 }}>Platform Activity</h3>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '100px' }}>
+                      {[
+                        { label: 'Users', val: dbData.users.length, max: Math.max(dbData.users.length, 1) },
+                        { label: 'Curriculum', val: dbData.curriculum.length, max: Math.max(dbData.curriculum.length, 1) },
+                        { label: 'Courses', val: dbData.courses.length, max: Math.max(dbData.courses.length, 1) },
+                        { label: 'Live', val: dbData.live_sessions.length, max: Math.max(dbData.live_sessions.length, 1) },
+                        { label: 'Assign', val: dbData.assignments.length, max: Math.max(dbData.assignments.length, 1) },
+                        { label: 'Projects', val: dbData.projects.length, max: Math.max(dbData.projects.length, 1) },
+                      ].map((b, i) => (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <div style={{
+                            width: '100%', borderRadius: '4px 4px 0 0',
+                            background: i % 2 === 0 ? 'var(--primary)' : 'var(--accent)',
+                            height: `${Math.max((b.val / b.max) * 80, 4)}px`,
+                            transition: 'height 0.3s ease',
+                            opacity: 0.85,
+                          }} />
+                          <div style={{ fontSize: '10px', color: 'var(--text-faint)', textAlign: 'center' }}>{b.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quick actions */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
+                    <h3 style={{ fontSize: '15px', color: 'var(--primary-deep)', marginBottom: '16px', fontWeight: 600 }}>Quick Actions</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {MODULES.filter(m => canCreate(m.key) && m.key !== 'overview').slice(0, 5).map(m => (
+                        <button key={m.key} onClick={() => setActiveModule(m.key)} style={{
+                          background: 'var(--bg)', border: '1px solid var(--border)', padding: '10px 14px', borderRadius: 'var(--radius-xl-sm)',
+                          cursor: 'pointer', textAlign: 'left', fontSize: '13.5px', color: 'var(--text)'
+                        }}>
+                          <span style={{ fontWeight: 600 }}>+</span> {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live classes */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
+                    <h3 style={{ fontSize: '15px', color: 'var(--primary-deep)', marginBottom: '16px', fontWeight: 600 }}>Live Classes</h3>
+                    {dbData.live_sessions.filter(s => s.status === 'active' || s.status === 'scheduled').slice(0, 3).map((s, i) => (
+                      <div key={i} style={{ padding: '10px 0', borderBottom: i < Math.min(dbData.live_sessions.filter(s2 => s2.status === 'active' || s2.status === 'scheduled').length - 1, 2) ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.title || 'Live Session'}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                          {s.batch || '—'} · {s.date ? new Date(s.date).toLocaleDateString() : '—'} · <span style={{ color: s.status === 'active' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {dbData.live_sessions.filter(s => s.status === 'active' || s.status === 'scheduled').length === 0 && (
+                      <p style={{ fontSize: '12.5px', color: 'var(--text-faint)' }}>No active live sessions.</p>
+                    )}
+                    {canCreate('liveclasses') && (
+                      <button onClick={() => setActiveModule('liveclasses')} style={{ marginTop: '10px', background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        View All →
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -4680,6 +4783,7 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
           </main>
+        </div>
         </div>
       )}
     </div>
