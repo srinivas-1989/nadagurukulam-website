@@ -1968,8 +1968,8 @@ const handleAddDiscipline = async (e) => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
-      {/* Adaptive header — shown for public and all authenticated views */}
-      {(view === 'public' || (role && (view === 'portal' || view === 'admin'))) && (
+      {/* Adaptive header — shown for public only; portal/admin have their own topbar inside the shell */}
+      {view === 'public' && (
         <header style={{
           background: view === 'public' ? 'var(--primary)' : 'var(--primary-deep)',
           color: '#fff', padding: view === 'public' ? '14px 28px' : '0 24px',
@@ -2231,7 +2231,7 @@ const handleAddDiscipline = async (e) => {
       {(view === 'portal' || view === 'admin') && role && (
         <div className="portal-layout" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
           {/* Top Nav Bar */}
-          <header className="portal-topbar" style={{ background: 'var(--primary-deep)', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: 'var(--shadow-md)' }}>
+          <header className="portal-topbar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: '26px', width: 'auto' }} />
               <span style={{ fontFamily: "'Futura', 'Jost', sans-serif", fontWeight: 700, fontSize: '16px', color: '#fff', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
