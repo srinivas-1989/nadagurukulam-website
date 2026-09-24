@@ -1968,10 +1968,16 @@ const handleAddDiscipline = async (e) => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
-      {/* Topbar */}
-      <header style={{ background: 'var(--primary)', color: '#fff', padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-md)' }}>
+      {/* Topbar — shown on public and portal views */}
+      <header style={{
+        background: view === 'public' ? 'var(--primary)' : 'var(--primary-deep)',
+        color: '#fff', padding: view === 'public' ? '16px 28px' : '0 24px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        boxShadow: 'var(--shadow-md)', height: view === 'public' ? 'auto' : '60px',
+        position: view === 'portal' ? 'sticky' : 'relative', top: 0, zIndex: view === 'portal' ? 50 : 'auto',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
-          <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: '46px', width: 'auto', background: 'var(--bg)', padding: '6px 12px', borderRadius: 'var(--radius-xl-sm)', display: 'block' }} />
+          <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '46px' : '32px', width: 'auto', background: 'var(--bg)', padding: view === 'public' ? '6px 12px' : '6px 10px', borderRadius: 'var(--radius-xl-sm)', display: 'block' }} />
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {role && (
