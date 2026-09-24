@@ -2232,20 +2232,18 @@ const handleAddDiscipline = async (e) => {
         <div className="portal-layout" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
           {/* Top Nav Bar */}
           <header className="portal-topbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: '26px', width: 'auto' }} />
-              <span style={{ fontFamily: "'Futura', 'Jost', sans-serif", fontWeight: 700, fontSize: '16px', color: '#fff', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
+            <div className="portal-topbar-left">
+              <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: '24px', width: 'auto' }} />
+              <span className="portal-brand">Nada Gurukulam</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
-                {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-              </span>
+            <div className="portal-topbar-right">
+              <span className="portal-role-badge">{role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
               {myProfile?.name && (
-                <span style={{ fontSize: '13px', color: '#f5b759' }}>{myProfile.name}</span>
+                <span className="portal-user-name">{myProfile.name}</span>
               )}
-              <button onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }} style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                Logout
-              </button>
+              <div className="portal-action-group">
+                <button className="portal-action-btn" onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }}>Logout</button>
+              </div>
             </div>
           </header>
 

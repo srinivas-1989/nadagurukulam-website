@@ -145,15 +145,124 @@ input, select, textarea {
 
 .portal-topbar {
   background: var(--primary-deep);
-  padding: 0 24px;
+  padding: 0 28px;
   height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
   box-shadow: var(--shadow-md);
+}
+
+.portal-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.portal-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.portal-brand {
+  font-family: 'Futura', 'Jost', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.portal-role-badge {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.portal-user-name {
+  font-size: 13px;
+  color: #f5b759;
+  font-weight: 600;
+}
+
+.portal-action-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-action-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 6px 14px;
+  border-radius: var(--radius-xl-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.portal-action-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+/* Settings dropdown anchor */
+.portal-settings-anchor {
+  position: relative;
+}
+
+.portal-settings-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 180px;
+  z-index: 60;
+  overflow: hidden;
+}
+
+.portal-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.portal-settings-item:hover {
+  background: var(--surface-muted);
+  color: var(--primary-deep);
+}
+
+.portal-settings-item.danger {
+  color: #81171a;
+}
+
+.portal-settings-item.danger:hover {
+  background: rgba(129, 23, 26, 0.06);
 }
 
 /* Dashboard components */
