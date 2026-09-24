@@ -2224,9 +2224,9 @@ const handleAddDiscipline = async (e) => {
 
       {/* VIEW 3: AUTHENTICATED PORTAL SHELL (all roles) */}
       {(view === 'portal' || view === 'admin') && role && (
-        <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <div className="portal-layout" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
           {/* Top Nav Bar */}
-          <header style={{ background: 'var(--primary-deep)', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: 'var(--shadow-md)' }}>
+          <header className="portal-topbar" style={{ background: 'var(--primary-deep)', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', fontFamily: "'Futura', 'Jost', sans-serif" }}>
               Nada Gurukulam
             </div>
@@ -2243,9 +2243,8 @@ const handleAddDiscipline = async (e) => {
             </div>
           </header>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr' }}>
           {/* Sidebar */}
-          <nav style={{ background: 'var(--primary-deep)', borderRight: '1px solid var(--border)', padding: '20px 10px', overflowY: 'auto' }}>
+          <nav className="portal-sidebar">
             <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', padding: '0 10px 16px', fontFamily: "'Futura', 'Jost', sans-serif", letterSpacing: '0.02em' }}>
               Nada Gurukulam
             </div>
@@ -2286,7 +2285,7 @@ const handleAddDiscipline = async (e) => {
           </nav>
 
           {/* Main Content Area */}
-          <main style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined, gridColumn: 2 }}>
+          <main className="portal-content" style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
               <h2 style={{ fontSize: '24px', color: 'var(--primary-deep)' }}>
                 {MODULES.find(m => m.key === activeModule)?.name}
@@ -4789,7 +4788,6 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
           </main>
-        </div>
         </div>
       )}
     </div>

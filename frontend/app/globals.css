@@ -117,11 +117,29 @@ input, select, textarea {
   background: var(--bg);
 }
 
+.portal-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
 .portal-sidebar {
   background: var(--primary-deep);
   border-right: 1px solid var(--border);
   padding: 20px 10px;
   overflow-y: auto;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  z-index: 40;
+}
+
+.portal-content {
+  grid-column: 2;
+  margin-left: 260px;
+  min-height: 100vh;
 }
 
 .portal-topbar {
@@ -194,7 +212,13 @@ input, select, textarea {
 
 /* Responsive sidebar */
 @media (max-width: 768px) {
+  .portal-layout {
+    grid-template-columns: 1fr;
+  }
   .portal-sidebar {
     display: none;
+  }
+  .portal-content {
+    margin-left: 0;
   }
 }
