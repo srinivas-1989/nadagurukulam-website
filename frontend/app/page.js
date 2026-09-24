@@ -1968,39 +1968,44 @@ const handleAddDiscipline = async (e) => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
-      {/* Topbar — shown on public and portal views */}
-      <header style={{
-        background: view === 'public' ? 'var(--primary)' : 'var(--primary-deep)',
-        color: '#fff', padding: view === 'public' ? '16px 28px' : '0 24px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        boxShadow: 'var(--shadow-md)', height: view === 'public' ? 'auto' : '60px',
-        position: view === 'portal' ? 'sticky' : 'relative', top: 0, zIndex: view === 'portal' ? 50 : 'auto',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
-          <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '46px' : '32px', width: 'auto', background: 'var(--bg)', padding: view === 'public' ? '6px 12px' : '6px 10px', borderRadius: 'var(--radius-xl-sm)', display: 'block' }} />
-        </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {role && (
-            <span style={{ background: 'rgba(255,255,255,0.15)', padding: '5px 14px', borderRadius: '99px', fontSize: '13px' }}>
-              Role: <b>{roles.find(r => r.key === role)?.name || role}</b>
-            </span>
-          )}
-          {view !== 'public' && (
-            <button onClick={() => setView('public')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
-              Public Site
-            </button>
-          )}
-          {!role ? (
-            <button onClick={() => setView('login')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
-              Sign In
-            </button>
-          ) : (
-            <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
-              Log out
-            </button>
-          )}
-        </div>
-      </header>
+      {/* Adaptive header — shown for public and all authenticated views */}
+      {(view === 'public' || (role && (view === 'portal' || view === 'admin'))) && (
+        <header style={{
+          background: view === 'public' ? 'var(--primary)' : 'var(--primary-deep)',
+          color: '#fff', padding: view === 'public' ? '14px 28px' : '0 24px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          boxShadow: 'var(--shadow-md)', height: view === 'public' ? 'auto' : '60px',
+          position: view === 'public' ? 'relative' : 'sticky', top: 0, zIndex: view === 'public' ? 'auto' : 50,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
+            <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '44px' : '30px', width: 'auto', background: 'transparent', display: 'block' }} />
+            {view !== 'public' && (
+              <span style={{ fontFamily: "'Futura', 'Jost', sans-serif", fontWeight: 700, fontSize: '16px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {role && (
+              <span style={{ background: 'rgba(255,255,255,0.15)', padding: '5px 14px', borderRadius: '99px', fontSize: '13px' }}>
+                Role: <b>{roles.find(r => r.key === role)?.name || role}</b>
+              </span>
+            )}
+            {view !== 'public' && (
+              <button onClick={() => setView('public')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
+                Public Site
+              </button>
+            )}
+            {!role ? (
+              <button onClick={() => setView('login')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                Sign In
+              </button>
+            ) : (
+              <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
+                Log out
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       {/* VIEW 1: PUBLIC HOMEPAGE */}
       {view === 'public' && (
@@ -2227,8 +2232,9 @@ const handleAddDiscipline = async (e) => {
         <div className="portal-layout" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
           {/* Top Nav Bar */}
           <header className="portal-topbar" style={{ background: 'var(--primary-deep)', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', fontFamily: "'Futura', 'Jost', sans-serif" }}>
-              Nada Gurukulam
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: '26px', width: 'auto' }} />
+              <span style={{ fontFamily: "'Futura', 'Jost', sans-serif", fontWeight: 700, fontSize: '16px', color: '#fff', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>

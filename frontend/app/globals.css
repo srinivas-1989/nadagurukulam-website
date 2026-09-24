@@ -46,10 +46,11 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Gill Sans', 'Gill Sans MT', 'Nunito Sans', sans-serif;
+  font-family: 'Nunito Sans', 'Gill Sans', 'Gill Sans MT', sans-serif;
   font-size: 15.5px;
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, .font-display {
