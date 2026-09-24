@@ -167,6 +167,7 @@ export default function Home() {
   const [view, setView] = useState('public'); // public | login | portal
   const [role, setRole] = useState(null);
   const [activeModule, setActiveModule] = useState('overview');
+  const [collapsed, setCollapsed] = useState(false);
 
   // Auth state (from Supabase Auth)
   const [session, setSession] = useState(null);
@@ -1978,7 +1979,7 @@ const handleAddDiscipline = async (e) => {
           position: view === 'public' ? 'relative' : 'sticky', top: 0, zIndex: view === 'public' ? 'auto' : 50,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
-            <img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '44px' : '30px', width: 'auto', background: 'transparent', display: 'block' }} />
+            <a href="/" title="Public site"><img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '44px' : '36px', width: 'auto', background: 'transparent', display: 'block' }} /></a>
             {view !== 'public' && (
               <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '16px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
             )}
@@ -2234,6 +2235,7 @@ const handleAddDiscipline = async (e) => {
           <header className="portal-topbar">
             <div className="portal-topbar-left">
               <a href="/" onClick={(e)=>{e.preventDefault();setView('public');}} style={{display:'flex',alignItems:'center',gap:'8px',textDecoration:'none'}}><img src="/logo-landscape.png" alt="Nada Gurukulam" style={{height:'24px',width:'auto'}} /><span className="portal-brand">Nada Gurukulam</span></a>
+                <button className="portal-action-btn" style={{marginLeft:'8px'}} onClick={() => setCollapsed(!collapsed)}>{collapsed ? '▶' : '◀'}</button>
               <span className="portal-brand">Nada Gurukulam</span>
             </div>
             <div className="portal-topbar-right">
@@ -2241,14 +2243,11 @@ const handleAddDiscipline = async (e) => {
               {myProfile?.name && (
                 <span className="portal-user-name">{myProfile.name}</span>
               )}
-              <div className="portal-action-group">
-                <button className="portal-action-btn" onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }}>Logout</button>
-              </div>
-            </div>
+                          </div>
           </header>
 
           {/* Sidebar */}
-          <nav className="portal-sidebar">
+          <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}`}>
             <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-deep)', padding: '0 10px 16px', fontFamily: "'Poppins', sans-serif", letterSpacing: '0.02em' }}>
               Nada Gurukulam
             </div>
@@ -2286,7 +2285,14 @@ const handleAddDiscipline = async (e) => {
                 </div>
               );
             })()}
-          </nav>
+          
+            {/* Logout button at bottom */}
+                      
+                {/* Logout button at bottom of sidebar */}
+                <div style={{ marginTop: 'auto', padding: '10px' }}>
+                  <button className="portal-action-btn" onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }}>Logout</button>
+                </div>
+
 
           {/* Main Content Area */}
           <main className="portal-content" style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined }}>
