@@ -2236,14 +2236,13 @@ const handleAddDiscipline = async (e) => {
             <div className="portal-topbar-left">
               <a href="/" onClick={(e)=>{e.preventDefault();setView('public');}} style={{display:'flex',alignItems:'center',gap:'8px',textDecoration:'none'}}><img src="/logo-landscape.png" alt="Nada Gurukulam" style={{height:'24px',width:'auto'}} /><span className="portal-brand">Nada Gurukulam</span></a>
                 <button className="portal-action-btn" style={{marginLeft:'8px'}} onClick={() => setCollapsed(!collapsed)}>{collapsed ? '▶' : '◀'}</button>
-              <span className="portal-brand">Nada Gurukulam</span>
             </div>
             <div className="portal-topbar-right">
               <span className="portal-role-badge">{role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
               {myProfile?.name && (
                 <span className="portal-user-name">{myProfile.name}</span>
               )}
-                          </div>
+            </div>
           </header>
 
           {/* Sidebar */}
@@ -2286,13 +2285,11 @@ const handleAddDiscipline = async (e) => {
               );
             })()}
           
-            {/* Logout button at bottom */}
-                      
                 {/* Logout button at bottom of sidebar */}
                 <div style={{ marginTop: 'auto', padding: '10px' }}>
                   <button className="portal-action-btn" onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }}>Logout</button>
                 </div>
-
+          </nav>
 
           {/* Main Content Area */}
           <main className="portal-content" style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined }}>
