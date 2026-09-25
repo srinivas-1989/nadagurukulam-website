@@ -3,7 +3,7 @@
    Light-only by design: cream grounds, never pitch black — dark mode is not
    defined by the guidelines and intentionally not implemented. */
 
-@import url('https://fonts.googleapis.com/css2?family=Amita:wght@400;700&family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Gentium+Book+Plus:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Tiro+Devanagari+Sanskrit:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amita:wght@400;700&family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Gentium+Book+Plus:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Petit+Formal+Script&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Tiro+Devanagari+Sanskrit:ital@0;1&display=swap');
 
 :root {
   /* PRIMARY (Dossiers design language) */
@@ -100,6 +100,16 @@ h1, h2, h3, h4, .font-display {
   position: absolute;
   pointer-events: none;
   line-height: 1;
+  z-index: 0;
+}
+
+/* Hero content shares the 1128px column used by <main> so every left edge lines up */
+.ndg-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1128px;
+  margin: 0 auto;
+  padding: 0 24px;
 }
 
 .ndg-om-divider {
@@ -158,7 +168,7 @@ input, select, textarea {
   gap: 12px;
   padding: 12px 16px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
@@ -180,7 +190,6 @@ input, select, textarea {
 
 .portal-content {
   grid-column: 2;
-  margin-left: 260px;
   min-height: 100vh;
 }
 
@@ -223,17 +232,17 @@ input, select, textarea {
 }
 
 .portal-role-badge {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.12);
-  padding: 4px 12px;
+  padding: 5px 14px;
   border-radius: 99px;
   font-weight: 500;
   text-transform: capitalize;
 }
 
 .portal-user-name {
-  font-size: 14px;
+  font-size: 15px;
   color: #fdf3e0;
   font-weight: 600;
   font-family: 'Poppins', sans-serif;
@@ -249,10 +258,10 @@ input, select, textarea {
   background: rgba(255, 255, 255, 0.12);
   color: #fdf3e0;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 6px 16px;
+  padding: 7px 18px;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 500;
   font-family: 'Inter', sans-serif;
   transition: all 0.15s ease;

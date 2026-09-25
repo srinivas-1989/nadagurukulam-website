@@ -1979,28 +1979,28 @@ const handleAddDiscipline = async (e) => {
           position: view === 'public' ? 'relative' : 'sticky', top: 0, zIndex: view === 'public' ? 'auto' : 50,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
-            <a href="/" title="Public site"><img src="/logo-landscape.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '44px' : '36px', width: 'auto', background: 'transparent', display: 'block' }} /></a>
+            <a href="/" title="Public site" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}><img src="/ndg-mark-cream-transparent.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '46px' : '36px', width: 'auto', background: 'transparent', display: 'block' }} /><span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '19px', letterSpacing: '0.01em', color: '#fff', lineHeight: 1.1 }}>Nada Gurukulam</span></a>
             {view !== 'public' && (
-              <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '16px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
+              <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '18px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {role && (
-              <span style={{ background: 'rgba(255,255,255,0.15)', padding: '5px 14px', borderRadius: '99px', fontSize: '13px' }}>
+              <span style={{ background: 'rgba(255,255,255,0.15)', padding: '6px 16px', borderRadius: '99px', fontSize: '14.5px' }}>
                 Role: <b>{roles.find(r => r.key === role)?.name || role}</b>
               </span>
             )}
             {view !== 'public' && (
-              <button onClick={() => setView('public')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={() => setView('public')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
                 Public Site
               </button>
             )}
             {!role ? (
-              <button onClick={() => setView('login')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={() => setView('login')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '14.5px' }}>
                 Sign In
               </button>
             ) : (
-              <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
                 Log out
               </button>
             )}
@@ -2011,54 +2011,56 @@ const handleAddDiscipline = async (e) => {
       {/* VIEW 1: PUBLIC HOMEPAGE */}
       {view === 'public' && (
         <div style={{ flex: 1 }}>
-          <section style={{ background: 'var(--bg-saffron)', padding: '64px 8vw 72px', position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
+          <section style={{ background: 'var(--bg-saffron)', padding: '64px 0 72px', position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
             {/* NDG brand elements: corner quarter-circles, Nataraja watermark (10–15% opacity) */}
-            <div className="ndg-corner" style={{ top: '-140px', right: '-140px', width: '340px', height: '340px', borderRadius: '50%', background: 'var(--primary)' }} />
-            <div className="ndg-corner" style={{ bottom: '-170px', left: '-170px', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--accent)', opacity: 0.35 }} />
-            <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', bottom: '16px', border: '1px dashed var(--divider)', borderRadius: 'var(--radius-xl)', pointerEvents: 'none', opacity: 0.6 }} />
-            <img className="ndg-watermark" src="/logo-mark.png" alt="" style={{ bottom: '-60px', right: '3vw', width: '380px', height: 'auto', opacity: 0.1 }} />
-            {role === 'super_admin' && !cmsEditing && (
-              <button onClick={() => { setCmsForm(cms); setCmsEditing(true); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.7)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, zIndex: 2 }}>
-                ✏️ Edit homepage copy
-              </button>
-            )}
-            {cmsEditing ? (
-              <div style={{ position: 'relative', background: 'var(--surface)', padding: '18px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)', maxWidth: '640px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input value={cmsForm.heroHeading} onChange={e => setCmsForm({ ...cmsForm, heroHeading: e.target.value })} placeholder="Hero heading" style={{ padding: '8px', border: '1px solid var(--border)', fontSize: '18px', fontWeight: 600 }} />
-                <input value={cmsForm.heroTagline} onChange={e => setCmsForm({ ...cmsForm, heroTagline: e.target.value })} placeholder="Tagline (script)" className="font-script" style={{ padding: '8px', border: '1px solid var(--border)', fontSize: '18px' }} />
-                <textarea value={cmsForm.heroLede} onChange={e => setCmsForm({ ...cmsForm, heroLede: e.target.value })} placeholder="Lede paragraph" rows={3} style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                <input value={cmsForm.disciplinesHeading} onChange={e => setCmsForm({ ...cmsForm, disciplinesHeading: e.target.value })} placeholder="Disciplines section heading" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                <input value={cmsForm.disciplinesSub} onChange={e => setCmsForm({ ...cmsForm, disciplinesSub: e.target.value })} placeholder="Disciplines section subline" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                <input value={cmsForm.footerAddress} onChange={e => setCmsForm({ ...cmsForm, footerAddress: e.target.value })} placeholder="Footer Address" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                <input value={cmsForm.footerPhone} onChange={e => setCmsForm({ ...cmsForm, footerPhone: e.target.value })} placeholder="Footer Phone" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                <input value={cmsForm.footerEmail} onChange={e => setCmsForm({ ...cmsForm, footerEmail: e.target.value })} placeholder="Footer Email" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={handleSaveCms} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Save</button>
-                  <button onClick={() => setCmsEditing(false)} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer' }}>Cancel</button>
+            <div className="ndg-corner" style={{ top: '-160px', right: '-160px', width: '360px', height: '360px', borderRadius: '50%', background: 'var(--primary)', opacity: 0.14 }} />
+            <div className="ndg-corner" style={{ bottom: '-200px', left: '-200px', width: '420px', height: '420px', borderRadius: '50%', background: 'var(--accent)', opacity: 0.22 }} />
+            <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', bottom: '16px', border: '1px dashed var(--divider)', borderRadius: 'var(--radius-xl)', pointerEvents: 'none', opacity: 0.5 }} />
+            <img className="ndg-watermark" src="/ndg-mark-transparent.png" alt="" style={{ bottom: '-40px', right: '3vw', width: '300px', height: 'auto', opacity: 0.14 }} />
+            <div className="ndg-hero-inner">
+              {role === 'super_admin' && !cmsEditing && (
+                <button onClick={() => { setCmsForm(cms); setCmsEditing(true); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.7)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, zIndex: 2 }}>
+                  ✏️ Edit homepage copy
+                </button>
+              )}
+              {cmsEditing ? (
+                <div style={{ position: 'relative', background: 'var(--surface)', padding: '18px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)', maxWidth: '640px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input value={cmsForm.heroHeading} onChange={e => setCmsForm({ ...cmsForm, heroHeading: e.target.value })} placeholder="Hero heading" style={{ padding: '8px', border: '1px solid var(--border)', fontSize: '18px', fontWeight: 600 }} />
+                  <input value={cmsForm.heroTagline} onChange={e => setCmsForm({ ...cmsForm, heroTagline: e.target.value })} placeholder="Tagline (script)" className="font-script" style={{ padding: '8px', border: '1px solid var(--border)', fontSize: '18px' }} />
+                  <textarea value={cmsForm.heroLede} onChange={e => setCmsForm({ ...cmsForm, heroLede: e.target.value })} placeholder="Lede paragraph" rows={3} style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                  <input value={cmsForm.disciplinesHeading} onChange={e => setCmsForm({ ...cmsForm, disciplinesHeading: e.target.value })} placeholder="Disciplines section heading" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                  <input value={cmsForm.disciplinesSub} onChange={e => setCmsForm({ ...cmsForm, disciplinesSub: e.target.value })} placeholder="Disciplines section subline" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                  <input value={cmsForm.footerAddress} onChange={e => setCmsForm({ ...cmsForm, footerAddress: e.target.value })} placeholder="Footer Address" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                  <input value={cmsForm.footerPhone} onChange={e => setCmsForm({ ...cmsForm, footerPhone: e.target.value })} placeholder="Footer Phone" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                  <input value={cmsForm.footerEmail} onChange={e => setCmsForm({ ...cmsForm, footerEmail: e.target.value })} placeholder="Footer Email" style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={handleSaveCms} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                    <button onClick={() => setCmsEditing(false)} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer' }}>Cancel</button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <h1 style={{ fontSize: 'clamp(32px, 4vw, 48px)', color: 'var(--primary-deep)', maxWidth: '18ch', margin: 0, position: 'relative', zIndex: 1 }}>
+                    {cms.heroHeading}
+                  </h1>
+                  <div className="font-script" style={{ color: 'var(--accent-deep)', fontSize: '26px', marginTop: '10px', position: 'relative', zIndex: 1 }}>
+                    {cms.heroTagline}
+                  </div>
+                  <p style={{ maxWidth: '60ch', color: 'var(--text-soft)', marginTop: '20px', fontSize: '16.5px', lineHeight: 1.65, position: 'relative', zIndex: 1 }}>
+                    {cms.heroLede}
+                  </p>
+                </>
+              )}
+              <div style={{ marginTop: '30px', position: 'relative', zIndex: 1 }}>
+                <button onClick={() => setView('login')} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 28px', fontWeight: 600, cursor: 'pointer', fontSize: '15px', borderRadius: 'var(--radius-xl-sm)' }}>
+                  Access Academic Portal
+                </button>
               </div>
-            ) : (
-              <>
-                <h1 style={{ fontSize: 'clamp(32px, 4vw, 48px)', color: 'var(--primary-deep)', maxWidth: '18ch', margin: 0, position: 'relative' }}>
-                  {cms.heroHeading}
-                </h1>
-                <div className="font-script" style={{ color: 'var(--accent-deep)', fontSize: '26px', marginTop: '10px', position: 'relative' }}>
-                  {cms.heroTagline}
-                </div>
-                <p style={{ maxWidth: '60ch', color: 'var(--text-soft)', marginTop: '20px', fontSize: '16.5px', lineHeight: 1.65, position: 'relative' }}>
-                  {cms.heroLede}
-                </p>
-              </>
-            )}
-            <div style={{ marginTop: '30px', position: 'relative' }}>
-              <button onClick={() => setView('login')} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 28px', fontWeight: 600, cursor: 'pointer', fontSize: '15px', borderRadius: 'var(--radius-xl-sm)' }}>
-                Access Academic Portal
-              </button>
             </div>
           </section>
-          <div className="ndg-om-divider font-devanagari" style={{ fontSize: '24px', marginTop: '36px' }}>ॐ</div>
+          <div className="ndg-om-divider font-devanagari" style={{ fontSize: '24px', marginTop: '20px' }}>ॐ</div>
 
-          <main style={{ maxWidth: '1080px', margin: '40px auto', padding: '0 24px' }}>
+          <main style={{ maxWidth: '1128px', margin: '40px auto', padding: '0 24px' }}>
             <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>{cms.disciplinesHeading}</h3>
             <p style={{ color: 'var(--text-soft)', marginBottom: '24px' }}>{cms.disciplinesSub}</p>
             {(() => {
@@ -2135,7 +2137,7 @@ const handleAddDiscipline = async (e) => {
           <footer style={{ background: 'var(--surface-muted)', borderTop: '1px solid var(--border)', padding: '40px 24px', marginTop: '60px' }}>
             <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
               <div>
-                <h4 style={{ fontSize: '18px', color: 'var(--primary-deep)', margin: '0 0 6px' }}>Nada Gurukulam</h4>
+                <img src="/ndg-logo-landscape-transparent.png" alt="Nada Gurukulam" style={{ width: '220px', height: 'auto', display: 'block', margin: '0 0 10px' }} />
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-soft)' }}>{cms.footerAddress}</p>
               </div>
               <div style={{ fontSize: '14px', color: 'var(--text-soft)', textAlign: 'right' }}>
@@ -2234,7 +2236,7 @@ const handleAddDiscipline = async (e) => {
           {/* Top Nav Bar */}
           <header className="portal-topbar">
             <div className="portal-topbar-left">
-              <a href="/" onClick={(e)=>{e.preventDefault();setView('public');}} style={{display:'flex',alignItems:'center',gap:'8px',textDecoration:'none'}}><img src="/logo-landscape.png" alt="Nada Gurukulam" style={{height:'24px',width:'auto'}} /><span className="portal-brand">Nada Gurukulam</span></a>
+              <a href="/" onClick={(e)=>{e.preventDefault();setView('public');}} style={{display:'flex',alignItems:'center',gap:'8px',textDecoration:'none'}}><img src="/ndg-mark-cream-transparent.png" alt="" style={{height:'30px',width:'auto',display:'block'}} /><span className="portal-brand">Nada Gurukulam</span></a>
                 <button className="portal-action-btn" style={{marginLeft:'8px'}} onClick={() => setCollapsed(!collapsed)}>{collapsed ? '▶' : '◀'}</button>
             </div>
             <div className="portal-topbar-right">
