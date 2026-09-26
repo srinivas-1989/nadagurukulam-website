@@ -163,6 +163,26 @@ export default function Home() {
     { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' }
   ];
 
+  const MODULE_ICONS = {
+    overview: <><rect x="3" y="3" width="7.5" height="7.5" rx="1" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1" /></>,
+    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="3.6" /><path d="M22 21v-2a4 4 0 0 0-3-3.85" /><path d="M16 3.3a4 4 0 0 1 0 7.4" /></>,
+    curriculum: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><path d="M9 6h7M9 10h5" /></>,
+    timetable: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><rect x="6.5" y="13" width="5" height="4.5" rx="1" /><rect x="14" y="13" width="3.5" height="4.5" rx="1" /></>,
+    batches: <><rect x="2" y="7" width="14" height="12" rx="2" /><path d="M16 12h3.5a2 2 0 0 1 2 2v4a1 1 0 0 1-1 1H16" /><path d="M6 12h6M6 16h4" /></>,
+    lessonplans: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 14.5l1.8 1.8 3.7-3.7" /></>,
+    liveclasses: <><rect x="2" y="5.5" width="13" height="13" rx="2.5" /><path d="M15 10.5l7-3.5v10l-7-3.5z" /><circle cx="8.5" cy="12" r="2.6" /></>,
+    assignments: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8.5" y="2" width="7" height="4" rx="1" /><path d="M8.5 12.5h7M8.5 16.5h4.5" /></>,
+    feedback: <><path d="M21 14a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" /><path d="M8.5 9.5h7M8.5 12.5h4" /></>,
+    events: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M12 12.5l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></>,
+    jobs: <><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M15.5 21V6a2 2 0 0 0-2-2h-3a2 2 0 0 0-2 2v15" /><path d="M2 12.5h20" /></>,
+    enquiries: <><path d="M3 5.5h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" /><path d="M2.5 7l9.5 6.5L21.5 7" /></>,
+    activities: <><circle cx="12" cy="9" r="5.5" /><path d="M8.6 13.6 7 22l5-2.8 5 2.8-1.6-8.4" /><path d="M12 6.5l1 2 2.2.3-1.6 1.6.4 2.2-2-1-2 1 .4-2.2L8.8 8.8l2.2-.3z" /></>,
+    projects: <><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /><path d="M12 11.5v5M9.5 14h5" /></>,
+    certificates: <><circle cx="12" cy="8.5" r="6" /><path d="M8.6 13.4 7.4 22.5 12 20l4.6 2.5-1.2-9.1" /><path d="M10 8.5l1.4 1.4 2.6-2.6" /></>,
+    roles: <><path d="M12 22s8-4 8-10V5.2L12 2 4 5.2V12c0 6 8 10 8 10z" /><path d="M9.2 12.2l2 2 3.6-3.8" /></>,
+    teachinglogs: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path d="M16.8 17.8l1.2 1.2 2.2-2.3" /></>
+  };
+
 // All state declarations at top (fix: move undefined state hooks to prevent errors)
   const [view, setView] = useState('public'); // public | login | portal
   const [role, setRole] = useState(null);
@@ -2353,8 +2373,8 @@ const handleAddDiscipline = async (e) => {
                 <div className="ndg-side-nav">
                   {currentModules.map(m => (
                     <button key={m.key} onClick={() => { setActiveModule(m.key); setDrawerOpen(false); }} className={`ndg-side-item${activeModule === m.key ? ' active' : ''}`}>
-                      <svg className="ndg-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" />
+                      <svg className="ndg-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        {MODULE_ICONS[m.key] || <circle cx="12" cy="12" r="9" />}
                       </svg>
                       <span className="ndg-side-item-text">{m.name}</span>
                       <span className="ndg-side-perm">{perm(m.key) || '—'}</span>
