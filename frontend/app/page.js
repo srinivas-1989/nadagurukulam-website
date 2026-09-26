@@ -168,6 +168,11 @@ export default function Home() {
   const [role, setRole] = useState(null);
   const [activeModule, setActiveModule] = useState('overview');
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dragging, setDragging] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  const [addBlockOpen, setAddBlockOpen] = useState(false);
+  const [widgets, setWidgets] = useState([]);
 
   // Auth state (from Supabase Auth)
   const [session, setSession] = useState(null);
@@ -393,6 +398,82 @@ export default function Home() {
   const canCreate = (m) => ['Submits', 'Own', 'Manage', 'Full'].includes(perm(m));
   const canAdmin = (m) => ['Manage', 'Full'].includes(perm(m));
   const isFull = (m) => perm(m) === 'Full';
+
+  // Overview block stats, computed from dbData that fetchData already loaded.
+  // A module absent from this map falls back to its record count, so a newly
+  // added module still renders a block instead of a blank.
+  const WIDGET_DEFS = {
+    users: { label: 'Users', sub: d => `${(d.users || []).filter(u => !u.is_verified).length} unverified` },
+    curriculum: { label: 'Disciplines', sub: d => `${(d.courses || []).length} courses` },
+    timetable: { label: 'Timetable Slots', sub: d => `${(d.timetable_periods || []).length} periods defined` },
+    batches: { label: 'Batches', sub: d => `${(d.batches || []).filter(b => b.status === 'active').length} active` },
+    lessonplans: { label: 'Lesson Plans', sub: d => `${(d.lesson_plans || []).filter(l => l.status === 'submitted').length} awaiting approval` },
+    liveclasses: { label: 'Live Sessions', sub: d => `${(d.live_sessions || []).filter(s => s.status === 'live' || s.status === 'scheduled').length} live or scheduled` },
+    assignments: { label: 'Assignments', sub: d => `${(d.assignments || []).length} set · ${(d.assignment_submissions || []).filter(s => !s.grade && s.grade !== 0).length} ungraded` },
+    feedback: { label: 'Feedback', sub: () => 'two-way cycles' },
+    events: { label: 'Events', sub: d => `${(d.events || []).filter(e => e.status === 'published').length} published` },
+    jobs: { label: 'Jobs', sub: d => `${(d.jobs || []).filter(j => j.status === 'open').length} open` },
+    enquiries: { label: 'Enquiries', sub: d => `${(d.enquiries || []).filter(e => e.status === 'new').length} new` },
+    activities: { label: 'Activities', sub: () => 'competitions & achievements' },
+    projects: { label: 'Projects', sub: () => 'student portfolio' },
+    certificates: { label: 'Certificates', sub: () => 'issued achievements' },
+    roles: { label: 'Roles', sub: d => `${(d.role_permissions || []).length} permission rows` },
+    teachinglogs: { label: 'Teaching Logs', sub: d => `${(d.class_entries || []).length} class entries` },
+  };
+  const widgetKeys = MODULES.filter(m => m.key !== 'overview' && perm(m.key)).map(m => m.key);
+  const widgetStat = (key) => {
+    const def = WIDGET_DEFS[key];
+    if (!def) return null;
+    const rows = dbData[key] || [];
+    return { label: def.label, value: rows.length, sub: def.sub(dbData) };
+  };
+
+  // Layout is per-user: an empty response means first visit, so seed defaults
+  // from the modules this role can actually see.
+  useEffect(() => {
+    if (view !== 'portal' || !session || !widgetKeys.length) return;
+    apiCall(`${apiUrl}/api/dashboard-widgets`).then(r => r.json()).then(rows => {
+      if (Array.isArray(rows) && rows.length) {
+        const saved = rows.map(r => r.module_key).filter(k => widgetKeys.includes(k));
+        const missing = widgetKeys.filter(k => !saved.includes(k));
+        setWidgets([...saved, ...missing].map(module_key => ({ module_key, visible: true })));
+      } else {
+        setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true })));
+      }
+    }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true }))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, session?.user?.id, role]);
+
+  // Optimistic local state already shows the change; this persists it.
+  useEffect(() => {
+    if (view !== 'portal' || !session || !widgets.length) return;
+    const t = setTimeout(() => {
+      apiCall(`${apiUrl}/api/dashboard-widgets`, {
+        method: 'PUT',
+        body: JSON.stringify({ widgets: widgets.map((w, i) => ({ module_key: w.module_key, sort_order: i, visible: w.visible })) }),
+      }).catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widgets]);
+
+  const moveWidget = (key, dir) => setWidgets(ws => {
+    const i = ws.findIndex(w => w.module_key === key);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ws.length) return ws;
+    const next = [...ws];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
+  const hideWidget = key => setWidgets(ws => ws.map(w => w.module_key === key ? { ...w, visible: false } : w));
+  const showWidget = key => setWidgets(ws => ws.map(w => w.module_key === key ? { ...w, visible: true } : w));
+  const dropWidget = (from, to) => setWidgets(ws => {
+    const next = [...ws];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  });
+
   const uploadFile = async (file, onUrl) => {
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) { alert('File too large (max 15 MB)'); return; }
@@ -2233,8 +2314,11 @@ const handleAddDiscipline = async (e) => {
       {/* VIEW 3: AUTHENTICATED PORTAL SHELL (all roles) */}
       {(view === 'portal' || view === 'admin') && role && (
         <div className={`portal-layout${collapsed ? ' collapsed' : ''}`}>
+          {/* Tapping the scrim or picking a module closes the drawer — under 1100px
+              the sidebar covers the content, so leaving it open traps the user. */}
+          {drawerOpen && <button className="portal-scrim drawer-open" onClick={() => setDrawerOpen(false)} aria-label="Close navigation" />}
           {/* Full-height maroon sidebar */}
-          <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}`}>
+          <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}${drawerOpen ? ' drawer-open' : ''}`}>
             <button className="ndg-side-chevron" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
               {collapsed ? '›' : '‹'}
             </button>
@@ -2268,7 +2352,7 @@ const handleAddDiscipline = async (e) => {
                 <div className="ndg-side-label">Modules</div>
                 <div className="ndg-side-nav">
                   {currentModules.map(m => (
-                    <button key={m.key} onClick={() => setActiveModule(m.key)} className={`ndg-side-item${activeModule === m.key ? ' active' : ''}`}>
+                    <button key={m.key} onClick={() => { setActiveModule(m.key); setDrawerOpen(false); }} className={`ndg-side-item${activeModule === m.key ? ' active' : ''}`}>
                       <svg className="ndg-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="9" />
                       </svg>
@@ -2283,7 +2367,7 @@ const handleAddDiscipline = async (e) => {
                   const todaySlots = dbData.timetable.filter(s => s.day_of_week === dayName).sort((a,b)=>toMinTT(a.start_time)-toMinTT(b.start_time));
                   if (todaySlots.length===0) return null;
                   return (
-                    <div style={{ marginTop: '14px', padding: '11px 12px', background: 'rgba(255,255,255,0.08)', borderRadius: '10px' }}>
+                    <div style={{ marginTop: '14px', padding: '11px 12px', background: 'rgba(255,255,255,0.08)', borderRadius: 'var(--radius-xl)' }}>
                       <div className="ndg-side-label" style={{ padding: 0, marginBottom: '7px' }}>Today · {dayName.slice(0,3)}</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                         {todaySlots.slice(0,3).map(s => (
@@ -2315,6 +2399,9 @@ const handleAddDiscipline = async (e) => {
             {/* Light cream topbar — carries the page title */}
             <header className="portal-topbar">
               <div className="ndg-topbar-left">
+                <button className="portal-hamburger" onClick={() => setDrawerOpen(v => !v)} aria-label="Toggle navigation" aria-expanded={drawerOpen}>
+                  <span />
+                </button>
                 <span className="ndg-sairam-pill">✳ Sai Ram</span>
                 <div className="ndg-topbar-title-wrap">
                   <div className="ndg-topbar-title">
@@ -2375,11 +2462,29 @@ const handleAddDiscipline = async (e) => {
                 { label: 'Recent Feedback', value: dbData.feedback.length, bg: 'var(--bg-saffron)', fg: 'var(--accent-deep)',
                   d: <><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12z" /></> },
               ];
-              const week = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-              const base = [3,5,4,7,6,2,4];
-              const wkMax = Math.max(...base, 1);
+              // Last 7 days, keyed on the UTC date so bare `date` columns and
+              // `timestamptz` instants land in the same bucket.
+              const weekCounts = () => {
+                const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                const days = Array.from({ length: 7 }, (_, i) => {
+                  const d = new Date();
+                  d.setUTCDate(d.getUTCDate() - (6 - i));
+                  return d.toISOString().slice(0, 10);
+                });
+                const tally = Array(7).fill(0);
+                const add = (rows, pick) => (rows || []).forEach(r => {
+                  const i = days.indexOf(String(pick(r) || '').slice(0, 10));
+                  if (i >= 0) tally[i]++;
+                });
+                add(dbData.class_entries, r => r.class_date);
+                add(dbData.live_sessions, r => r.session_date);
+                add(dbData.assignment_submissions, r => r.submitted_at);
+                return days.map((k, i) => ({ day: names[new Date(k + 'T00:00:00Z').getUTCDay()], count: tally[i] }));
+              };
+              const week = weekCounts();
+              const wkMax = Math.max(...week.map(d => d.count), 1);
               const qa = MODULES.filter(m => canCreate(m.key) && m.key !== 'overview').slice(0, 6);
-              const live = dbData.live_sessions.filter(s => s.status === 'active' || s.status === 'scheduled');
+              const live = dbData.live_sessions.filter(s => s.status === 'live' || s.status === 'scheduled');
               return (
                 <div className="ndg-ov">
                   {/* Dark maroon welcome hero */}
@@ -2411,14 +2516,42 @@ const handleAddDiscipline = async (e) => {
 
                   {/* Block header row */}
                   <div className="ndg-ov-blockhead">
-                    <h2>7 Blocks on your overview</h2>
-                    <button className="ndg-ov-ghost-btn">
+                    <h2>{widgets.filter(w => w.visible).length} Blocks on your overview</h2>
+                    <button className="ndg-ov-ghost-btn" onClick={() => setAddBlockOpen(v => !v)} aria-expanded={addBlockOpen}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                         <path d="M12 5v14M5 12h14" />
                       </svg>
-                      Add Block
+                      {addBlockOpen ? 'Done' : 'Add Block'}
                     </button>
                   </div>
+
+                  {addBlockOpen && (
+                    <div className="ndg-addblock">
+                      <strong style={{ fontSize: 14 }}>Add a block</strong>
+                      <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--text-soft)' }}>
+                        Every module you can access is available as a block. Hidden blocks keep their place in the layout.
+                      </p>
+                      <div className="ndg-addblock-grid">
+                        {widgetKeys.map(k => {
+                          const st = widgetStat(k);
+                          if (!st) return null;
+                          const on = widgets.find(w => w.module_key === k)?.visible;
+                          return (
+                            <button
+                              key={k}
+                              className="ndg-addblock-item"
+                              disabled={on}
+                              onClick={() => showWidget(k)}
+                              style={on ? { opacity: 0.45, cursor: 'default' } : undefined}
+                            >
+                              <b>{st.label}</b>
+                              <span>{on ? 'Already on overview' : `${st.value} · ${st.sub}`}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Four metric cards — icon chip on top, big serif number below */}
                   <div className="ndg-ov-metrics">
@@ -2449,9 +2582,9 @@ const handleAddDiscipline = async (e) => {
                       </div>
                       <div className="ndg-ov-bars">
                         {week.map((d, i) => (
-                          <div key={d} className="ndg-ov-bar-col">
-                            <div className="ndg-ov-bar" style={{ height: `${Math.round((base[i] / wkMax) * 100)}%` }} />
-                            <div className="ndg-ov-bar-label">{d}</div>
+                          <div key={d.day} className="ndg-ov-bar-col" title={`${d.count} on ${d.day}`}>
+                            <div className="ndg-ov-bar" style={{ height: `${Math.round((d.count / wkMax) * 100)}%` }} />
+                            <div className="ndg-ov-bar-label">{d.day}</div>
                           </div>
                         ))}
                       </div>
@@ -2465,7 +2598,6 @@ const handleAddDiscipline = async (e) => {
                         <div className="ndg-ov-card-title">
                           <h3>Quick Actions</h3>
                         </div>
-                        <button className="ndg-ov-ghost-btn">Edit Actions</button>
                       </div>
                       <div className="ndg-ov-qa">
                         {qa.map(m => (
@@ -2478,6 +2610,46 @@ const handleAddDiscipline = async (e) => {
                         ))}
                       </div>
                     </section>
+                  </div>
+
+                  {/* Draggable module blocks. Grid is auto-fit, so an added block
+                      reflows into place without a gap; order lives in `widgets`. */}
+                  <div className="ndg-widget-grid" style={{ marginTop: 16 }}>
+                    {widgets.map((w, i) => {
+                      const st = widgetStat(w.module_key);
+                      if (!st) return null;
+                      return (
+                        <div
+                          key={w.module_key}
+                          className={`ndg-widget${dragOver === w.module_key ? ' drag-over' : ''}${dragging === w.module_key ? ' dragging' : ''}`}
+                          style={w.visible ? undefined : { display: 'none' }}
+                          onDragOver={e => { if (dragging) { e.preventDefault(); setDragOver(w.module_key); } }}
+                          onDrop={e => {
+                            e.preventDefault();
+                            const from = widgets.findIndex(x => x.module_key === dragging);
+                            if (from >= 0) dropWidget(from, i);
+                            setDragging(null); setDragOver(null);
+                          }}
+                        >
+                          <div className="ndg-widget-ctl">
+                            <button
+                              className="drag"
+                              draggable
+                              onDragStart={() => setDragging(w.module_key)}
+                              onDragEnd={() => { setDragging(null); setDragOver(null); }}
+                              aria-label={`Move ${st.label}`}
+                              title="Drag to reorder"
+                            >⠿</button>
+                            <button onClick={() => moveWidget(w.module_key, -1)} aria-label={`Move ${st.label} up`} title="Move up">↑</button>
+                            <button onClick={() => moveWidget(w.module_key, 1)} aria-label={`Move ${st.label} down`} title="Move down">↓</button>
+                            <button className="hide" onClick={() => hideWidget(w.module_key)} aria-label={`Hide ${st.label}`} title="Hide block">×</button>
+                          </div>
+                          <div className="ndg-widget-label">{st.label}</div>
+                          <div className="ndg-widget-value">{st.value}</div>
+                          <div className="ndg-widget-sub">{st.sub}</div>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Live classes with tabs */}
@@ -2494,8 +2666,8 @@ const handleAddDiscipline = async (e) => {
                         <div key={i} style={{ padding: '12px 0', borderBottom: i < live.length - 1 ? '1px solid var(--divider)' : 'none' }}>
                           <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.title || 'Live Session'}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                            {s.batch || '—'} · {s.date ? new Date(s.date).toLocaleDateString() : '—'} ·{' '}
-                            <span style={{ color: s.status === 'active' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
+                            {s.batch || '—'} · {s.session_date ? new Date(s.session_date).toLocaleDateString() : '—'} ·{' '}
+                            <span style={{ color: s.status === 'live' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
                           </div>
                         </div>
                       ))
@@ -3010,7 +3182,7 @@ const handleAddDiscipline = async (e) => {
                       </div>
                       {syllabusParseErr && <div style={{ color: 'var(--primary)', fontSize: '13px', background: 'var(--bg-saffron)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}>{syllabusParseErr}</div>}
                       {syllabusDrafts.length > 0 && (
-                        <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
                           <div style={{ padding: '10px 14px', background: 'var(--bg-saffron)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                             <b style={{ color: 'var(--primary-deep)' }}>{syllabusDrafts.length} paper{syllabusDrafts.length===1?'':'s'} from {syllabusParsed?.filename || syllabusFile?.name || 'file'} · {(syllabusParsed?.size ?? syllabusFile?.size ?? 0)/1024 ? `${((syllabusParsed?.size ?? syllabusFile?.size ?? 0)/1024).toFixed(1)} KB` : ''}</b>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -3027,7 +3199,7 @@ const handleAddDiscipline = async (e) => {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: 'var(--bg)' }}>
                             {syllabusDrafts.map((d, idx) => (
-                              <div key={idx} style={{ border: `1.5px solid ${d._verified ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '10px', overflow: 'hidden', background: '#fff', opacity: d._include ? 1 : 0.55 }}>
+                              <div key={idx} style={{ border: `1.5px solid ${d._verified ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-xl)', overflow: 'hidden', background: '#fff', opacity: d._include ? 1 : 0.55 }}>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '9px 12px', background: d._verified ? 'var(--bg-saffron)' : 'var(--bg)', flexWrap: 'wrap' }}>
                                   <input type="checkbox" checked={!!d._include} onChange={e => updateDraft(idx, { _include: e.target.checked })} title="Include in publish" />
                                   <b style={{ color: 'var(--primary-deep)', fontSize: '13px', flex: '1 1 160px' }}>{d.code || '(no code)'} · {d.courseName || '(no name)'}</b>
@@ -3159,8 +3331,8 @@ const handleAddDiscipline = async (e) => {
                 </div>
                 {(() => { const hasFilter=!!(filterCat||filterDisc||filterYear||filterSem||filterType); if(!hasFilter) return <div style={{ background:'var(--surface)', border:'1px dashed var(--border)', borderRadius:'var(--radius-xl)', padding:'18px 14px', textAlign:'center', color:'var(--text-faint)', fontSize:'13px' }}>{(dbData.courses||[]).length===0?'No courses yet — use Add Course above.':'Apply a filter above to see courses — choose Category, Program, Year, Semester or Type.'}{` · ${(dbData.courses||[]).length} course${(dbData.courses||[]).length===1?'':'s'} in total`}</div>; return null; })()}
                 {(() => { const hasFilter=!!(filterCat||filterDisc||filterYear||filterSem||filterType); if(!hasFilter) return null; return (
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflowX: 'hidden', overflowY: 'auto', maxHeight: '520px', boxShadow: 'var(--shadow-sm)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', tableLayout: 'fixed' }}>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflowX: 'auto', overflowY: 'auto', maxHeight: '520px', boxShadow: 'var(--shadow-sm)' }}>
+                  <table style={{ minWidth: '1080px', width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                       <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
                         <th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'12%' }}>Category</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'12%' }}>Program</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'20%' }}>Course</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'9%' }}>Code</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'7%' }}>Type</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'7%' }}>Year</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'10%' }}>Semester</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'6%' }}>Credits</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'7%' }}>Hours</th><th style={{ padding: '12px', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--primary-deep)', width:'10%' }}>Actions</th>
@@ -3369,7 +3541,7 @@ const handleAddDiscipline = async (e) => {
                           )}
 
                           {syllabusContent.modules?.length > 0 ? syllabusContent.modules.map((mod, mi) => (
-                            <div key={mi} style={{ border: '1.5px solid var(--primary)', borderRadius: '12px', overflow: 'hidden' }}>
+                            <div key={mi} style={{ border: '1.5px solid var(--primary)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
                               <div style={{ padding: '9px 14px', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: '13.5px' }}>
                                 Module {mi + 1} - {mod.title || 'Untitled'}
                               </div>
@@ -3427,7 +3599,7 @@ const handleAddDiscipline = async (e) => {
                           ) : pgModules.map((mod) => {
                             const topics = (dbData.course_module_topics || []).filter(t => t.module_id === mod.id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
                             return (
-                              <div key={mod.id} style={{ border: '1.5px solid var(--primary)', borderRadius: '12px', overflow: 'hidden' }}>
+                              <div key={mod.id} style={{ border: '1.5px solid var(--primary)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
                                 <div style={{ padding: '9px 14px', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: '13.5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span>Module {mod.module_number} — {mod.title}</span>
                                   {canAdmin('curriculum') && <button onClick={() => handleDeleteModule(mod.id)} style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Delete</button>}
@@ -3445,7 +3617,7 @@ const handleAddDiscipline = async (e) => {
                             );
                           })}
                           {canCreate('curriculum') && (
-                            <div id="add-syllabus-panel" style={{ background: 'var(--surface-muted)', border: '1.5px solid var(--primary)', borderRadius: '12px', overflow: 'hidden' }}>
+                            <div id="add-syllabus-panel" style={{ background: 'var(--surface-muted)', border: '1.5px solid var(--primary)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: showAddSyllabus ? 'var(--primary)' : 'var(--bg-saffron)', color: showAddSyllabus ? '#fff' : 'var(--primary-deep)', cursor: 'pointer' }} onClick={() => setShowAddSyllabus(!showAddSyllabus)}>
                                 <b style={{ fontSize: '14px' }}>{showAddSyllabus ? '▾ Add Syllabus — Adding Modules' : '▸ Add Syllabus'}</b>
                                 <span style={{ fontSize: '11px', opacity: 0.85 }}>{showAddSyllabus ? 'Collapse' : 'Click to add modules'}</span>
@@ -3459,7 +3631,7 @@ const handleAddDiscipline = async (e) => {
                                     <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Version auto-increments per course per year</span>
                                     {role==='super_admin' && (()=>{ const ms=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear).reduce((m,s)=>Math.max(m,Number(s.version_number)||0),0); return ms>0 ? <button type="button" onClick={async()=>{ if(!confirm(`Reset versions for ${syllModAcademicYear}? Current max V${ms}. This will delete all V${ms} syllabi for this course/year (Super Admin only).`)) return; const toDel=(dbData.course_syllabi||[]).filter(s=>s.course_id===activeSyllabusCourse.id&&s.academic_year===syllModAcademicYear&&Number(s.version_number)===ms); for(const s of toDel){ await apiCall(`${apiUrl}/api/course_syllabi/${s.id}`,{method:'DELETE'}); } alert(`Deleted V${ms} for ${syllModAcademicYear}. Next save will be V${ms} (reuse) or V${ms+1} if kept.`); fetchData(); }} style={{ background:'none', border:'1px solid var(--primary)', color:'var(--primary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'11px' }}>Reset version</button> : null; })()}
                                   </div>
-                                  <div style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg)' }}>
+                                  <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                       <b style={{ fontSize: '13px', color: 'var(--primary-deep)' }}>Add Module</b>
                                       <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>All fields have side headings — every input labeled</span>
@@ -3617,7 +3789,7 @@ const handleAddDiscipline = async (e) => {
                               <label style={{ fontSize: '13px', color: 'var(--text-soft)', fontWeight: 700 }}>Modules — exactly like the image: title / hours / RBT / methodology / topics / CO mapping</label>
                               <button type="button" onClick={() => setSyllabusForm({ ...syllabusForm, modules: [...(syllabusForm.modules || []), { title: '', hours: '', rbt_level: 'L1 to L4', methodology: '', topics: [], co_mapping: '' }] })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Add Module</button>
                             </div>
-                            {(syllabusForm.modules || []).length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-faint)', padding: '10px', border: '1px dashed var(--border)', borderRadius: '6px' }}>No modules yet. Click + Add Module and fill as per the document.</div>}
+                            {(syllabusForm.modules || []).length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-faint)', padding: '10px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-xl)' }}>No modules yet. Click + Add Module and fill as per the document.</div>}
                             {(syllabusForm.modules || []).map((mod, mi) => (
                               <div key={mi} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px', background: '#fff', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -4273,7 +4445,7 @@ const handleAddDiscipline = async (e) => {
                 )}
                 <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '10px', lineHeight: 1.5 }}>Columns: {TT.map(c=>`${c.kind==='break'?`[${c.label}]`:`<b>${c.label}</b>`} ${c.start}–${c.end}`).join(' · ')} — club within same break-separated block (colspan). Default 8 periods; edit below.</div>
                 {canAdmin('timetable') && (
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 12px', marginBottom: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                       <b style={{ fontSize: '13px', color: 'var(--primary-deep)' }}>Period manager — columns are data</b>
                       <button type="button" onClick={()=>setShowPeriodMgr(v=>!v)} style={{ background: showPeriodMgr?'var(--primary)':'none', color: showPeriodMgr?'#fff':'var(--primary)', border: '1px solid var(--primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>{showPeriodMgr ? 'Hide' : 'Edit columns'}</button>

@@ -1035,6 +1035,39 @@ app.post('/api/roles', authMiddleware, rolesCreate);
 app.put('/api/roles/:id', authMiddleware, rolesUpdate);
 app.delete('/api/roles/:id', authMiddleware, rolesDelete);
 
+// Overview widget layout — a personal preference scoped to the caller.
+// Not a module, so it stays out of the `modules` CRUD loop above: that loop
+// resolves permissions through role_permissions, which has no row for this.
+app.get('/api/dashboard-widgets', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('dashboard_widgets')
+      .select('id, module_key, sort_order, visible')
+      .eq('user_id', req.auth.profile.id)
+      .order('sort_order');
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
+  try {
+    const widgets = req.body?.widgets;
+    if (!Array.isArray(widgets)) return res.status(400).json({ error: 'widgets must be an array' });
+    const rows = widgets.map((w, i) => ({
+      user_id: req.auth.profile.id,
+      module_key: String(w.module_key || '').slice(0, 64),
+      sort_order: i,
+      visible: w.visible !== false,
+    })).filter(r => r.module_key);
+    await supabase.from('dashboard_widgets').delete().eq('user_id', req.auth.profile.id);
+    if (rows.length) {
+      const { error } = await supabase.from('dashboard_widgets').insert(rows);
+      if (error) throw error;
+    }
+    res.json({ ok: true, count: rows.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Admin: user password/OTP management
 app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res) => {
   try {
