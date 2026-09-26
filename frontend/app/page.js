@@ -216,9 +216,28 @@ export default function Home() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 
   const resolveRole = (uid) =>
-    supabase.from('users').select('role_key, id').eq('auth_user_id', uid).single();
+    supabase.from('users').select('role_key, id, email, must_change_password').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
     supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+
+  // Entering the portal is only legal once the account no longer owes a password
+  // swap; a session alone just means Supabase let us in. Without this gate a
+  // first-time user is bounced into an empty shell the moment they type the temp
+  // password, because authMiddleware answers 403 PASSWORD_CHANGE_REQUIRED to
+  // every data call and there is no render path back to the OTP form.
+  const enterPortal = (uid, profile) => {
+    if (profile?.must_change_password) {
+      const addr = profile.email || '';
+      setOtpMode(true);
+      setOtpEmail(addr);
+      setOtpMsg('Password change required — fetching your OTP…');
+      setView('login');
+      if (addr) requestOtpFor(addr);
+      return;
+    }
+    setRole(profile?.role_key || null);
+    setView('portal');
+  };
 
   // Load initial session and data
   useEffect(() => {
@@ -226,10 +245,7 @@ export default function Home() {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       if (s) {
-        resolveRole(s.user.id).then(({ data }) => {
-          if (data) setRole(data.role_key);
-          setView('portal');
-        });
+        resolveRole(s.user.id).then(({ data }) => enterPortal(s.user.id, data));
         loadMyProfile(s.user.id);
       }
     });
@@ -238,10 +254,7 @@ export default function Home() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       if (sess) {
-        resolveRole(sess.user.id).then(({ data }) => {
-          if (data) setRole(data.role_key);
-          setView('portal');
-        });
+        resolveRole(sess.user.id).then(({ data }) => enterPortal(sess.user.id, data));
         loadMyProfile(sess.user.id);
       } else {
         setRole(null);
@@ -405,7 +418,13 @@ export default function Home() {
     if (res.status === 401) { setSession(null); setRole(null); setView('login'); }
     else if (res.status === 403) {
       let j = null; try { j = await res.clone().json(); } catch {}
-      if (j?.code === 'PASSWORD_CHANGE_REQUIRED') { setOtpMode(true); setView('login'); }
+      if (j?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        // Admin flipped must_change_password on a live session — the flag was set
+        // after we resolved the profile, so re-resolve to pick up the email.
+        supabase.auth.getUser().then(({ data }) => {
+          if (data?.user?.id) resolveRole(data.user.id).then(({ data: p }) => enterPortal(data.user.id, p));
+        });
+      }
     }
     return res;
   };
@@ -732,6 +751,19 @@ export default function Home() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otpMsg, setOtpMsg] = useState('');
+
+  // Both the "Request OTP" button and the post-signin gate need this, and the
+  // backend invalidates any earlier OTP on each request — so keep one call site.
+  const requestOtpFor = async (addr) => {
+    if (!addr) { setOtpMsg('Enter your official email first'); return; }
+    setOtpEmail(addr);
+    const r = await fetch(`${apiUrl}/api/auth/request-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: addr }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setOtpMsg(j.error || 'Could not send OTP'); return; }
+    setOtpMsg(j.emailSent ? `OTP sent to ${addr} (expires 10 min)` : `Dev OTP: ${j.otp} — copy and paste above (email not configured)`);
+    // Non-prod returns the code inline; prefill so first-time users aren't hunting for it.
+    if (j.otp) setOtpCode(j.otp);
+  };
 
   const [newDiscName, setNewDiscName] = useState('');
   const [newDiscLevels, setNewDiscLevels] = useState('');
@@ -2254,7 +2286,7 @@ const handleAddDiscipline = async (e) => {
       )}
 
       {/* VIEW 2: LOGIN / AUTH — supports first-login OTP password change */}
-      {view === 'login' && !session && (
+      {view === 'login' && (
         <div style={{ maxWidth: '720px', margin: '60px auto', padding: '0 24px', flex: 1 }}>
           <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>{otpMode ? 'Set your password' : 'Sign in to Portal'}</h2>
           <p style={{ color: 'var(--text-soft)', textAlign: 'center', marginBottom: '24px' }}>
@@ -2266,14 +2298,7 @@ const handleAddDiscipline = async (e) => {
               <input type="email" placeholder="Official email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input placeholder="6-digit OTP" value={otpCode} onChange={e => setOtpCode(e.target.value)} maxLength={6} style={{ flex: 1, padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px', letterSpacing: '0.12em' }} />
-                <button type="button" onClick={async () => {
-                  if (!otpEmail) { setOtpMsg('Enter your official email first'); return; }
-                  const r = await fetch(`${apiUrl}/api/auth/request-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: otpEmail }) });
-                  const j = await r.json().catch(()=>({}));
-                  if (!r.ok) { setOtpMsg(j.error || 'Failed to send OTP'); return; }
-                  setOtpMsg(j.emailSent ? `OTP sent to ${otpEmail} (expires 10 min)` : `Dev OTP: ${j.otp} — copy and paste above (email not configured)`);
-                  if (j.otp) setOtpCode(j.otp);
-                }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>Send / Resend OTP</button>
+                <button type="button" onClick={() => requestOtpFor(otpEmail)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>Send / Resend OTP</button>
               </div>
               <input type="password" placeholder="New password (min 8 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
               <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
@@ -2288,6 +2313,11 @@ const handleAddDiscipline = async (e) => {
                 const { error } = await supabase.auth.signInWithPassword({ email: otpEmail, password: newPassword });
                 if (error) { setOtpMsg('Password changed — please sign in with your new password. ' + error.message); setOtpMode(false); return; }
                 setOtpMode(false); setOtpCode(''); setNewPassword(''); setConfirmPassword(''); setOtpMsg('');
+                // onAuthStateChange resolves the role while the profile row still
+                // carries must_change_password, which would bounce straight back to
+                // this form. Read the refreshed row and enter the portal off that.
+                const { data: fresh } = await supabase.from('users').select('role_key, email, must_change_password').eq('auth_user_id', (await supabase.auth.getUser()).data?.user?.id).single();
+                if (fresh) enterPortal(fresh.id ?? null, fresh);
               }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '13px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 700, cursor: 'pointer', fontSize: '15px' }}>Verify OTP & Set Password</button>
               <button type="button" onClick={() => { setOtpMode(false); setOtpMsg(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Back to Sign In</button>
             </div>
@@ -2302,19 +2332,8 @@ const handleAddDiscipline = async (e) => {
                   const loginEmail = email;
                   const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
                   if (error) { alert(error.message); return; }
-                  const uid = data?.user?.id;
-                  if (uid) {
-                    const { data: prof } = await supabase.from('users').select('must_change_password, email').eq('auth_user_id', uid).single();
-                    if (prof?.must_change_password) {
-                      setOtpMode(true); setOtpEmail(prof.email || loginEmail); setOtpMsg('Password change required — request OTP to continue');
-                      try {
-                        const rr = await fetch(`${apiUrl}/api/auth/request-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: prof.email || loginEmail }) });
-                        const jj = await rr.json().catch(()=>({}));
-                        if (rr.ok) setOtpMsg(jj.emailSent ? `OTP sent to ${prof.email || loginEmail}` : `Dev OTP: ${jj.otp}`);
-                        if (jj?.otp) setOtpCode(jj.otp);
-                      } catch {}
-                    }
-                  }
+                  // onAuthStateChange picks up the session and routes through
+                  // enterPortal, which owns the must_change_password branch.
                   setEmail(''); setPassword('');
                 } catch (err) { alert('Login failed'); } finally { setAuthLoading(false); }
               }} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-xl)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
