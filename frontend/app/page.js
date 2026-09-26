@@ -2249,21 +2249,21 @@ const handleAddDiscipline = async (e) => {
 
           {/* Sidebar */}
           <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}`}>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-deep)', padding: '0 10px 16px', fontFamily: "'Poppins', sans-serif", letterSpacing: '0.02em' }}>
+            <div className="portal-sidebar-brand">
               Nada Gurukulam
             </div>
-            <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-faint)', padding: '0 10px 10px', letterSpacing: '0.06em', borderBottom: '1px solid var(--border)', marginBottom: '10px' }}>
+            <div className="portal-sidebar-kicker">
               Portal Modules
             </div>
             {currentModules.length === 0 && (
-              <p style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '0 10px', margin: 0 }}>
+              <p className="portal-sidebar-hint">
                 No modules assigned to this role yet — set them in Roles &amp; Permissions as Super Admin.
               </p>
             )}
             {currentModules.map(m => (
-              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'rgba(255,255,255,0.12)' : 'transparent', color: activeModule === m.key ? 'var(--accent)' : 'rgba(255,255,255,0.7)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 600 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '13.5px' }}>
+              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '11px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'rgba(255,255,255,0.14)' : 'transparent', color: activeModule === m.key ? 'var(--accent-light)' : 'rgba(255,255,255,0.88)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 700 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '15.5px', letterSpacing: '0.01em' }}>
                 <span>{m.name}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 6px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(129,23,26,0.08)', color: activeModule === m.key ? '#fff' : 'var(--text-faint)' }}>
+                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)', color: activeModule === m.key ? '#fff' : 'rgba(255,255,255,0.6)' }}>
                   {perm(m.key) || '—'}
                 </span>
               </button>
@@ -2294,44 +2294,62 @@ const handleAddDiscipline = async (e) => {
           </nav>
 
           {/* Main Content Area */}
-          <main className="portal-content" style={{ padding: activeModule==='timetable' ? '20px 16px' : '36px', maxWidth: activeModule==='timetable' ? 'none' : '940px', width: '100%', overflow: activeModule==='timetable' ? 'visible' : undefined }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
-              <h2 style={{ fontSize: '24px', color: 'var(--primary-deep)' }}>
-                {MODULES.find(m => m.key === activeModule)?.name}
-              </h2>
-              <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>
-                Access Level: <b>{perm(activeModule) || '—'}</b>
-              </span>
+          <main className={`portal-content${activeModule === 'timetable' ? ' is-wide' : ''}`} style={{ overflow: activeModule === 'timetable' ? 'visible' : undefined }}>
+            {/* Shared module banner — all 17 modules render through this one block */}
+            <div className="ndg-module-banner">
+              <img src="/ndg-mark-cream-transparent.png" alt="" aria-hidden="true" className="ndg-watermark" />
+              <div className="ndg-module-banner-copy">
+                <div className="ndg-module-eyebrow">Nada Gurukulam · {String(role || '').replace(/_/g, ' ')}</div>
+                <h1 className="ndg-module-title">
+                  {MODULES.find(m => m.key === activeModule)?.name}
+                </h1>
+                <p className="ndg-module-desc">
+                  {MODULES.find(m => m.key === activeModule)?.desc}
+                </p>
+              </div>
+              <span className="ndg-module-perm">Access: {perm(activeModule) || '—'}</span>
             </div>
 
             {/* OVERVIEW — shared dashboard for all authenticated roles */}
             {activeModule === 'overview' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-                {/* Dark burgundy welcome hero */}
-                <div style={{ background: 'var(--primary-deep)', borderRadius: 'var(--radius-xl)', padding: '28px 32px', boxShadow: 'var(--shadow-lg)', position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(221,159,60,0.12)' }} />
-                  <div style={{ position: 'absolute', bottom: '-40px', left: '-20px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+                {/* Bright welcome hero — light ground, saffron eyebrow, serif title */}
+                <div style={{ background: 'linear-gradient(120deg, #fff6e4 0%, var(--surface) 60%, #fbe9c8 100%)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '30px 34px', boxShadow: 'var(--shadow-md)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: '-50px', right: '-30px', width: '190px', height: '190px', borderRadius: '50%', background: 'rgba(221,159,60,0.18)' }} />
                   <div style={{ position: 'relative' }}>
-                    <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#fff', marginBottom: '6px', fontFamily: "'Poppins', sans-serif" }}>
-                      Welcome back{myProfile?.name ? `, ${myProfile.name.split(' ')[0]}` : ''}
-                    </h1>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', margin: 0 }}>
-                      {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} · Level: {perm('overview') || 'View'}
-                    </p>
+                    <div style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-deep)', marginBottom: '8px' }}>
+                      {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Dashboard
+                    </div>
+                    <h2 style={{ fontSize: '32px', fontWeight: 700, color: 'var(--primary-deep)', marginBottom: '18px', fontFamily: "'Gentium Book Plus', Georgia, serif", lineHeight: 1.15 }}>
+                      Welcome Back{myProfile?.name ? `, ${myProfile.name.split(' ')[0]}` : ''}
+                    </h2>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'Total Students', val: dbData.users.filter(u => u.role === 'student').length },
+                        { label: 'Pending Enquiries', val: dbData.enquiries?.length || 0 },
+                        { label: 'Courses Live', val: dbData.courses.length },
+                      ].map(s => (
+                        <span key={s.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid var(--border)', borderRadius: '99px', padding: '8px 18px', boxShadow: 'var(--shadow-sm)', fontSize: '13.5px', color: 'var(--text-soft)' }}>
+                          <b style={{ color: 'var(--primary-deep)', fontSize: '15px' }}>{s.val}</b> {s.label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
                 {/* Four metric cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                   {[
-                    { label: 'System Users', value: dbData.users.length, color: 'var(--primary)' },
-                    { label: 'Disciplines', value: dbData.curriculum.length, color: 'var(--accent-deep)' },
-                    { label: 'Courses', value: dbData.courses.length, color: 'var(--primary)' },
-                    { label: 'Live Sessions', value: dbData.live_sessions.length, color: 'var(--accent-deep)' },
+                    { label: 'System Users', value: dbData.users.length, color: 'var(--primary)', bg: 'rgba(129,23,26,0.1)' },
+                    { label: 'Disciplines', value: dbData.curriculum.length, color: 'var(--accent-deep)', bg: 'rgba(197,133,57,0.14)' },
+                    { label: 'Courses', value: dbData.courses.length, color: 'var(--primary)', bg: 'rgba(129,23,26,0.1)' },
+                    { label: 'Live Sessions', value: dbData.live_sessions.length, color: 'var(--accent-deep)', bg: 'rgba(197,133,57,0.14)' },
                   ].map((m, i) => (
-                    <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                      <div style={{ fontSize: '30px', fontWeight: 700, color: m.color }}>{m.value}</div>
-                      <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{m.label}</div>
+                    <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '20px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <span aria-hidden="true" style={{ width: '52px', height: '52px', borderRadius: '50%', background: m.bg, color: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '21px', fontWeight: 700, fontFamily: "'Poppins', sans-serif" }}>
+                        {m.value}
+                      </span>
+                      <span style={{ fontSize: '14.5px', color: 'var(--text-soft)', fontWeight: 500 }}>{m.label}</span>
                     </div>
                   ))}
                 </div>
