@@ -216,7 +216,7 @@ export default function Home() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 
   const resolveRole = (uid) =>
-    supabase.from('users').select('role_key, id, email, must_change_password').eq('auth_user_id', uid).single();
+    supabase.from('users').select('role_key, id, email, must_change_password, status').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
     supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
 
@@ -226,6 +226,19 @@ export default function Home() {
   // password, because authMiddleware answers 403 PASSWORD_CHANGE_REQUIRED to
   // every data call and there is no render path back to the OTP form.
   const enterPortal = (uid, profile) => {
+    // A self-signup account holds a valid Supabase session while it sits in the
+    // admin approval queue, so the session alone must not open the portal.
+    if (profile && profile.status !== 'active') {
+      supabase.auth.signOut();
+      setSession(null);
+      setRole(null);
+      setOtpMode(false);
+      setOtpMsg(profile.status === 'pending'
+        ? 'Your account is awaiting admin approval. You will be able to sign in once it is approved.'
+        : 'This account is inactive. Please contact the administrator.');
+      setView('login');
+      return;
+    }
     if (profile?.must_change_password) {
       const addr = profile.email || '';
       setOtpMode(true);
@@ -301,25 +314,34 @@ export default function Home() {
     }
   }, [session]);
 
-  // Both endpoints resolve the user server-side from :id, so no body is sent.
-  const adminUserCall = async (userId, action) => {
+  // Both endpoints resolve the user server-side from :id; only reset-password and
+  // approve take an optional JSON body.
+  const adminUserCall = async (userId, action, body) => {
     const { data: { session: sess } } = await supabase.auth.getSession();
     if (!sess?.access_token) throw new Error('No session token available');
     const response = await fetch(`${apiUrl}/api/admin/users/${userId}/${action}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.access_token}` },
+      body: body ? JSON.stringify(body) : undefined,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Failed to ${action.replace('-', ' ')}`);
     return data;
   };
 
-  const handleAdminGenerateOtp = async (userId, user) => {
+  // One entry point for both credential modes. 'otp' re-issues the login code for a
+  // user who already knows their password; 'both' also plants a temp password that
+  // must be swapped on next sign-in.
+  const handleAdminResetPassword = async (userId, user, mode) => {
+    const explain = mode === 'otp'
+      ? `Send a fresh one-time code to ${user.email}? The current password keeps working.`
+      : `Issue a new temporary password to ${user.name}?\n\nThey must swap it at their next sign-in via OTP to ${user.email}.`;
+    if (!confirm(explain)) return;
     try {
-      const data = await adminUserCall(userId, 'generate-otp');
+      const data = await adminUserCall(userId, 'reset-password', { mode });
       setUserNotice({
-        noticeTitle: `OTP generated for ${user.name}`,
-        otp: data.otp, email: user.email, emailSent: data.emailSent,
+        noticeTitle: mode === 'otp' ? `OTP sent to ${user.name}` : `Temporary password issued for ${user.name}`,
+        tempPassword: data.tempPassword, otp: data.otp, email: user.email, emailSent: data.emailSent,
       });
       fetchData();
     } catch (error) {
@@ -327,14 +349,31 @@ export default function Home() {
     }
   };
 
-  const handleAdminResetPassword = async (userId, user) => {
-    if (!confirm(`Reset password for "${user.name}"?\n\nA new temporary password is issued and the user must change it at their next sign-in via OTP to ${user.email}.`)) return;
+  const handleAdminApproveSignup = async (user) => {
+    const roleKey = prompt(`Approve "${user.name}".\n\nEnter the role key to grant (current request: ${user.role_key}):`, user.role_key === 'super_admin' ? '' : user.role_key);
+    if (!roleKey) return;
     try {
-      const data = await adminUserCall(userId, 'reset-password');
-      setUserNotice({
-        noticeTitle: `Temporary password issued for ${user.name}`,
-        tempPassword: data.tempPassword, email: user.email, emailSent: data.emailSent,
+      const data = await adminUserCall(user.id, 'approve', {
+        role_key: roleKey.trim(),
+        program_id: user.program_id || null,
+        designation: user.designation || null,
       });
+      setUserNotice({
+        noticeTitle: `${user.name} approved as ${roleKey.trim()}`,
+        otp: data.otp, email: user.email, emailSent: data.emailSent,
+      });
+      setUserTab('all');
+      fetchData();
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const handleAdminRejectSignup = async (user) => {
+    if (!confirm(`Reject "${user.name}" (${user.email})?\n\nTheir account and sign-in credentials are permanently deleted.`)) return;
+    try {
+      await adminUserCall(user.id, 'reject-signup');
+      alert('Signup rejected and removed.');
       fetchData();
     } catch (error) {
       alert(error.message);
@@ -665,6 +704,11 @@ export default function Home() {
   const [newDateOfJoining, setNewDateOfJoining] = useState('');
   const [newYearComm, setNewYearComm] = useState('');
   const [userNotice, setUserNotice] = useState(null); // { tempPassword, otp, email }
+  const [userTab, setUserTab] = useState('all'); // all | pending
+  const [signupMode, setSignupMode] = useState(false);
+  const [signupMsg, setSignupMsg] = useState('');
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', phone: '', password: '', role_key: 'student', roll_no: '', designation: '', year_of_commencement: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
@@ -2121,9 +2165,14 @@ const handleAddDiscipline = async (e) => {
               </button>
             )}
             {!role ? (
-              <button onClick={() => setView('login')} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '14.5px' }}>
-                Sign In
-              </button>
+              <>
+                <button onClick={() => { setSignupMode(true); setSignupMsg(''); setView('login'); }} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
+                  Sign Up
+                </button>
+                <button onClick={() => { setSignupMode(false); setView('login'); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '14.5px' }}>
+                  Sign In
+                </button>
+              </>
             ) : (
               <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
                 Log out
@@ -2280,11 +2329,52 @@ const handleAddDiscipline = async (e) => {
       {/* VIEW 2: LOGIN / AUTH — supports first-login OTP password change */}
       {view === 'login' && (
         <div style={{ maxWidth: '720px', margin: '60px auto', padding: '0 24px', flex: 1 }}>
-          <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>{otpMode ? 'Set your password' : 'Sign in to Portal'}</h2>
+          <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>{otpMode ? 'Set your password' : signupMode ? 'Request Access' : 'Sign in to Portal'}</h2>
           <p style={{ color: 'var(--text-soft)', textAlign: 'center', marginBottom: '24px' }}>
-            {otpMode ? 'You must change your temporary password using an OTP sent to your official email.' : 'Use your Supabase Auth credentials to access the portal.'}
+            {otpMode ? 'You must change your temporary password using an OTP sent to your official email.'
+              : signupMode ? 'Fill in your details. An administrator reviews every request before your account is activated.'
+              : 'Use your Supabase Auth credentials to access the portal.'}
           </p>
-          {otpMode ? (
+          {signupMode ? (
+            <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {signupMsg && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: 'var(--radius)', fontSize: '13px', color: 'var(--text-soft)' }}>{signupMsg}</div>}
+              <input placeholder="Full name" value={signupForm.name} onChange={e => setSignupForm({ ...signupForm, name: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <input type="email" placeholder="Email" value={signupForm.email} onChange={e => setSignupForm({ ...signupForm, email: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <input placeholder="Phone" value={signupForm.phone} onChange={e => setSignupForm({ ...signupForm, phone: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <select value={signupForm.role_key} onChange={e => setSignupForm({ ...signupForm, role_key: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px', background: 'var(--surface)' }}>
+                <option value="student">I am applying as a student</option>
+                <option value="faculty">I am applying as faculty / staff</option>
+              </select>
+              {signupForm.role_key === 'student' && (
+                <>
+                  <input placeholder="Roll number (optional)" value={signupForm.roll_no} onChange={e => setSignupForm({ ...signupForm, roll_no: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+                  <input type="number" placeholder="Year of commencement" value={signupForm.year_of_commencement} onChange={e => setSignupForm({ ...signupForm, year_of_commencement: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+                </>
+              )}
+              {signupForm.role_key === 'faculty' && (
+                <input placeholder="Designation (optional)" value={signupForm.designation} onChange={e => setSignupForm({ ...signupForm, designation: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              )}
+              <input type="password" placeholder="Password (min 8 chars)" value={signupForm.password} onChange={e => setSignupForm({ ...signupForm, password: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+              <button type="button" disabled={signupLoading} onClick={async () => {
+                const f = signupForm;
+                if (!f.name || !f.email || !f.password) { setSignupMsg('Name, email and password are required'); return; }
+                if (f.password.length < 8) { setSignupMsg('Password must be at least 8 characters'); return; }
+                setSignupLoading(true); setSignupMsg('');
+                try {
+                  const r = await fetch(`${apiUrl}/api/public/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                    name: f.name, email: f.email, phone: f.phone, password: f.password,
+                    role_key: f.role_key, roll_no: f.roll_no, designation: f.designation,
+                    year_of_commencement: f.year_of_commencement ? Number(f.year_of_commencement) : null,
+                  })});
+                  const j = await r.json().catch(() => ({}));
+                  if (!r.ok) { setSignupMsg(j.error || 'Signup failed'); return; }
+                  setSignupMsg('Request received. An administrator will review it and email you an OTP once approved.');
+                  setSignupForm({ name: '', email: '', phone: '', password: '', role_key: 'student', roll_no: '', designation: '', year_of_commencement: '' });
+                } catch (err) { setSignupMsg('Signup failed — please try again'); } finally { setSignupLoading(false); }
+              }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '13px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 700, cursor: signupLoading ? 'default' : 'pointer', fontSize: '15px' }}>{signupLoading ? 'Submitting…' : 'Submit Request'}</button>
+              <button type="button" onClick={() => { setSignupMode(false); setSignupMsg(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Back to Sign In</button>
+            </div>
+          ) : otpMode ? (
             <div style={{ background: 'var(--surface)', border: '1.5px solid var(--accent)', padding: '22px', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {otpMsg && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 12px', borderRadius: 'var(--radius)', fontSize: '13px', color: 'var(--text-soft)' }}>{otpMsg}</div>}
               <input type="email" placeholder="Official email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
@@ -2333,7 +2423,10 @@ const handleAddDiscipline = async (e) => {
                 <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '16px' }} />
                 <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer', fontSize: '16px' }}>Sign In</button>
               </form>
-              <button type="button" onClick={() => setOtpMode(true)} style={{ display: 'block', margin: '0 auto', background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>First login? Set password with OTP</button>
+              <div style={{ display: 'flex', gap: '18px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setOtpMode(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>First login? Set password with OTP</button>
+                <button type="button" onClick={() => { setSignupMode(true); setSignupMsg(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>New here? Request access</button>
+              </div>
             </>
           )}
           <button onClick={() => setView('public')} style={{ display: 'block', margin: '40px auto 0', background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', textDecoration: 'underline' }}>
@@ -2758,6 +2851,15 @@ const handleAddDiscipline = async (e) => {
                   </form>
                 )}
 
+                {/* Tabs: all users vs the self-signup approval queue */}
+                {role === 'super_admin' && (
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--divider)' }}>
+                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`]].map(([key, label]) => (
+                      <button key={key} onClick={() => setUserTab(key)} style={{ background: 'none', border: 'none', borderBottom: userTab === key ? '2px solid var(--primary)' : '2px solid transparent', padding: '9px 16px', cursor: 'pointer', fontSize: '13.5px', fontWeight: userTab === key ? 700 : 500, color: userTab === key ? 'var(--primary-deep)' : 'var(--text-soft)' }}>{label}</button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Filters */}
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
@@ -2782,6 +2884,7 @@ const handleAddDiscipline = async (e) => {
                 {/* Banner List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {dbData.users
+                    .filter(u => userTab !== 'pending' || u.status === 'pending')
                     .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
                     .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
                     .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()))
@@ -2794,10 +2897,16 @@ const handleAddDiscipline = async (e) => {
                           <div style={{ fontSize: '11px', color: '#a09a8f' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          {role === 'super_admin' && (
+                          {u.status === 'pending' && role === 'super_admin' && (
                             <>
-                              <button onClick={() => handleAdminGenerateOtp(u.id, u)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Generate OTP</button>
-                              <button onClick={() => handleAdminResetPassword(u.id, u)} style={{ background: 'none', border: '1px solid var(--accent-deep)', color: 'var(--accent-deep)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reset Password</button>
+                              <button onClick={() => handleAdminApproveSignup(u)} style={{ background: '#1d7a4c', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Approve</button>
+                              <button onClick={() => handleAdminRejectSignup(u)} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reject</button>
+                            </>
+                          )}
+                          {u.status !== 'pending' && role === 'super_admin' && (
+                            <>
+                              <button onClick={() => handleAdminResetPassword(u.id, u, 'otp')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Send OTP</button>
+                              <button onClick={() => handleAdminResetPassword(u.id, u, 'both')} style={{ background: 'none', border: '1px solid var(--accent-deep)', color: 'var(--accent-deep)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reset Password</button>
                             </>
                           )}
                           <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>

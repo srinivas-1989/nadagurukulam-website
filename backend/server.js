@@ -165,6 +165,41 @@ app.post('/api/public/enquiries', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/public/signup', async (req, res) => {
+  try {
+    const { name, email, phone, password, role_key, program_id, roll_no, year_of_commencement } = req.body;
+    if (!name || !email || !password || !role_key) return res.status(400).json({ error: 'Missing required fields' });
+    const emailLower = String(email).trim().toLowerCase();
+
+    // Create Auth User
+    const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+      email: emailLower,
+      password: password,
+      email_confirm: true,
+      user_metadata: { name }
+    });
+    if (authErr) return res.status(400).json({ error: authErr.message });
+
+    // Create User record in pending state
+    const { data: userData, error: userErr } = await supabase.from('users').insert([{
+      auth_user_id: authData.user.id,
+      name, email: emailLower, phone, role_key,
+      status: 'pending',
+      program_id: program_id || null,
+      roll_no: roll_no || null,
+      year_of_commencement: year_of_commencement || null,
+      must_change_password: false
+    }]).select();
+
+    if (userErr) {
+      await supabase.auth.admin.deleteUser(authData.user.id).catch(() => {});
+      throw userErr;
+    }
+
+    res.status(201).json(userData[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Storage upload — auth required; base64 JSON, ~15 MB limit. Uses Supabase Storage
 // bucket "attachments" (create in dashboard or via SQL). No new dep; signed URLs swap later.
 const UPLOAD_BUCKET = process.env.STORAGE_BUCKET || 'attachments';
@@ -206,12 +241,20 @@ async function authMiddleware(req, res, next) {
     // Fetch the user's role from public.users — match by auth_user_id
     const { data: profile, error: profileErr } = await supabase
       .from('users')
-      .select('role_key, id, name, email, must_change_password')
+      .select('role_key, id, name, email, must_change_password, status')
       .eq('auth_user_id', user.id)
       .single();
     if (profileErr || !profile) {
       // User exists in Supabase Auth but not in our users table — deny
       return res.status(403).json({ error: 'User not registered in portal' });
+    }
+    // Approval gate — a self-signup account stays 'pending' until an admin
+    // approves it, so it holds a valid JWT but no portal access.
+    if (profile.status === 'pending') {
+      return res.status(403).json({ error: 'Account pending admin approval', code: 'PENDING_APPROVAL' });
+    }
+    if (profile.status === 'inactive') {
+      return res.status(403).json({ error: 'Account is inactive', code: 'ACCOUNT_INACTIVE' });
     }
     // Force password change gate — allow only OTP/password-change + health/cms reads
     if (profile.must_change_password) {
@@ -1059,21 +1102,33 @@ app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
 });
 
 // Admin: user password/OTP management
+// `mode` picks what the admin issues: 'otp' refreshes the one-time code only,
+// 'both' (default) issues a fresh temporary password and demands an OTP swap.
 app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res) => {
   try {
     if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can reset passwords' });
+    const mode = req.body?.mode === 'otp' ? 'otp' : 'both';
     const { data: user } = await supabase.from('users').select('auth_user_id, email, id').eq('id', req.params.id).single();
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const tempPassword = genTempPassword();
-    const { error: authErr } = await supabase.auth.admin.updateUserById(user.auth_user_id, { password: tempPassword });
-    if (authErr) throw authErr;
-    await supabase.from('users').update({ must_change_password: true }).eq('id', user.id);
+
+    let tempPassword;
+    if (mode === 'both') {
+      tempPassword = genTempPassword();
+      const { error: authErr } = await supabase.auth.admin.updateUserById(user.auth_user_id, { password: tempPassword });
+      if (authErr) throw authErr;
+      await supabase.from('users').update({ must_change_password: true }).eq('id', user.id);
+    }
+
+    await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
     const otp = genOTP();
     const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
     await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
-    const emailed = await sendOTPEmail(user.email, otp, tempPassword);
-    res.json({ ok: true, emailSent: emailed, tempPassword: (process.env.NODE_ENV !== 'production' || !emailed) ? tempPassword : undefined });
+    const emailed = await sendOTPEmail(user.email, otp, tempPassword || null);
+    res.json({
+      ok: true, mode, emailSent: emailed,
+      otp: (process.env.NODE_ENV !== 'production' || !emailed) ? otp : undefined,
+      tempPassword: tempPassword && (process.env.NODE_ENV !== 'production' || !emailed) ? tempPassword : undefined,
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/admin/users/:id/generate-otp', authMiddleware, async (req, res) => {
@@ -1087,6 +1142,45 @@ app.post('/api/admin/users/:id/generate-otp', authMiddleware, async (req, res) =
     await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
     const emailed = await sendOTPEmail(user.email, otp, null);
     res.json({ ok: true, emailSent: emailed, otp: (process.env.NODE_ENV !== 'production' || !emailed) ? otp : undefined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: approve a self-signup applicant. Flips status pending → active,
+// applies the real role/program an admin picks, and issues the first OTP.
+app.post('/api/admin/users/:id/approve', authMiddleware, async (req, res) => {
+  try {
+    if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can approve signups' });
+    const { role_key, program_id, designation } = req.body || {};
+    const { data: user } = await supabase.from('users').select('id, email, status').eq('id', req.params.id).single();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.status !== 'pending') return res.status(409).json({ error: 'Only pending signups can be approved' });
+    if (!role_key || role_key === 'super_admin') return res.status(400).json({ error: 'A non-super-admin role must be assigned' });
+
+    const { error: roleErr } = await supabase
+      .from('users')
+      .update({ status: 'active', role_key, program_id: program_id || null, designation: designation || null })
+      .eq('id', user.id);
+    if (roleErr) throw roleErr;
+
+    await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
+    const otp = genOTP();
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
+    const emailed = await sendOTPEmail(user.email, otp, null);
+    res.json({ ok: true, emailSent: emailed, otp: (process.env.NODE_ENV !== 'production' || !emailed) ? otp : undefined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: reject a self-signup applicant outright.
+app.post('/api/admin/users/:id/reject-signup', authMiddleware, async (req, res) => {
+  try {
+    if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can reject signups' });
+    const { data: user } = await supabase.from('users').select('id, status, auth_user_id').eq('id', req.params.id).single();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.status !== 'pending') return res.status(409).json({ error: 'Only pending signups can be rejected' });
+    if (user.auth_user_id) await supabase.auth.admin.deleteUser(user.auth_user_id).catch(() => {});
+    await supabase.from('users').delete().eq('id', user.id);
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
