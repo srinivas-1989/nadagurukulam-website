@@ -222,16 +222,6 @@ async function authMiddleware(req, res, next) {
       );
       if (!allow) return res.status(403).json({ error: 'Password change required', code: 'PASSWORD_CHANGE_REQUIRED' });
     }
-    // Enhanced email verification check for sensitive operations
-    if (!profile.email_verified && (
-        req.path.startsWith('/api/admin/') ||
-        req.path.startsWith('/api/users') && (req.method === 'PUT' || req.method === 'DELETE') ||
-        req.path.startsWith('/api/curriculum') && req.method !== 'GET' ||
-        req.path.startsWith('/api/batches') && req.method !== 'GET' ||
-        req.path.startsWith('/api/timetable') && req.method !== 'GET'
-      )) {
-      return res.status(403).json({ error: 'Email verification required for sensitive operations' });
-    }
     req.auth = { user, profile };
     next();
   } catch (err) {
