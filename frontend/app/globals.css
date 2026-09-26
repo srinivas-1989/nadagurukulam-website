@@ -1093,6 +1093,61 @@ input, select, textarea {
 }
 
 /* ===== Enhanced layout & alignment ===== */
+.ndg-module-banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(122deg, #7c1a1c 0%, var(--primary-deep) 55%, #43100f 100%);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  padding: 24px 32px;
+  color: #fdf3e0;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ndg-module-banner-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 700px;
+}
+
+.ndg-module-banner-title {
+  font-family: 'Gentium Book Plus', Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff8ea;
+  margin: 0;
+}
+
+.ndg-module-banner-desc {
+  font-size: 13.5px;
+  color: rgba(253, 243, 224, 0.85);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ndg-module-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ndg-module-perm-pill {
+  background: var(--accent);
+  color: var(--primary-deep);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .ndg-page-wrapper {
   max-width: 940px;
   margin: 0 auto;

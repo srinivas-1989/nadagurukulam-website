@@ -2343,6 +2343,21 @@ const handleAddDiscipline = async (e) => {
 
             <main className={`portal-content${activeModule === 'timetable' ? ' is-wide' : ''}`} style={{ overflow: activeModule === 'timetable' ? 'visible' : undefined }}>
 
+            {activeModule !== 'overview' && (() => {
+              const m = MODULES.find(mod => mod.key === activeModule);
+              return (
+                <section className="ndg-module-banner">
+                  <div className="ndg-module-banner-left">
+                    <h1 className="ndg-module-banner-title">{m?.name}</h1>
+                    <p className="ndg-module-banner-desc">{m?.desc}</p>
+                  </div>
+                  <div className="ndg-module-banner-right">
+                    {perm(activeModule) && <span className="ndg-module-perm-pill">{perm(activeModule)}</span>}
+                  </div>
+                </section>
+              );
+            })()}
+
             {/* OVERVIEW — shared dashboard for all authenticated roles */}
             {activeModule === 'overview' && (() => {
               const heroStats = [
