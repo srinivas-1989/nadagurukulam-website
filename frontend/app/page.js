@@ -2478,21 +2478,23 @@ const handleAddDiscipline = async (e) => {
 
             {/* OVERVIEW — shared dashboard for all authenticated roles */}
             {activeModule === 'overview' && (() => {
+              // Each stat belongs to a module, so a user who cannot reach that
+              // module should not see a number that would be unreadable in place.
               const heroStats = [
-                { label: 'pending verifications', val: dbData.users.filter(u => !u.verified).length },
-                { label: 'ungraded submissions', val: dbData.assignment_submissions.filter(s => !s.grade).length },
-                { label: 'total students', val: dbData.users.filter(u => u.role === 'student').length },
-              ];
+                { label: 'pending verifications', val: dbData.users.filter(u => !u.verified).length, mod: 'users' },
+                { label: 'ungraded submissions', val: dbData.assignment_submissions.filter(s => !s.grade).length, mod: 'assignments' },
+                { label: 'total students', val: dbData.users.filter(u => u.role === 'student').length, mod: 'users' },
+              ].filter(s => perm(s.mod));
               const metrics = [
-                { label: 'Total Courses', value: dbData.courses.length, bg: 'var(--primary)', fg: '#fff',
+                { label: 'Total Courses', value: dbData.courses.length, bg: 'var(--primary)', fg: '#fff', mod: 'curriculum',
                   d: <><rect x="3" y="4" width="18" height="6" rx="1.5" /><path d="M3 15h18M8 15v5M16 15v5" /></> },
-                { label: 'Pending Reviews', value: dbData.lesson_plans.filter(l => l.status === 'submitted').length, bg: 'var(--accent)', fg: '#fff',
+                { label: 'Pending Reviews', value: dbData.lesson_plans.filter(l => l.status === 'submitted').length, bg: 'var(--accent)', fg: '#fff', mod: 'lessonplans',
                   d: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> },
-                { label: 'Ungraded', value: dbData.assignment_submissions.filter(s => !s.grade).length, bg: '#c23b3b', fg: '#fff',
+                { label: 'Ungraded', value: dbData.assignment_submissions.filter(s => !s.grade).length, bg: '#c23b3b', fg: '#fff', mod: 'assignments',
                   d: <><path d="M12 20V9" /><path d="M6 4h12" /><path d="M8 4l1 3h6l1-3" /></> },
                 { label: 'Recent Feedback', value: dbData.feedback.length, bg: 'var(--bg-saffron)', fg: 'var(--accent-deep)',
                   d: <><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12z" /></> },
-              ];
+              ].filter(m => perm(m.mod));
               // Last 7 days, keyed on the UTC date so bare `date` columns and
               // `timestamptz` instants land in the same bucket.
               const weekCounts = () => {
@@ -2515,7 +2517,9 @@ const handleAddDiscipline = async (e) => {
               const week = weekCounts();
               const wkMax = Math.max(...week.map(d => d.count), 1);
               const qa = MODULES.filter(m => canCreate(m.key) && m.key !== 'overview').slice(0, 6);
-              const live = dbData.live_sessions.filter(s => s.status === 'live' || s.status === 'scheduled');
+              const live = dbData.live_sessions.filter(s =>
+                (s.status === 'live' || s.status === 'scheduled') && perm('liveclasses')
+              );
               return (
                 <div className="ndg-ov">
                   {/* Dark maroon welcome hero */}
