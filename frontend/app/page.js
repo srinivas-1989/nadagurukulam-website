@@ -2232,194 +2232,266 @@ const handleAddDiscipline = async (e) => {
 
       {/* VIEW 3: AUTHENTICATED PORTAL SHELL (all roles) */}
       {(view === 'portal' || view === 'admin') && role && (
-        <div className="portal-layout" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-          {/* Top Nav Bar */}
-          <header className="portal-topbar">
-            <div className="portal-topbar-left">
-              <a href="/" onClick={(e)=>{e.preventDefault();setView('public');}} style={{display:'flex',alignItems:'center',gap:'8px',textDecoration:'none'}}><img src="/ndg-mark-cream-transparent.png" alt="" style={{height:'30px',width:'auto',display:'block'}} /><span className="portal-brand">Nada Gurukulam</span></a>
-                <button className="portal-action-btn" style={{marginLeft:'8px'}} onClick={() => setCollapsed(!collapsed)}>{collapsed ? '▶' : '◀'}</button>
-            </div>
-            <div className="portal-topbar-right">
-              <span className="portal-role-badge">{role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
-              {myProfile?.name && (
-                <span className="portal-user-name">{myProfile.name}</span>
-              )}
-            </div>
-          </header>
-
-          {/* Sidebar */}
+        <div className={`portal-layout${collapsed ? ' collapsed' : ''}`}>
+          {/* Full-height maroon sidebar */}
           <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}`}>
-            <div className="portal-sidebar-brand">
-              Nada Gurukulam
-            </div>
-            <div className="portal-sidebar-kicker">
-              Portal Modules
-            </div>
-            {currentModules.length === 0 && (
-              <p className="portal-sidebar-hint">
-                No modules assigned to this role yet — set them in Roles &amp; Permissions as Super Admin.
-              </p>
-            )}
-            {currentModules.map(m => (
-              <button key={m.key} onClick={() => setActiveModule(m.key)} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '11px 12px', borderRadius: 'var(--radius-xl-sm)', background: activeModule === m.key ? 'rgba(255,255,255,0.14)' : 'transparent', color: activeModule === m.key ? 'var(--accent-light)' : 'rgba(255,255,255,0.88)', border: 'none', textAlign: 'left', fontWeight: activeModule === m.key ? 700 : 500, cursor: 'pointer', marginBottom: '2px', fontSize: '15.5px', letterSpacing: '0.01em' }}>
-                <span>{m.name}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: activeModule === m.key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)', color: activeModule === m.key ? '#fff' : 'rgba(255,255,255,0.6)' }}>
-                  {perm(m.key) || '—'}
-                </span>
-              </button>
-            ))}
-            {perm('timetable') && myProfile && dbData.timetable.length > 0 && (() => {
-              const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-              const todaySlots = dbData.timetable.filter(s => s.day_of_week === dayName).sort((a,b)=>toMinTT(a.start_time)-toMinTT(b.start_time));
-              if (todaySlots.length===0) return null;
-              return (
-                <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-saffron)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '8px' }}>My Timetable — {dayName.slice(0,3)}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {todaySlots.slice(0,5).map(s => {
-                      const k = slotToKeys(s);
-                      const lab = k.from===k.to ? FIXED_MAP[k.from]?.label : `${FIXED_MAP[k.from]?.label}→${FIXED_MAP[k.to]?.label}`;
-                      return <div key={s.id} style={{ fontSize: '12px', lineHeight: 1.35, color: 'var(--text)' }}><span style={{ fontWeight: 700, color: 'var(--primary)' }}>{lab}</span> <span style={{ color: 'var(--text-faint)' }}>{fmtTT(s.start_time)}–{fmtTT(s.end_time)}</span><br /><span style={{ color: 'var(--text-soft)' }}>{s.subject || '—'}</span>{s.room ? <span style={{ color: 'var(--text-faint)' }}> · {s.room}</span> : null}</div>;
-                    })}
-                  </div>
-                  <button onClick={() => setActiveModule('timetable')} style={{ marginTop: '8px', background: 'none', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: '99px', cursor: 'pointer', fontSize: '11px', color: 'var(--primary)' }}>Open full timetable →</button>
-                </div>
-              );
-            })()}
-          
-                {/* Logout button at bottom of sidebar */}
-                <div style={{ marginTop: 'auto', padding: '10px' }}>
-                  <button className="portal-action-btn" onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }}>Logout</button>
-                </div>
-          </nav>
+            <button className="ndg-side-chevron" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+              {collapsed ? '›' : '‹'}
+            </button>
 
-          {/* Main Content Area */}
-          <main className={`portal-content${activeModule === 'timetable' ? ' is-wide' : ''}`} style={{ overflow: activeModule === 'timetable' ? 'visible' : undefined }}>
-            {/* Shared module banner — all 17 modules render through this one block */}
-            <div className="ndg-module-banner">
-              <img src="/ndg-mark-cream-transparent.png" alt="" aria-hidden="true" className="ndg-watermark" />
-              <div className="ndg-module-banner-copy">
-                <div className="ndg-module-eyebrow">Nada Gurukulam · {String(role || '').replace(/_/g, ' ')}</div>
-                <h1 className="ndg-module-title">
-                  {MODULES.find(m => m.key === activeModule)?.name}
-                </h1>
-                <p className="ndg-module-desc">
-                  {MODULES.find(m => m.key === activeModule)?.desc}
-                </p>
+            <div className="ndg-side-logo">
+              <img src="/ndg-mark-cream-transparent.png" alt="" />
+              <div className="ndg-side-brand-copy">
+                <div className="ndg-side-brand-name">Nada Gurukulam</div>
+                <div className="ndg-side-brand-sub">Classical Arts Academy</div>
               </div>
-              <span className="ndg-module-perm">Access: {perm(activeModule) || '—'}</span>
             </div>
 
-            {/* OVERVIEW — shared dashboard for all authenticated roles */}
-            {activeModule === 'overview' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-                {/* Bright welcome hero — light ground, saffron eyebrow, serif title */}
-                <div style={{ background: 'linear-gradient(120deg, #fff6e4 0%, var(--surface) 60%, #fbe9c8 100%)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '30px 34px', boxShadow: 'var(--shadow-md)', position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: '-50px', right: '-30px', width: '190px', height: '190px', borderRadius: '50%', background: 'rgba(221,159,60,0.18)' }} />
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-deep)', marginBottom: '8px' }}>
-                      {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Dashboard
-                    </div>
-                    <h2 style={{ fontSize: '32px', fontWeight: 700, color: 'var(--primary-deep)', marginBottom: '18px', fontFamily: "'Gentium Book Plus', Georgia, serif", lineHeight: 1.15 }}>
-                      Welcome Back{myProfile?.name ? `, ${myProfile.name.split(' ')[0]}` : ''}
-                    </h2>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {[
-                        { label: 'Total Students', val: dbData.users.filter(u => u.role === 'student').length },
-                        { label: 'Pending Enquiries', val: dbData.enquiries?.length || 0 },
-                        { label: 'Courses Live', val: dbData.courses.length },
-                      ].map(s => (
-                        <span key={s.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid var(--border)', borderRadius: '99px', padding: '8px 18px', boxShadow: 'var(--shadow-sm)', fontSize: '13.5px', color: 'var(--text-soft)' }}>
-                          <b style={{ color: 'var(--primary-deep)', fontSize: '15px' }}>{s.val}</b> {s.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+            <div className="ndg-side-divider" />
 
-                {/* Four metric cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                  {[
-                    { label: 'System Users', value: dbData.users.length, color: 'var(--primary)', bg: 'rgba(129,23,26,0.1)' },
-                    { label: 'Disciplines', value: dbData.curriculum.length, color: 'var(--accent-deep)', bg: 'rgba(197,133,57,0.14)' },
-                    { label: 'Courses', value: dbData.courses.length, color: 'var(--primary)', bg: 'rgba(129,23,26,0.1)' },
-                    { label: 'Live Sessions', value: dbData.live_sessions.length, color: 'var(--accent-deep)', bg: 'rgba(197,133,57,0.14)' },
-                  ].map((m, i) => (
-                    <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '20px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span aria-hidden="true" style={{ width: '52px', height: '52px', borderRadius: '50%', background: m.bg, color: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '21px', fontWeight: 700, fontFamily: "'Poppins', sans-serif" }}>
-                        {m.value}
-                      </span>
-                      <span style={{ fontSize: '14.5px', color: 'var(--text-soft)', fontWeight: 500 }}>{m.label}</span>
-                    </div>
+            <div className="ndg-side-user">
+              <span className="ndg-side-avatar">
+                {(myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+              </span>
+              <div className="ndg-side-brand-copy">
+                <div className="ndg-side-user-name">{myProfile?.name || 'Administrator'}</div>
+                <span className="ndg-side-role-pill">{String(role).replace(/_/g, ' ')}</span>
+              </div>
+            </div>
+
+            <div className="ndg-side-divider" />
+
+            {currentModules.length === 0 ? (
+              <p className="ndg-side-hint">No modules assigned to this role yet — set them in Roles &amp; Permissions.</p>
+            ) : (
+              <>
+                <div className="ndg-side-label">Modules</div>
+                <div className="ndg-side-nav">
+                  {currentModules.map(m => (
+                    <button key={m.key} onClick={() => setActiveModule(m.key)} className={`ndg-side-item${activeModule === m.key ? ' active' : ''}`}>
+                      <svg className="ndg-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                      </svg>
+                      <span className="ndg-side-item-text">{m.name}</span>
+                      <span className="ndg-side-perm">{perm(m.key) || '—'}</span>
+                    </button>
                   ))}
                 </div>
 
-                {/* Platform activity panel + quick actions + live classes row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                  {/* Activity visualization */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                    <h3 style={{ fontSize: '15px', color: 'var(--primary-deep)', marginBottom: '16px', fontWeight: 600 }}>Platform Activity</h3>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '100px' }}>
-                      {[
-                        { label: 'Users', val: dbData.users.length, max: Math.max(dbData.users.length, 1) },
-                        { label: 'Curriculum', val: dbData.curriculum.length, max: Math.max(dbData.curriculum.length, 1) },
-                        { label: 'Courses', val: dbData.courses.length, max: Math.max(dbData.courses.length, 1) },
-                        { label: 'Live', val: dbData.live_sessions.length, max: Math.max(dbData.live_sessions.length, 1) },
-                        { label: 'Assign', val: dbData.assignments.length, max: Math.max(dbData.assignments.length, 1) },
-                        { label: 'Projects', val: dbData.projects.length, max: Math.max(dbData.projects.length, 1) },
-                      ].map((b, i) => (
-                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <div style={{
-                            width: '100%', borderRadius: '4px 4px 0 0',
-                            background: i % 2 === 0 ? 'var(--primary)' : 'var(--accent)',
-                            height: `${Math.max((b.val / b.max) * 80, 4)}px`,
-                            transition: 'height 0.3s ease',
-                            opacity: 0.85,
-                          }} />
-                          <div style={{ fontSize: '10px', color: 'var(--text-faint)', textAlign: 'center' }}>{b.label}</div>
-                        </div>
+                {perm('timetable') && myProfile && dbData.timetable.length > 0 && (() => {
+                  const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                  const todaySlots = dbData.timetable.filter(s => s.day_of_week === dayName).sort((a,b)=>toMinTT(a.start_time)-toMinTT(b.start_time));
+                  if (todaySlots.length===0) return null;
+                  return (
+                    <div style={{ marginTop: '14px', padding: '11px 12px', background: 'rgba(255,255,255,0.08)', borderRadius: '10px' }}>
+                      <div className="ndg-side-label" style={{ padding: 0, marginBottom: '7px' }}>Today · {dayName.slice(0,3)}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        {todaySlots.slice(0,3).map(s => (
+                          <div key={s.id} style={{ fontSize: '11px', lineHeight: 1.35, color: 'rgba(255,255,255,0.72)' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--accent-light)' }}>{fmtTT(s.start_time)}</span> {s.subject || '—'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+
+            <div className="ndg-side-ornament" aria-hidden="true"><span /><span /><span /></div>
+
+            <button className="ndg-side-foot" onClick={() => { setSession(null); setRole(null); setMyProfile(null); setView('public'); }}>
+              <svg className="ndg-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              <span className="ndg-side-foot-text">Sign Out</span>
+            </button>
+          </nav>
+
+          {/* Main Content Area */}
+          <div className="portal-main">
+            {/* Light cream topbar — carries the page title */}
+            <header className="portal-topbar">
+              <div className="ndg-topbar-left">
+                <span className="ndg-sairam-pill">✳ Sai Ram</span>
+                <div className="ndg-topbar-title-wrap">
+                  <div className="ndg-topbar-title">
+                    {MODULES.find(m => m.key === activeModule)?.name}
+                    {myProfile?.name ? ` · ${myProfile.name}` : ''}
+                  </div>
+                  <div className="ndg-topbar-rule" />
+                </div>
+              </div>
+              <div className="ndg-topbar-right">
+                <div className="ndg-topbar-search">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-deep)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+                  </svg>
+                  <input placeholder="Search..." aria-label="Search portal" />
+                </div>
+                <button className="ndg-icon-btn" aria-label="Notifications">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                  </svg>
+                  <span className="ndg-notif-dot" />
+                </button>
+              </div>
+            </header>
+
+            <main className={`portal-content${activeModule === 'timetable' ? ' is-wide' : ''}`} style={{ overflow: activeModule === 'timetable' ? 'visible' : undefined }}>
+
+            {/* OVERVIEW — shared dashboard for all authenticated roles */}
+            {activeModule === 'overview' && (() => {
+              const heroStats = [
+                { label: 'pending verifications', val: dbData.users.filter(u => !u.verified).length },
+                { label: 'ungraded submissions', val: dbData.assignment_submissions.filter(s => !s.grade).length },
+                { label: 'total students', val: dbData.users.filter(u => u.role === 'student').length },
+              ];
+              const metrics = [
+                { label: 'Total Courses', value: dbData.courses.length, bg: 'var(--primary)', fg: '#fff',
+                  d: <><rect x="3" y="4" width="18" height="6" rx="1.5" /><path d="M3 15h18M8 15v5M16 15v5" /></> },
+                { label: 'Pending Reviews', value: dbData.lesson_plans.filter(l => l.status === 'submitted').length, bg: 'var(--accent)', fg: '#fff',
+                  d: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> },
+                { label: 'Ungraded', value: dbData.assignment_submissions.filter(s => !s.grade).length, bg: '#c23b3b', fg: '#fff',
+                  d: <><path d="M12 20V9" /><path d="M6 4h12" /><path d="M8 4l1 3h6l1-3" /></> },
+                { label: 'Recent Feedback', value: dbData.feedback.length, bg: 'var(--bg-saffron)', fg: 'var(--accent-deep)',
+                  d: <><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12z" /></> },
+              ];
+              const week = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+              const base = [3,5,4,7,6,2,4];
+              const wkMax = Math.max(...base, 1);
+              const qa = MODULES.filter(m => canCreate(m.key) && m.key !== 'overview').slice(0, 6);
+              const live = dbData.live_sessions.filter(s => s.status === 'active' || s.status === 'scheduled');
+              return (
+                <div className="ndg-ov">
+                  {/* Dark maroon welcome hero */}
+                  <section className="ndg-ov-hero">
+                    <div className="ndg-ov-hero-eyebrow">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M3 8l4.5 3L12 4l4.5 7L21 8l-1.6 11H4.6L3 8z" />
+                      </svg>
+                      {role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Dashboard
+                    </div>
+                    <h1 className="ndg-ov-hero-title">
+                      Welcome Back{myProfile?.name ? `, ${myProfile.name.split(' ')[0]}` : ''}
+                    </h1>
+                    <p className="ndg-ov-hero-desc">
+                      Here is what is happening across Nada Gurukulam today. Pick a module from the
+                      sidebar, or jump straight into a task below.
+                    </p>
+                    <div className="ndg-ov-hero-stats">
+                      {heroStats.map(s => (
+                        <span key={s.label} className="ndg-ov-hero-stat">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                          <b>{s.val}</b> {s.label}
+                        </span>
                       ))}
                     </div>
+                  </section>
+
+                  {/* Block header row */}
+                  <div className="ndg-ov-blockhead">
+                    <h2>7 Blocks on your overview</h2>
+                    <button className="ndg-ov-ghost-btn">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Add Block
+                    </button>
                   </div>
 
-                  {/* Quick actions */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                    <h3 style={{ fontSize: '15px', color: 'var(--primary-deep)', marginBottom: '16px', fontWeight: 600 }}>Quick Actions</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {MODULES.filter(m => canCreate(m.key) && m.key !== 'overview').slice(0, 5).map(m => (
-                        <button key={m.key} onClick={() => setActiveModule(m.key)} style={{
-                          background: 'var(--bg)', border: '1px solid var(--border)', padding: '10px 14px', borderRadius: 'var(--radius-xl-sm)',
-                          cursor: 'pointer', textAlign: 'left', fontSize: '13.5px', color: 'var(--text)'
-                        }}>
-                          <span style={{ fontWeight: 600 }}>+</span> {m.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Live classes */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '22px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-                    <h3 style={{ fontSize: '15px', color: 'var(--primary-deep)', marginBottom: '16px', fontWeight: 600 }}>Live Classes</h3>
-                    {dbData.live_sessions.filter(s => s.status === 'active' || s.status === 'scheduled').slice(0, 3).map((s, i) => (
-                      <div key={i} style={{ padding: '10px 0', borderBottom: i < Math.min(dbData.live_sessions.filter(s2 => s2.status === 'active' || s2.status === 'scheduled').length - 1, 2) ? '1px solid var(--border)' : 'none' }}>
-                        <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.title || 'Live Session'}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                          {s.batch || '—'} · {s.date ? new Date(s.date).toLocaleDateString() : '—'} · <span style={{ color: s.status === 'active' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
+                  {/* Four metric cards — icon chip on top, big serif number below */}
+                  <div className="ndg-ov-metrics">
+                    {metrics.map(m => (
+                      <div key={m.label} className="ndg-ov-metric">
+                        <span className="ndg-ov-chip" style={{ background: m.bg, color: m.fg }} aria-hidden="true">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{m.d}</svg>
+                        </span>
+                        <div>
+                          <div className="ndg-ov-metric-value">{m.value}</div>
+                          <div className="ndg-ov-metric-label">{m.label}</div>
                         </div>
                       </div>
                     ))}
-                    {dbData.live_sessions.filter(s => s.status === 'active' || s.status === 'scheduled').length === 0 && (
-                      <p style={{ fontSize: '12.5px', color: 'var(--text-faint)' }}>No active live sessions.</p>
+                  </div>
+
+                  {/* Platform Activity (1fr) + Quick Actions (1.5fr) */}
+                  <div className="ndg-ov-split">
+                    <section className="ndg-ov-card">
+                      <div className="ndg-ov-card-head">
+                        <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
+                          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" /></svg>
+                        </span>
+                        <div className="ndg-ov-card-title">
+                          <h3>Platform Activity</h3>
+                        </div>
+                        <span className="ndg-ov-metric-label" style={{ marginTop: 0 }}>This Week</span>
+                      </div>
+                      <div className="ndg-ov-bars">
+                        {week.map((d, i) => (
+                          <div key={d} className="ndg-ov-bar-col">
+                            <div className="ndg-ov-bar" style={{ height: `${Math.round((base[i] / wkMax) * 100)}%` }} />
+                            <div className="ndg-ov-bar-label">{d}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="ndg-ov-card">
+                      <div className="ndg-ov-card-head">
+                        <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
+                          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4L12 2zM18 15l.9 2.6L21.5 18l-2.6.9L18 21.5l-.9-2.6L14.5 18l2.6-.9L18 15z" /></svg>
+                        </span>
+                        <div className="ndg-ov-card-title">
+                          <h3>Quick Actions</h3>
+                        </div>
+                        <button className="ndg-ov-ghost-btn">Edit Actions</button>
+                      </div>
+                      <div className="ndg-ov-qa">
+                        {qa.map(m => (
+                          <button key={m.key} className="ndg-ov-qa-tile" onClick={() => setActiveModule(m.key)}>
+                            <span className="ndg-ov-qa-chip" aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                            </span>
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+
+                  {/* Live classes with tabs */}
+                  <section className="ndg-ov-card">
+                    <div className="ndg-ov-tabs">
+                      <button className="ndg-ov-tab active">Active</button>
+                      <button className="ndg-ov-tab">Upcoming</button>
+                      <button className="ndg-ov-tab">Completed</button>
+                    </div>
+                    {live.length === 0 ? (
+                      <p className="ndg-ov-empty">No live classes scheduled right now.</p>
+                    ) : (
+                      live.slice(0, 4).map((s, i) => (
+                        <div key={i} style={{ padding: '12px 0', borderBottom: i < live.length - 1 ? '1px solid var(--divider)' : 'none' }}>
+                          <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.title || 'Live Session'}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                            {s.batch || '—'} · {s.date ? new Date(s.date).toLocaleDateString() : '—'} ·{' '}
+                            <span style={{ color: s.status === 'active' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
+                          </div>
+                        </div>
+                      ))
                     )}
                     {canCreate('liveclasses') && (
-                      <button onClick={() => setActiveModule('liveclasses')} style={{ marginTop: '10px', background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                        View All →
-                      </button>
+                      <button className="ndg-ov-ghost-btn" style={{ marginTop: 14 }} onClick={() => setActiveModule('liveclasses')}>See All →</button>
                     )}
-                  </div>
+                  </section>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* USERS MODULE — banner cards + tabbed View Profile */}
             {activeModule === 'users' && (
@@ -4815,6 +4887,7 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
           </main>
+          </div>
         </div>
       )}
     </div>
