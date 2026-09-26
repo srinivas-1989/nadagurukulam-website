@@ -301,51 +301,43 @@ export default function Home() {
     }
   }, [session]);
 
-  const handleAdminGenerateOtp = async (userId, userType) => {
+  // Both endpoints resolve the user server-side from :id, so no body is sent.
+  const adminUserCall = async (userId, action) => {
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    if (!sess?.access_token) throw new Error('No session token available');
+    const response = await fetch(`${apiUrl}/api/admin/users/${userId}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.access_token}` },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Failed to ${action.replace('-', ' ')}`);
+    return data;
+  };
+
+  const handleAdminGenerateOtp = async (userId, user) => {
     try {
-      const { data: { session: sess } } = await supabase.auth.getSession();
-      if (!sess?.access_token) throw new Error('No session token available');
-
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}/generate-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sess.access_token}`
-        },
-        body: JSON.stringify({ email: userType }) // UserType as email in this example
+      const data = await adminUserCall(userId, 'generate-otp');
+      setUserNotice({
+        noticeTitle: `OTP generated for ${user.name}`,
+        otp: data.otp, email: user.email, emailSent: data.emailSent,
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to generate OTP');
-
-      console.log('OTP generated successfully:', data);
-      return data;
+      fetchData();
     } catch (error) {
-      console.error('Error in handleAdminGenerateOtp:', error);
-      throw error;
+      alert(error.message);
     }
   };
 
-  const handleAdminResetPassword = async (userId, userName) => {
-    if (!confirm(`Reset password for user "${userName}"? This will generate a new temporary password and OTP.`)) return;
+  const handleAdminResetPassword = async (userId, user) => {
+    if (!confirm(`Reset password for "${user.name}"?\n\nA new temporary password is issued and the user must change it at their next sign-in via OTP to ${user.email}.`)) return;
     try {
-      const { data: { session: sess } } = await supabase.auth.getSession();
-      if (!sess?.access_token) throw new Error('No session token available');
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sess.access_token}`,
-        },
-        body: JSON.stringify({ email: userName })
+      const data = await adminUserCall(userId, 'reset-password');
+      setUserNotice({
+        noticeTitle: `Temporary password issued for ${user.name}`,
+        tempPassword: data.tempPassword, email: user.email, emailSent: data.emailSent,
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed reset password');
-      console.log('Password reset successful:', data);
-      return data;
+      fetchData();
     } catch (error) {
-      console.error('Error in handleAdminResetPassword:', error);
-      throw error;
+      alert(error.message);
     }
   };
 
@@ -2798,6 +2790,12 @@ const handleAddDiscipline = async (e) => {
                           <div style={{ fontSize: '11px', color: '#a09a8f' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
+                          {role === 'super_admin' && (
+                            <>
+                              <button onClick={() => handleAdminGenerateOtp(u.id, u)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Generate OTP</button>
+                              <button onClick={() => handleAdminResetPassword(u.id, u)} style={{ background: 'none', border: '1px solid var(--accent-deep)', color: 'var(--accent-deep)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reset Password</button>
+                            </>
+                          )}
                           <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
                           <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
                           <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
