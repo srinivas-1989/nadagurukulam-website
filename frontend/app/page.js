@@ -2884,7 +2884,7 @@ const handleAddDiscipline = async (e) => {
                       // 7. Live Classes Schedule
                       if (k === 'live_classes_card') {
                         return (
-                          <section key={k} className={`ndg-ov-card ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setActiveModule('liveclasses')} {...dragProps}>
+                          <section key={k} className={`ndg-ov-card ndg-ov-card--large ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setActiveModule('liveclasses')} {...dragProps}>
                             {renderCtl()}
                             <div className="ndg-ov-card-head" style={{ marginBottom: 12 }}>
                               <div className="ndg-ov-card-title">

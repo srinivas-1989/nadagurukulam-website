@@ -797,6 +797,11 @@ input, select, textarea {
   box-shadow: var(--shadow-sm);
   padding: 22px;
   transition: box-shadow 0.15s ease, opacity 0.15s ease;
+  min-height: 200px;
+}
+
+.ndg-ov-card--large {
+  min-height: 320px;
 }
 
 /* Drag feedback is shared by every block: metrics, cards and module tiles. */
