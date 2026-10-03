@@ -2762,7 +2762,7 @@ const handleAddDiscipline = async (e) => {
                       // 1. Metric Card: Total Courses
                       if (k === 'metric_courses') {
                         return (
-                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('curriculum')} {...dragProps}>
+                          <div key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('curriculum')} {...dragProps} style={{ cursor: 'pointer' }}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5" /><path d="M3 15h18M8 15v5M16 15v5" /></svg>
@@ -2771,14 +2771,14 @@ const handleAddDiscipline = async (e) => {
                               <div className="ndg-ov-metric-value">{dbData.courses.length}</div>
                               <div className="ndg-ov-metric-label">{w.custom_title || 'Total Courses'}</div>
                             </div>
-                          </button>
+                          </div>
                         );
                       }
 
                       // 2. Metric Card: Pending Reviews
                       if (k === 'metric_reviews') {
                         return (
-                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('lessonplans')} {...dragProps}>
+                          <div key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('lessonplans')} {...dragProps} style={{ cursor: 'pointer' }}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -2787,14 +2787,14 @@ const handleAddDiscipline = async (e) => {
                               <div className="ndg-ov-metric-value">{dbData.lesson_plans.filter(l => l.status === 'submitted').length}</div>
                               <div className="ndg-ov-metric-label">{w.custom_title || 'Pending Reviews'}</div>
                             </div>
-                          </button>
+                          </div>
                         );
                       }
 
                       // 3. Metric Card: Ungraded
                       if (k === 'metric_ungraded') {
                         return (
-                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('assignments')} {...dragProps}>
+                          <div key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('assignments')} {...dragProps} style={{ cursor: 'pointer' }}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: '#c23b3b', color: '#fff' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V9" /><path d="M6 4h12" /><path d="M8 4l1 3h6l1-3" /></svg>
@@ -2803,14 +2803,14 @@ const handleAddDiscipline = async (e) => {
                               <div className="ndg-ov-metric-value">{dbData.assignment_submissions.filter(s => !s.grade && s.grade !== 0).length}</div>
                               <div className="ndg-ov-metric-label">{w.custom_title || 'Ungraded'}</div>
                             </div>
-                          </button>
+                          </div>
                         );
                       }
 
                       // 4. Metric Card: Recent Feedback
                       if (k === 'metric_feedback') {
                         return (
-                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('feedback')} {...dragProps}>
+                          <div key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('feedback')} {...dragProps} style={{ cursor: 'pointer' }}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: 'var(--bg-saffron)', color: 'var(--accent-deep)' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12z" /></svg>
@@ -2819,7 +2819,7 @@ const handleAddDiscipline = async (e) => {
                               <div className="ndg-ov-metric-value">{dbData.feedback.length}</div>
                               <div className="ndg-ov-metric-label">{w.custom_title || 'Recent Feedback'}</div>
                             </div>
-                          </button>
+                          </div>
                         );
                       }
 
