@@ -742,14 +742,21 @@ input, select, textarea {
   box-shadow: var(--shadow-sm);
   padding: 20px;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
   cursor: pointer;
   text-align: left;
   width: 100%;
   appearance: none;
   font: inherit;
   transition: background 0.2s;
+  height: 100%;
+}
+
+.ndg-ov-metric > div:not(.ndg-ov-chip) {
+  flex: 1;
+  min-width: 0;
 }
 
 .ndg-ov-metric:hover {
@@ -757,8 +764,8 @@ input, select, textarea {
 }
 
 .ndg-ov-chip {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -773,19 +780,19 @@ input, select, textarea {
 
 .ndg-ov-metric-value {
   font-family: 'Gentium Book Plus', Georgia, serif;
-  font-size: 34px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1;
   color: var(--primary-deep);
 }
 
 .ndg-ov-metric-label {
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.13em;
   color: var(--text-faint);
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .ndg-ov-split {
@@ -803,6 +810,9 @@ input, select, textarea {
   padding: 22px;
   transition: box-shadow 0.15s ease, opacity 0.15s ease;
   min-height: 200px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .ndg-ov-card--large {
@@ -833,10 +843,14 @@ input, select, textarea {
 
 .ndg-ov-card-title h3 {
   font-family: 'Gentium Book Plus', Georgia, serif;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--primary-deep);
   margin: 0;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ndg-ov-card-title span {
@@ -970,6 +984,11 @@ input, select, textarea {
   padding: 34px 0;
   color: var(--text-faint);
   font-size: 13.5px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Settings dropdown anchor */
