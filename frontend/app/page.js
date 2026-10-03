@@ -2673,15 +2673,17 @@ const handleAddDiscipline = async (e) => {
                   <div className="ndg-ov-blockhead">
                     <h2>{widgets.filter(w => w.visible).length} Blocks on your overview</h2>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="ndg-ov-ghost-btn" onClick={() => setAddBlockOpen(v => !v)} aria-expanded={addBlockOpen}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                          <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        {addBlockOpen ? 'Done' : 'Add Block'}
-                      </button>
+                      {editMode && (
+                        <button className="ndg-ov-ghost-btn" onClick={() => setAddBlockOpen(v => !v)} aria-expanded={addBlockOpen}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                          {addBlockOpen ? 'Done' : 'Add Block'}
+                        </button>
+                      )}
                       <button
                         className="ndg-ov-ghost-btn"
-                        onClick={() => setEditMode(v => !v)}
+                        onClick={() => { setEditMode(v => !v); setAddBlockOpen(false); }}
                         style={editMode ? { background: 'var(--bg-saffron)', borderColor: 'var(--accent-deep)' } : {}}
                       >
                         {editMode ? 'Done Editing' : 'Edit Layout'}
@@ -2689,7 +2691,7 @@ const handleAddDiscipline = async (e) => {
                     </div>
                   </div>
 
-                  {addBlockOpen && (
+                  {editMode && addBlockOpen && (
                     <div className="ndg-addblock">
                       <strong style={{ fontSize: 14 }}>Add a block</strong>
                       <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--text-soft)' }}>

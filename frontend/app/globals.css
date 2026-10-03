@@ -1748,6 +1748,22 @@ input, select, textarea {
   .ndg-widget-grid { grid-template-columns: 1fr; }
 }
 
+/* Base tile. Must be positioned: the control strip is absolutely placed
+   against it, so without `position: relative` it escapes to an ancestor. */
+.ndg-widget {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.ndg-widget:hover { background: var(--surface-muted); }
+
 .ndg-widget.span-1 { grid-column: span 1; }
 .ndg-widget.span-2 { grid-column: span 2; }
 .ndg-widget.span-3 { grid-column: span 3; }
@@ -1783,13 +1799,21 @@ input, select, textarea {
   top: 8px;
   right: 8px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 2px;
+  max-width: calc(100% - 16px);
   z-index: 10;
+  padding: 2px;
+  background: var(--surface);
+  border-radius: var(--radius-xl-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .ndg-widget-ctl button {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
