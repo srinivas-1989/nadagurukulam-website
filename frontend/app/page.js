@@ -494,7 +494,13 @@ export default function Home() {
   const widgetStat = (key) => {
     const def = WIDGET_DEFS[key];
     if (!def) return null;
-    const rows = dbData[key] || [];
+    const mapKey = key === 'lessonplans' ? 'lesson_plans'
+      : key === 'liveclasses' ? 'live_sessions'
+      : key === 'teachinglogs' ? 'class_entries'
+      : key === 'curriculum' ? 'courses'
+      : key === 'timetable' ? 'timetable_periods'
+      : key;
+    const rows = dbData[mapKey] || dbData[key] || [];
     return { label: def.label, value: rows.length, sub: def.sub(dbData) };
   };
 
@@ -504,15 +510,15 @@ export default function Home() {
     if (view !== 'portal' || !session || !widgetKeys.length) return;
     apiCall(`${apiUrl}/api/dashboard-widgets`).then(r => r.json()).then(rows => {
       if (Array.isArray(rows) && rows.length) {
-        const saved = rows.map(r => r.module_key).filter(k => widgetKeys.includes(k));
-        const missing = widgetKeys.filter(k => !saved.includes(k));
-        setWidgets([...saved, ...missing].map(module_key => ({ module_key, visible: true })));
+        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false })).filter(w => widgetKeys.includes(w.module_key));
+        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true }));
+        setWidgets([...saved, ...missing]);
       } else {
         setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true })));
       }
     }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true }))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, session?.user?.id, role]);
+  }, [view, session?.user?.id, role, widgetKeys.join(',')]);
 
   // Optimistic local state already shows the change; this persists it.
   useEffect(() => {
@@ -536,7 +542,13 @@ export default function Home() {
     return next;
   });
   const hideWidget = key => setWidgets(ws => ws.map(w => w.module_key === key ? { ...w, visible: false } : w));
-  const showWidget = key => setWidgets(ws => ws.map(w => w.module_key === key ? { ...w, visible: true } : w));
+  const showWidget = key => setWidgets(ws => {
+    const exists = ws.some(w => w.module_key === key);
+    if (exists) {
+      return ws.map(w => w.module_key === key ? { ...w, visible: true } : w);
+    }
+    return [...ws, { module_key: key, visible: true }];
+  });
   const dropWidget = (from, to) => setWidgets(ws => {
     const next = [...ws];
     const [moved] = next.splice(from, 1);
@@ -2750,7 +2762,8 @@ const handleAddDiscipline = async (e) => {
                         <div
                           key={w.module_key}
                           className={`ndg-widget${dragOver === w.module_key ? ' drag-over' : ''}${dragging === w.module_key ? ' dragging' : ''}`}
-                          style={w.visible ? undefined : { display: 'none' }}
+                          style={w.visible ? { cursor: 'pointer' } : { display: 'none' }}
+                          onClick={() => setActiveModule(w.module_key)}
                           onDragOver={e => { if (dragging) { e.preventDefault(); setDragOver(w.module_key); } }}
                           onDrop={e => {
                             e.preventDefault();
@@ -2759,7 +2772,7 @@ const handleAddDiscipline = async (e) => {
                             setDragging(null); setDragOver(null);
                           }}
                         >
-                          <div className="ndg-widget-ctl">
+                          <div className="ndg-widget-ctl" onClick={e => e.stopPropagation()}>
                             <button
                               className="drag"
                               draggable
