@@ -2696,7 +2696,7 @@ const handleAddDiscipline = async (e) => {
                   {/* Four metric cards — icon chip on top, big serif number below */}
                   <div className="ndg-ov-metrics">
                     {metrics.map(m => (
-                      <div key={m.label} className="ndg-ov-metric">
+                      <button key={m.label} className="ndg-ov-metric" onClick={() => setActiveModule(m.mod)} style={{ cursor: 'pointer' }}>
                         <span className="ndg-ov-chip" style={{ background: m.bg, color: m.fg }} aria-hidden="true">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{m.d}</svg>
                         </span>
@@ -2704,13 +2704,13 @@ const handleAddDiscipline = async (e) => {
                           <div className="ndg-ov-metric-value">{m.value}</div>
                           <div className="ndg-ov-metric-label">{m.label}</div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
 
                   {/* Platform Activity (1fr) + Quick Actions (1.5fr) */}
                   <div className="ndg-ov-split">
-                    <section className="ndg-ov-card">
+                    <section className="ndg-ov-card" onClick={() => setActiveModule('teachinglogs')} style={{ cursor: 'pointer' }}>
                       <div className="ndg-ov-card-head">
                         <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
                           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" /></svg>
@@ -2794,8 +2794,8 @@ const handleAddDiscipline = async (e) => {
                   </div>
 
                   {/* Live classes with tabs */}
-                  <section className="ndg-ov-card">
-                    <div className="ndg-ov-tabs">
+                  <section className="ndg-ov-card" onClick={() => setActiveModule('liveclasses')} style={{ cursor: 'pointer' }}>
+                    <div className="ndg-ov-tabs" onClick={e => e.stopPropagation()}>
                       <button className="ndg-ov-tab active">Active</button>
                       <button className="ndg-ov-tab">Upcoming</button>
                       <button className="ndg-ov-tab">Completed</button>
@@ -2813,8 +2813,8 @@ const handleAddDiscipline = async (e) => {
                         </div>
                       ))
                     )}
-                    {canCreate('liveclasses') && (
-                      <button className="ndg-ov-ghost-btn" style={{ marginTop: 14 }} onClick={() => setActiveModule('liveclasses')}>See All →</button>
+                    {perm('liveclasses') && (
+                      <button className="ndg-ov-ghost-btn" style={{ marginTop: 14 }} onClick={(e) => { e.stopPropagation(); setActiveModule('liveclasses'); }}>See All →</button>
                     )}
                   </section>
                 </div>

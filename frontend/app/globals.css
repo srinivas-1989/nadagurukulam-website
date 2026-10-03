@@ -738,6 +738,16 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  transition: background 0.2s;
+}
+
+.ndg-ov-metric:hover {
+  background: var(--surface-muted);
 }
 
 .ndg-ov-chip {
