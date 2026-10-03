@@ -730,6 +730,7 @@ input, select, textarea {
 }
 
 .ndg-ov-metric {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
@@ -789,12 +790,24 @@ input, select, textarea {
 }
 
 .ndg-ov-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   padding: 22px;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease;
 }
+
+/* Drag feedback is shared by every block: metrics, cards and module tiles. */
+.ndg-ov-metric.drag-over,
+.ndg-ov-card.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(221, 159, 60, 0.22);
+}
+
+.ndg-ov-metric.dragging,
+.ndg-ov-card.dragging { opacity: 0.45; }
 
 .ndg-ov-card-head {
   display: flex;
@@ -1748,18 +1761,15 @@ input, select, textarea {
 
 .ndg-widget.dragging { opacity: 0.45; }
 
-/* Control strip — hover/focus only, so the resting dashboard stays clean. */
+/* Control strip — shown when edit mode is active. */
 .ndg-widget-ctl {
   position: absolute;
   top: 8px;
   right: 8px;
   display: flex;
   gap: 2px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  z-index: 10;
 }
-.ndg-widget:hover .ndg-widget-ctl,
-.ndg-widget:focus-within .ndg-widget-ctl { opacity: 1; }
 
 .ndg-widget-ctl button {
   width: 24px;

@@ -192,6 +192,7 @@ export default function Home() {
   const [dragging, setDragging] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [addBlockOpen, setAddBlockOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [widgets, setWidgets] = useState([]);
 
   // Auth state (from Supabase Auth)
@@ -489,11 +490,23 @@ export default function Home() {
     certificates: { label: 'Certificates', sub: () => 'issued achievements' },
     roles: { label: 'Roles', sub: d => `${(d.role_permissions || []).length} permission rows` },
     teachinglogs: { label: 'Teaching Logs', sub: d => `${(d.class_entries || []).length} class entries` },
+    metric_courses: { label: 'Total Courses', sub: d => `${(d.curriculum_units || []).length} units mapped`, value: d => d.courses.length },
+    metric_reviews: { label: 'Pending Reviews', sub: d => 'lesson plans awaiting approval', value: d => d.lesson_plans.filter(l => l.status === 'submitted').length },
+    metric_ungraded: { label: 'Ungraded', sub: d => 'submissions without a grade', value: d => d.assignment_submissions.filter(s => !s.grade && s.grade !== 0).length },
+    metric_feedback: { label: 'Recent Feedback', sub: d => 'two-way cycles logged', value: d => d.feedback.length },
+    platform_activity: { label: 'Platform Activity', sub: () => 'class entries, sessions and submissions over 7 days', value: d => d.class_entries.length + d.live_sessions.length + d.assignment_submissions.length },
+    quick_actions_card: { label: 'Quick Actions', sub: () => 'modules you can create in', value: () => MODULES.filter(m => m.key !== 'overview' && canCreate(m.key)).slice(0, 6).length },
+    live_classes_card: { label: 'Live Classes', sub: d => `${d.live_sessions.filter(s => s.status === 'live').length} live · ${d.live_sessions.filter(s => s.status === 'scheduled').length} scheduled`, value: d => d.live_sessions.filter(s => s.status === 'live' || s.status === 'scheduled').length },
   };
-  const widgetKeys = MODULES.filter(m => m.key !== 'overview' && perm(m.key)).map(m => m.key);
+  const overviewBlockKeys = ['metric_courses', 'metric_reviews', 'metric_ungraded', 'metric_feedback', 'platform_activity', 'quick_actions_card', 'live_classes_card'];
+  const widgetKeys = [
+    ...overviewBlockKeys.filter(k => WIDGET_DEFS[k].mod === undefined || perm(WIDGET_DEFS[k].mod)),
+    ...MODULES.filter(m => m.key !== 'overview' && perm(m.key)).map(m => m.key),
+  ];
   const widgetStat = (key) => {
     const def = WIDGET_DEFS[key];
     if (!def) return null;
+    if (def.value) return { label: def.label, value: def.value(dbData), sub: def.sub(dbData) };
     const mapKey = key === 'lessonplans' ? 'lesson_plans'
       : key === 'liveclasses' ? 'live_sessions'
       : key === 'teachinglogs' ? 'class_entries'
@@ -2657,19 +2670,28 @@ const handleAddDiscipline = async (e) => {
                   {/* Block header row */}
                   <div className="ndg-ov-blockhead">
                     <h2>{widgets.filter(w => w.visible).length} Blocks on your overview</h2>
-                    <button className="ndg-ov-ghost-btn" onClick={() => setAddBlockOpen(v => !v)} aria-expanded={addBlockOpen}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                      {addBlockOpen ? 'Done' : 'Add Block'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="ndg-ov-ghost-btn" onClick={() => setAddBlockOpen(v => !v)} aria-expanded={addBlockOpen}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        {addBlockOpen ? 'Done' : 'Add Block'}
+                      </button>
+                      <button
+                        className="ndg-ov-ghost-btn"
+                        onClick={() => setEditMode(v => !v)}
+                        style={editMode ? { background: 'var(--bg-saffron)', borderColor: 'var(--accent-deep)' } : {}}
+                      >
+                        {editMode ? 'Done Editing' : 'Edit Layout'}
+                      </button>
+                    </div>
                   </div>
 
                   {addBlockOpen && (
                     <div className="ndg-addblock">
                       <strong style={{ fontSize: 14 }}>Add a block</strong>
                       <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--text-soft)' }}>
-                        Every module you can access is available as a block. Hidden blocks keep their place in the layout.
+                        Every module and metric card is available as a block. Hidden blocks keep their place in the layout.
                       </p>
                       <div className="ndg-addblock-grid">
                         {widgetKeys.map(k => {
@@ -2693,98 +2715,202 @@ const handleAddDiscipline = async (e) => {
                     </div>
                   )}
 
-                  {/* Four metric cards — icon chip on top, big serif number below */}
-                  <div className="ndg-ov-metrics">
-                    {metrics.map(m => (
-                      <button key={m.label} className="ndg-ov-metric" onClick={() => setActiveModule(m.mod)} style={{ cursor: 'pointer' }}>
-                        <span className="ndg-ov-chip" style={{ background: m.bg, color: m.fg }} aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{m.d}</svg>
-                        </span>
-                        <div>
-                          <div className="ndg-ov-metric-value">{m.value}</div>
-                          <div className="ndg-ov-metric-label">{m.label}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Platform Activity (1fr) + Quick Actions (1.5fr) */}
-                  <div className="ndg-ov-split">
-                    <section className="ndg-ov-card" onClick={() => setActiveModule('teachinglogs')} style={{ cursor: 'pointer' }}>
-                      <div className="ndg-ov-card-head">
-                        <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" /></svg>
-                        </span>
-                        <div className="ndg-ov-card-title">
-                          <h3>Platform Activity</h3>
-                        </div>
-                        <span className="ndg-ov-metric-label" style={{ marginTop: 0 }}>This Week</span>
-                      </div>
-                      <div className="ndg-ov-bars">
-                        {week.map((d, i) => (
-                          <div key={d.day} className="ndg-ov-bar-col" title={`${d.count} on ${d.day}`}>
-                            <div className="ndg-ov-bar" style={{ height: `${Math.round((d.count / wkMax) * 100)}%` }} />
-                            <div className="ndg-ov-bar-label">{d.day}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className="ndg-ov-card">
-                      <div className="ndg-ov-card-head">
-                        <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4L12 2zM18 15l.9 2.6L21.5 18l-2.6.9L18 21.5l-.9-2.6L14.5 18l2.6-.9L18 15z" /></svg>
-                        </span>
-                        <div className="ndg-ov-card-title">
-                          <h3>Quick Actions</h3>
-                        </div>
-                      </div>
-                      <div className="ndg-ov-qa">
-                        {qa.map(m => (
-                          <button key={m.key} className="ndg-ov-qa-tile" onClick={() => setActiveModule(m.key)}>
-                            <span className="ndg-ov-qa-chip" aria-hidden="true">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-                            </span>
-                            {m.name}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  </div>
-
-                  {/* Draggable module blocks. Grid is auto-fit, so an added block
-                      reflows into place without a gap; order lives in `widgets`. */}
+                  {/* Dashboard Cards Grid (Rendered in order defined in `widgets`) */}
                   <div className="ndg-widget-grid" style={{ marginTop: 16 }}>
                     {widgets.map((w, i) => {
-                      const st = widgetStat(w.module_key);
+                      if (!w.visible) return null;
+                      const k = w.module_key;
+                      const st = widgetStat(k);
+
+                      const renderCtl = () => editMode && (
+                        <div className="ndg-widget-ctl" onClick={e => e.stopPropagation()}>
+                          <button
+                            className="drag"
+                            draggable
+                            onDragStart={() => setDragging(k)}
+                            onDragEnd={() => { setDragging(null); setDragOver(null); }}
+                            aria-label={`Move ${st?.label || k}`}
+                            title="Drag to reorder"
+                          >⠿</button>
+                          <button onClick={() => moveWidget(k, -1)} aria-label="Move up" title="Move up">↑</button>
+                          <button onClick={() => moveWidget(k, 1)} aria-label="Move down" title="Move down">↓</button>
+                          <button className="hide" onClick={() => hideWidget(k)} aria-label="Hide block" title="Hide block">×</button>
+                        </div>
+                      );
+
+                      const dragProps = {
+                        onDragOver: e => { if (dragging) { e.preventDefault(); setDragOver(k); } },
+                        onDrop: e => {
+                          e.preventDefault();
+                          const from = widgets.findIndex(x => x.module_key === dragging);
+                          if (from >= 0) dropWidget(from, i);
+                          setDragging(null); setDragOver(null);
+                        }
+                      };
+
+                      // 1. Metric Card: Total Courses
+                      if (k === 'metric_courses') {
+                        return (
+                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('curriculum')} {...dragProps}>
+                            {renderCtl()}
+                            <span className="ndg-ov-chip" style={{ background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5" /><path d="M3 15h18M8 15v5M16 15v5" /></svg>
+                            </span>
+                            <div>
+                              <div className="ndg-ov-metric-value">{dbData.courses.length}</div>
+                              <div className="ndg-ov-metric-label">Total Courses</div>
+                            </div>
+                          </button>
+                        );
+                      }
+
+                      // 2. Metric Card: Pending Reviews
+                      if (k === 'metric_reviews') {
+                        return (
+                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('lessonplans')} {...dragProps}>
+                            {renderCtl()}
+                            <span className="ndg-ov-chip" style={{ background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                            </span>
+                            <div>
+                              <div className="ndg-ov-metric-value">{dbData.lesson_plans.filter(l => l.status === 'submitted').length}</div>
+                              <div className="ndg-ov-metric-label">Pending Reviews</div>
+                            </div>
+                          </button>
+                        );
+                      }
+
+                      // 3. Metric Card: Ungraded
+                      if (k === 'metric_ungraded') {
+                        return (
+                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('assignments')} {...dragProps}>
+                            {renderCtl()}
+                            <span className="ndg-ov-chip" style={{ background: '#c23b3b', color: '#fff' }} aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V9" /><path d="M6 4h12" /><path d="M8 4l1 3h6l1-3" /></svg>
+                            </span>
+                            <div>
+                              <div className="ndg-ov-metric-value">{dbData.assignment_submissions.filter(s => !s.grade && s.grade !== 0).length}</div>
+                              <div className="ndg-ov-metric-label">Ungraded</div>
+                            </div>
+                          </button>
+                        );
+                      }
+
+                      // 4. Metric Card: Recent Feedback
+                      if (k === 'metric_feedback') {
+                        return (
+                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('feedback')} {...dragProps}>
+                            {renderCtl()}
+                            <span className="ndg-ov-chip" style={{ background: 'var(--bg-saffron)', color: 'var(--accent-deep)' }} aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12z" /></svg>
+                            </span>
+                            <div>
+                              <div className="ndg-ov-metric-value">{dbData.feedback.length}</div>
+                              <div className="ndg-ov-metric-label">Recent Feedback</div>
+                            </div>
+                          </button>
+                        );
+                      }
+
+                      // 5. Platform Activity
+                      if (k === 'platform_activity') {
+                        return (
+                          <section key={k} className={`ndg-ov-card${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ gridColumn: 'span 2' }} {...dragProps}>
+                            {renderCtl()}
+                            <div className="ndg-ov-card-head">
+                              <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" /></svg>
+                              </span>
+                              <div className="ndg-ov-card-title">
+                                <h3>Platform Activity</h3>
+                              </div>
+                              <span className="ndg-ov-metric-label" style={{ marginTop: 0 }}>This Week</span>
+                            </div>
+                            <div className="ndg-ov-bars">
+                              {week.map((d, idx) => (
+                                <div key={d.day || idx} className="ndg-ov-bar-col" title={`${d.count} on ${d.day}`}>
+                                  <div className="ndg-ov-bar" style={{ height: `${Math.round((d.count / wkMax) * 100)}%` }} />
+                                  <div className="ndg-ov-bar-label">{d.day}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        );
+                      }
+
+                      // 6. Quick Actions
+                      if (k === 'quick_actions_card') {
+                        return (
+                          <section key={k} className={`ndg-ov-card${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ gridColumn: 'span 2' }} {...dragProps}>
+                            {renderCtl()}
+                            <div className="ndg-ov-card-head">
+                              <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4L12 2zM18 15l.9 2.6L21.5 18l-2.6.9L18 21.5l-.9-2.6L14.5 18l2.6-.9L18 15z" /></svg>
+                              </span>
+                              <div className="ndg-ov-card-title">
+                                <h3>Quick Actions</h3>
+                              </div>
+                            </div>
+                            <div className="ndg-ov-qa">
+                              {qa.map(m => (
+                                <button key={m.key} className="ndg-ov-qa-tile" onClick={() => setActiveModule(m.key)}>
+                                  <span className="ndg-ov-qa-chip" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                                  </span>
+                                  {m.name}
+                                </button>
+                              ))}
+                            </div>
+                          </section>
+                        );
+                      }
+
+                      // 7. Live Classes Schedule
+                      if (k === 'live_classes_card') {
+                        return (
+                          <section key={k} className={`ndg-ov-card${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ gridColumn: 'span 2', cursor: 'pointer' }} onClick={() => setActiveModule('liveclasses')} {...dragProps}>
+                            {renderCtl()}
+                            <div className="ndg-ov-card-head" style={{ marginBottom: 12 }}>
+                              <div className="ndg-ov-card-title">
+                                <h3>Live Classes Schedule</h3>
+                              </div>
+                            </div>
+                            <div className="ndg-ov-tabs" onClick={e => e.stopPropagation()}>
+                              <button className="ndg-ov-tab active">Active</button>
+                              <button className="ndg-ov-tab">Upcoming</button>
+                              <button className="ndg-ov-tab">Completed</button>
+                            </div>
+                            {live.length === 0 ? (
+                              <p className="ndg-ov-empty">No live classes scheduled right now.</p>
+                            ) : (
+                              live.slice(0, 4).map((s, idx) => (
+                                <div key={idx} style={{ padding: '12px 0', borderBottom: idx < live.length - 1 ? '1px solid var(--divider)' : 'none' }}>
+                                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.title || 'Live Session'}</div>
+                                  <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                                    {s.batch || '—'} · {s.session_date ? new Date(s.session_date).toLocaleDateString() : '—'} ·{' '}
+                                    <span style={{ color: s.status === 'live' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                            {perm('liveclasses') && (
+                              <button className="ndg-ov-ghost-btn" style={{ marginTop: 14 }} onClick={(e) => { e.stopPropagation(); setActiveModule('liveclasses'); }}>See All →</button>
+                            )}
+                          </section>
+                        );
+                      }
+
+                      // 8. Standard Module Block Widget
                       if (!st) return null;
                       return (
                         <div
-                          key={w.module_key}
-                          className={`ndg-widget${dragOver === w.module_key ? ' drag-over' : ''}${dragging === w.module_key ? ' dragging' : ''}`}
-                          style={w.visible ? { cursor: 'pointer' } : { display: 'none' }}
-                          onClick={() => setActiveModule(w.module_key)}
-                          onDragOver={e => { if (dragging) { e.preventDefault(); setDragOver(w.module_key); } }}
-                          onDrop={e => {
-                            e.preventDefault();
-                            const from = widgets.findIndex(x => x.module_key === dragging);
-                            if (from >= 0) dropWidget(from, i);
-                            setDragging(null); setDragOver(null);
-                          }}
+                          key={k}
+                          className={`ndg-widget${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setActiveModule(k)}
+                          {...dragProps}
                         >
-                          <div className="ndg-widget-ctl" onClick={e => e.stopPropagation()}>
-                            <button
-                              className="drag"
-                              draggable
-                              onDragStart={() => setDragging(w.module_key)}
-                              onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                              aria-label={`Move ${st.label}`}
-                              title="Drag to reorder"
-                            >⠿</button>
-                            <button onClick={() => moveWidget(w.module_key, -1)} aria-label={`Move ${st.label} up`} title="Move up">↑</button>
-                            <button onClick={() => moveWidget(w.module_key, 1)} aria-label={`Move ${st.label} down`} title="Move down">↓</button>
-                            <button className="hide" onClick={() => hideWidget(w.module_key)} aria-label={`Hide ${st.label}`} title="Hide block">×</button>
-                          </div>
+                          {renderCtl()}
                           <div className="ndg-widget-label">{st.label}</div>
                           <div className="ndg-widget-value">{st.value}</div>
                           <div className="ndg-widget-sub">{st.sub}</div>
@@ -2792,31 +2918,6 @@ const handleAddDiscipline = async (e) => {
                       );
                     })}
                   </div>
-
-                  {/* Live classes with tabs */}
-                  <section className="ndg-ov-card" onClick={() => setActiveModule('liveclasses')} style={{ cursor: 'pointer' }}>
-                    <div className="ndg-ov-tabs" onClick={e => e.stopPropagation()}>
-                      <button className="ndg-ov-tab active">Active</button>
-                      <button className="ndg-ov-tab">Upcoming</button>
-                      <button className="ndg-ov-tab">Completed</button>
-                    </div>
-                    {live.length === 0 ? (
-                      <p className="ndg-ov-empty">No live classes scheduled right now.</p>
-                    ) : (
-                      live.slice(0, 4).map((s, i) => (
-                        <div key={i} style={{ padding: '12px 0', borderBottom: i < live.length - 1 ? '1px solid var(--divider)' : 'none' }}>
-                          <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-deep)' }}>{s.title || 'Live Session'}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                            {s.batch || '—'} · {s.session_date ? new Date(s.session_date).toLocaleDateString() : '—'} ·{' '}
-                            <span style={{ color: s.status === 'live' ? '#10b981' : 'var(--accent-deep)' }}>{s.status}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                    {perm('liveclasses') && (
-                      <button className="ndg-ov-ghost-btn" style={{ marginTop: 14 }} onClick={(e) => { e.stopPropagation(); setActiveModule('liveclasses'); }}>See All →</button>
-                    )}
-                  </section>
                 </div>
               );
             })()}
