@@ -2472,10 +2472,6 @@ const handleAddDiscipline = async (e) => {
           {drawerOpen && <button className="portal-scrim drawer-open" onClick={() => setDrawerOpen(false)} aria-label="Close navigation" />}
           {/* Full-height maroon sidebar */}
           <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}${drawerOpen ? ' drawer-open' : ''}`}>
-            <button className="ndg-side-chevron" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-              {collapsed ? '›' : '‹'}
-            </button>
-
             <div className="ndg-side-logo">
               <img src="/ndg-mark-cream-transparent.png" alt="" />
               <div className="ndg-side-brand-copy">
@@ -2546,6 +2542,18 @@ const handleAddDiscipline = async (e) => {
               <span className="ndg-side-foot-text">Sign Out</span>
             </button>
           </nav>
+
+          {/* Collapse toggle sits outside <nav> so the sidebar's own
+              overflow-y clipping can never cut it off, and it stacks above
+              every panel. */}
+          <button
+            className={`ndg-side-toggle${collapsed ? ' is-collapsed' : ''}`}
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? '›' : '‹'}
+          </button>
 
           {/* Main Content Area */}
           <div className="portal-main">
