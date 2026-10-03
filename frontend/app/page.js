@@ -540,7 +540,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const t = setTimeout(() => {
       apiCall(`${apiUrl}/api/dashboard-widgets`, {
         method: 'PUT',
-        body: JSON.stringify({ widgets: widgets.map((w, i) => ({ module_key: w.module_key, sort_order: i, visible: w.visible })) }),
+        body: JSON.stringify({ widgets: widgets.map((w, i) => ({ module_key: w.module_key, sort_order: i, visible: w.visible, width: w.width || 1, custom_title: w.custom_title })) }),
       }).catch(() => {});
     }, 400);
     return () => clearTimeout(t);
@@ -2741,10 +2741,6 @@ const handleAddDiscipline = async (e) => {
                           <button onClick={() => moveWidget(k, 1)} aria-label="Move down" title="Move down">↓</button>
                           <button className="hide" onClick={() => hideWidget(k)} aria-label="Hide block" title="Hide block">×</button>
                           <button onClick={() => {
-                             const newWidth = prompt("Enter width (1-4):", w.width || 1);
-                             if(newWidth && !isNaN(newWidth)) updateWidget(k, { width: parseInt(newWidth) });
-                          }} title="Resize">⇹</button>
-                          <button onClick={() => {
                              const newTitle = prompt("Enter new title:", st?.label || k);
                              if(newTitle !== null) updateWidget(k, { custom_title: newTitle });
                           }} title="Rename">✎</button>
@@ -2752,7 +2748,14 @@ const handleAddDiscipline = async (e) => {
                       );
 
                       const dragProps = {
-                        onDragOver: e => { if (dragging) { e.preventDefault(); setDragOver(k); } },
+                        onDragOver: e => {
+                          if (dragging && dragging !== k) {
+                            e.preventDefault();
+                            setDragOver(k);
+                            const from = widgets.findIndex(x => x.module_key === dragging);
+                            if (from >= 0 && from !== i) dropWidget(from, i);
+                          }
+                        },
                         onDrop: e => {
                           e.preventDefault();
                           const from = widgets.findIndex(x => x.module_key === dragging);
