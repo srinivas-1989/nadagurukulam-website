@@ -1075,7 +1075,7 @@ app.get('/api/dashboard-widgets', authMiddleware, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('dashboard_widgets')
-      .select('id, module_key, sort_order, visible')
+      .select('id, module_key, sort_order, visible, width, custom_title')
       .eq('user_id', req.auth.profile.id)
       .order('sort_order');
     if (error) throw error;
@@ -1091,6 +1091,8 @@ app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
       module_key: String(w.module_key || '').slice(0, 64),
       sort_order: i,
       visible: w.visible !== false,
+      width: parseInt(w.width) || 1,
+      custom_title: w.custom_title ? String(w.custom_title).slice(0, 100) : null,
     })).filter(r => r.module_key);
     await supabase.from('dashboard_widgets').delete().eq('user_id', req.auth.profile.id);
     if (rows.length) {

@@ -1732,27 +1732,43 @@ input, select, textarea {
 }
 
 /* ===== Dashboard blocks =====
-   Grid is auto-fit so an added block reflows into place with no gaps. */
+   Grid is auto-fit so an added block reflows into place with no gaps.
+   Supports widths: full (span 4), 3/4 (span 3), half (span 2), quarter (span 1) in a 4-column grid. */
 .ndg-widget-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
-.ndg-widget {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  padding: 16px 18px;
-  min-width: 0;
-  transition: box-shadow 0.15s ease, opacity 0.15s ease;
+@media (max-width: 1024px) {
+  .ndg-widget-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-.ndg-widget.span-2 { grid-column: span 2; }
+@media (max-width: 640px) {
+  .ndg-widget-grid { grid-template-columns: 1fr; }
+}
 
-@media (max-width: 640px) { .ndg-widget.span-2 { grid-column: span 1; } }
+.ndg-widget.span-1 { grid-column: span 1; }
+.ndg-widget.span-2 { grid-column: span 2; }
+.ndg-widget.span-3 { grid-column: span 3; }
+.ndg-widget.span-4 { grid-column: span 4; }
+
+.ndg-ov-card.span-1, .ndg-ov-metric.span-1 { grid-column: span 1; }
+.ndg-ov-card.span-2, .ndg-ov-metric.span-2 { grid-column: span 2; }
+.ndg-ov-card.span-3, .ndg-ov-metric.span-3 { grid-column: span 3; }
+.ndg-ov-card.span-4, .ndg-ov-metric.span-4 { grid-column: span 4; }
+
+@media (max-width: 1024px) {
+  .ndg-widget.span-3, .ndg-widget.span-4,
+  .ndg-ov-card.span-3, .ndg-ov-card.span-4,
+  .ndg-ov-metric.span-3, .ndg-ov-metric.span-4 { grid-column: span 2; }
+}
+
+@media (max-width: 640px) {
+  .ndg-widget.span-1, .ndg-widget.span-2, .ndg-widget.span-3, .ndg-widget.span-4,
+  .ndg-ov-card.span-1, .ndg-ov-card.span-2, .ndg-ov-card.span-3, .ndg-ov-card.span-4,
+  .ndg-ov-metric.span-1, .ndg-ov-metric.span-2, .ndg-ov-metric.span-3, .ndg-ov-metric.span-4 { grid-column: span 1; }
+}
 
 .ndg-widget.drag-over {
   border-color: var(--accent);

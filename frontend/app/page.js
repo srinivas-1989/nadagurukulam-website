@@ -193,7 +193,8 @@ export default function Home() {
   const [dragOver, setDragOver] = useState(null);
   const [addBlockOpen, setAddBlockOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [widgets, setWidgets] = useState([]);
+// Add width/custom_title to widgets state
+const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, sort_order, width, custom_title}
 
   // Auth state (from Supabase Auth)
   const [session, setSession] = useState(null);
@@ -523,13 +524,13 @@ export default function Home() {
     if (view !== 'portal' || !session || !widgetKeys.length) return;
     apiCall(`${apiUrl}/api/dashboard-widgets`).then(r => r.json()).then(rows => {
       if (Array.isArray(rows) && rows.length) {
-        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false })).filter(w => widgetKeys.includes(w.module_key));
-        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true }));
+        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false, width: r.width || 1, custom_title: r.custom_title || null })).filter(w => widgetKeys.includes(w.module_key));
+        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true, width: 1, custom_title: null }));
         setWidgets([...saved, ...missing]);
       } else {
-        setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true })));
+        setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: 1, custom_title: null })));
       }
-    }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true }))));
+    }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: 1, custom_title: null }))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, session?.user?.id, role, widgetKeys.join(',')]);
 
@@ -555,12 +556,13 @@ export default function Home() {
     return next;
   });
   const hideWidget = key => setWidgets(ws => ws.map(w => w.module_key === key ? { ...w, visible: false } : w));
+  const updateWidget = (key, updates) => setWidgets(ws => ws.map(w => w.module_key === key ? { ...w, ...updates } : w));
   const showWidget = key => setWidgets(ws => {
     const exists = ws.some(w => w.module_key === key);
     if (exists) {
       return ws.map(w => w.module_key === key ? { ...w, visible: true } : w);
     }
-    return [...ws, { module_key: key, visible: true }];
+    return [...ws, { module_key: key, visible: true, width: 1, custom_title: null }];
   });
   const dropWidget = (from, to) => setWidgets(ws => {
     const next = [...ws];
@@ -2722,6 +2724,7 @@ const handleAddDiscipline = async (e) => {
                       const k = w.module_key;
                       const st = widgetStat(k);
 
+                      const widthClass = `span-${w.width || 1}`;
                       const renderCtl = () => editMode && (
                         <div className="ndg-widget-ctl" onClick={e => e.stopPropagation()}>
                           <button
@@ -2735,6 +2738,14 @@ const handleAddDiscipline = async (e) => {
                           <button onClick={() => moveWidget(k, -1)} aria-label="Move up" title="Move up">↑</button>
                           <button onClick={() => moveWidget(k, 1)} aria-label="Move down" title="Move down">↓</button>
                           <button className="hide" onClick={() => hideWidget(k)} aria-label="Hide block" title="Hide block">×</button>
+                          <button onClick={() => {
+                             const newWidth = prompt("Enter width (1-4):", w.width || 1);
+                             if(newWidth && !isNaN(newWidth)) updateWidget(k, { width: parseInt(newWidth) });
+                          }} title="Resize">⇹</button>
+                          <button onClick={() => {
+                             const newTitle = prompt("Enter new title:", st?.label || k);
+                             if(newTitle !== null) updateWidget(k, { custom_title: newTitle });
+                          }} title="Rename">✎</button>
                         </div>
                       );
 
@@ -2751,14 +2762,14 @@ const handleAddDiscipline = async (e) => {
                       // 1. Metric Card: Total Courses
                       if (k === 'metric_courses') {
                         return (
-                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('curriculum')} {...dragProps}>
+                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('curriculum')} {...dragProps}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5" /><path d="M3 15h18M8 15v5M16 15v5" /></svg>
                             </span>
                             <div>
                               <div className="ndg-ov-metric-value">{dbData.courses.length}</div>
-                              <div className="ndg-ov-metric-label">Total Courses</div>
+                              <div className="ndg-ov-metric-label">{w.custom_title || 'Total Courses'}</div>
                             </div>
                           </button>
                         );
@@ -2767,14 +2778,14 @@ const handleAddDiscipline = async (e) => {
                       // 2. Metric Card: Pending Reviews
                       if (k === 'metric_reviews') {
                         return (
-                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('lessonplans')} {...dragProps}>
+                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('lessonplans')} {...dragProps}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
                             </span>
                             <div>
                               <div className="ndg-ov-metric-value">{dbData.lesson_plans.filter(l => l.status === 'submitted').length}</div>
-                              <div className="ndg-ov-metric-label">Pending Reviews</div>
+                              <div className="ndg-ov-metric-label">{w.custom_title || 'Pending Reviews'}</div>
                             </div>
                           </button>
                         );
@@ -2783,14 +2794,14 @@ const handleAddDiscipline = async (e) => {
                       // 3. Metric Card: Ungraded
                       if (k === 'metric_ungraded') {
                         return (
-                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('assignments')} {...dragProps}>
+                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('assignments')} {...dragProps}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: '#c23b3b', color: '#fff' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V9" /><path d="M6 4h12" /><path d="M8 4l1 3h6l1-3" /></svg>
                             </span>
                             <div>
                               <div className="ndg-ov-metric-value">{dbData.assignment_submissions.filter(s => !s.grade && s.grade !== 0).length}</div>
-                              <div className="ndg-ov-metric-label">Ungraded</div>
+                              <div className="ndg-ov-metric-label">{w.custom_title || 'Ungraded'}</div>
                             </div>
                           </button>
                         );
@@ -2799,14 +2810,14 @@ const handleAddDiscipline = async (e) => {
                       // 4. Metric Card: Recent Feedback
                       if (k === 'metric_feedback') {
                         return (
-                          <button key={k} className={`ndg-ov-metric${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('feedback')} {...dragProps}>
+                          <button key={k} className={`ndg-ov-metric ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} onClick={() => setActiveModule('feedback')} {...dragProps}>
                             {renderCtl()}
                             <span className="ndg-ov-chip" style={{ background: 'var(--bg-saffron)', color: 'var(--accent-deep)' }} aria-hidden="true">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12z" /></svg>
                             </span>
                             <div>
                               <div className="ndg-ov-metric-value">{dbData.feedback.length}</div>
-                              <div className="ndg-ov-metric-label">Recent Feedback</div>
+                              <div className="ndg-ov-metric-label">{w.custom_title || 'Recent Feedback'}</div>
                             </div>
                           </button>
                         );
@@ -2815,14 +2826,14 @@ const handleAddDiscipline = async (e) => {
                       // 5. Platform Activity
                       if (k === 'platform_activity') {
                         return (
-                          <section key={k} className={`ndg-ov-card${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ gridColumn: 'span 2' }} {...dragProps}>
+                          <section key={k} className={`ndg-ov-card ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} {...dragProps}>
                             {renderCtl()}
                             <div className="ndg-ov-card-head">
                               <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--primary)', color: '#fff' }} aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" /></svg>
                               </span>
                               <div className="ndg-ov-card-title">
-                                <h3>Platform Activity</h3>
+                                <h3>{w.custom_title || 'Platform Activity'}</h3>
                               </div>
                               <span className="ndg-ov-metric-label" style={{ marginTop: 0 }}>This Week</span>
                             </div>
@@ -2841,14 +2852,14 @@ const handleAddDiscipline = async (e) => {
                       // 6. Quick Actions
                       if (k === 'quick_actions_card') {
                         return (
-                          <section key={k} className={`ndg-ov-card${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ gridColumn: 'span 2' }} {...dragProps}>
+                          <section key={k} className={`ndg-ov-card ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} {...dragProps}>
                             {renderCtl()}
                             <div className="ndg-ov-card-head">
                               <span className="ndg-ov-chip" style={{ width: 40, height: 40, background: 'var(--accent)', color: '#fff' }} aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4L12 2zM18 15l.9 2.6L21.5 18l-2.6.9L18 21.5l-.9-2.6L14.5 18l2.6-.9L18 15z" /></svg>
                               </span>
                               <div className="ndg-ov-card-title">
-                                <h3>Quick Actions</h3>
+                                <h3>{w.custom_title || 'Quick Actions'}</h3>
                               </div>
                             </div>
                             <div className="ndg-ov-qa">
@@ -2868,11 +2879,11 @@ const handleAddDiscipline = async (e) => {
                       // 7. Live Classes Schedule
                       if (k === 'live_classes_card') {
                         return (
-                          <section key={k} className={`ndg-ov-card${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ gridColumn: 'span 2', cursor: 'pointer' }} onClick={() => setActiveModule('liveclasses')} {...dragProps}>
+                          <section key={k} className={`ndg-ov-card ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setActiveModule('liveclasses')} {...dragProps}>
                             {renderCtl()}
                             <div className="ndg-ov-card-head" style={{ marginBottom: 12 }}>
                               <div className="ndg-ov-card-title">
-                                <h3>Live Classes Schedule</h3>
+                                <h3>{w.custom_title || 'Live Classes Schedule'}</h3>
                               </div>
                             </div>
                             <div className="ndg-ov-tabs" onClick={e => e.stopPropagation()}>
@@ -2905,13 +2916,13 @@ const handleAddDiscipline = async (e) => {
                       return (
                         <div
                           key={k}
-                          className={`ndg-widget${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`}
+                          className={`ndg-widget ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`}
                           style={{ cursor: 'pointer' }}
                           onClick={() => setActiveModule(k)}
                           {...dragProps}
                         >
                           {renderCtl()}
-                          <div className="ndg-widget-label">{st.label}</div>
+                          <div className="ndg-widget-label">{w.custom_title || st.label}</div>
                           <div className="ndg-widget-value">{st.value}</div>
                           <div className="ndg-widget-sub">{st.sub}</div>
                         </div>

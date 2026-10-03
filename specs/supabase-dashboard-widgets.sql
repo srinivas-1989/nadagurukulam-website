@@ -35,3 +35,7 @@ create policy "Own dashboard widgets deletable"
 
 create index if not exists dashboard_widgets_user_sort_idx
   on public.dashboard_widgets(user_id, sort_order);
+
+alter table public.dashboard_widgets add column if not exists width integer not null default 1;
+alter table public.dashboard_widgets add column if not exists custom_title text;
+alter table public.dashboard_widgets add constraint dashboard_widgets_width_range check (width between 1 and 4);
