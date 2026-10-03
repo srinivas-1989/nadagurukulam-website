@@ -518,19 +518,21 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     return { label: def.label, value: rows.length, sub: def.sub(dbData) };
   };
 
+  const getDefaultWidth = (k) => ['platform_activity', 'quick_actions_card', 'live_classes_card'].includes(k) ? 2 : 1;
+
   // Layout is per-user: an empty response means first visit, so seed defaults
   // from the modules this role can actually see.
   useEffect(() => {
     if (view !== 'portal' || !session || !widgetKeys.length) return;
     apiCall(`${apiUrl}/api/dashboard-widgets`).then(r => r.json()).then(rows => {
       if (Array.isArray(rows) && rows.length) {
-        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false, width: r.width || 1, custom_title: r.custom_title || null })).filter(w => widgetKeys.includes(w.module_key));
-        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true, width: 1, custom_title: null }));
+        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false, width: r.width || getDefaultWidth(r.module_key), custom_title: r.custom_title || null })).filter(w => widgetKeys.includes(w.module_key));
+        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true, width: getDefaultWidth(module_key), custom_title: null }));
         setWidgets([...saved, ...missing]);
       } else {
-        setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: 1, custom_title: null })));
+        setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: getDefaultWidth(module_key), custom_title: null })));
       }
-    }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: 1, custom_title: null }))));
+    }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: getDefaultWidth(module_key), custom_title: null }))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, session?.user?.id, role, widgetKeys.join(',')]);
 
@@ -562,7 +564,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (exists) {
       return ws.map(w => w.module_key === key ? { ...w, visible: true } : w);
     }
-    return [...ws, { module_key: key, visible: true, width: 1, custom_title: null }];
+    return [...ws, { module_key: key, visible: true, width: getDefaultWidth(key), custom_title: null }];
   });
   const dropWidget = (from, to) => setWidgets(ws => {
     const next = [...ws];

@@ -181,7 +181,6 @@ input, select, textarea {
 .portal-sidebar.collapsed .ndg-side-brand-copy,
 .portal-sidebar.collapsed .ndg-side-user,
 .portal-sidebar.collapsed .ndg-side-label,
-.portal-sidebar.collapsed .ndg-side-chevron,
 .portal-sidebar.collapsed .ndg-side-item-text,
 .portal-sidebar.collapsed .ndg-side-perm,
 .portal-sidebar.collapsed .ndg-side-ornament,
@@ -243,7 +242,13 @@ input, select, textarea {
   font-size: 14px;
   line-height: 1;
   padding: 0;
-  z-index: 2;
+  z-index: 50;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  cursor: pointer;
+}
+
+.portal-sidebar.collapsed .ndg-side-chevron {
+  right: -14px;
 }
 
 .ndg-side-chevron:hover {
