@@ -806,7 +806,7 @@ input, select, textarea {
 }
 
 .ndg-ov-card--large {
-  min-height: 320px;
+  min-height: 200px;
 }
 
 /* Drag feedback is shared by every block: metrics, cards and module tiles. */
