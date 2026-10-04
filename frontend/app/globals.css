@@ -1796,8 +1796,7 @@ input, select, textarea {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  align-items: stretch;
-  grid-auto-rows: 1fr;
+  align-items: start;
 }
 .ndg-widget,
 .ndg-ov-card {
