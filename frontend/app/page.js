@@ -252,6 +252,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       return;
     }
     setRole(profile?.role_key || null);
+    if (profile) setMyProfile(profile);
     setView('portal');
   };
 
@@ -386,7 +387,11 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (!nextName) { setProfileMsg('Name cannot be empty.'); return; }
     setProfileSaving(true); setProfileMsg('');
     try {
-      const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify({ name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim(), avatar_url: profileAvatar || null }) });
+      // avatar_url is sent only when the picture actually changed — omitting it keeps
+      // whatever is stored, and clearing sends an explicit null.
+      const patch = { name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim() };
+      if (profileAvatar !== null) patch.avatar_url = profileAvatar || null;
+      const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify(patch) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Save failed'); }
       const saved = await res.json();
       setMyProfile(prev => (prev ? { ...prev, ...saved } : prev));
@@ -2557,19 +2562,21 @@ const handleAddDiscipline = async (e) => {
 
             <div className="ndg-side-divider" />
 
-            <div className="ndg-side-user">
+            <button
+              className="ndg-side-user"
+              onClick={() => { setProfileOpen(true); setDrawerOpen(false); }}
+              title="Edit your profile"
+            >
               <span className="ndg-side-avatar">
-                {(myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                {myProfile?.avatar_url
+                  ? <img src={myProfile.avatar_url} alt="" />
+                  : (myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
               </span>
-              <div className="ndg-side-brand-copy">
-                <button
-                  className="ndg-side-user-name ndg-side-user-link"
-                  onClick={() => { setProfileOpen(true); setDrawerOpen(false); }}
-                  title="Edit your profile"
-                >{myProfile?.name || 'Administrator'}</button>
+              <span className="ndg-side-brand-copy">
+                <span className="ndg-side-user-name">{myProfile?.name || 'Administrator'}</span>
                 <span className="ndg-side-role-pill">{String(role).replace(/_/g, ' ')}</span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <div className="ndg-side-divider" />
 
@@ -2687,12 +2694,21 @@ const handleAddDiscipline = async (e) => {
                       <label style={label}>Display Name</label>
                       <input value={profileName} onChange={e => setProfileName(e.target.value)} style={field} placeholder="Your full name" />
                       <label style={{ ...label, marginTop: '16px' }}>Profile Picture</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: '#666', overflow: 'hidden' }}>
-                          {profileAvatar ? <img src={profileAvatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (myProfile?.name?.[0] || 'A').toUpperCase()}
-                        </div>
-                        <input type="file" accept="image/*" onChange={e => handlePickAvatar(e.target.files[0])} disabled={profileUploading} />
-                        {profileUploading && <span>Uploading…</span>}
+                      <div className="ndg-profile-avatar-row">
+                        <span className="ndg-profile-avatar-pick">
+                          {profileAvatar || myProfile?.avatar_url
+                            ? <img src={profileAvatar || myProfile.avatar_url} alt="" />
+                            : (myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                        </span>
+                        <label className="ndg-profile-file-btn">
+                          {profileUploading ? 'Uploading…' : (profileAvatar || myProfile?.avatar_url) ? 'Replace picture' : 'Upload picture'}
+                          <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={profileUploading}
+                            onChange={e => { handlePickAvatar(e.target.files[0]); e.target.value = ''; }} />
+                        </label>
+                        {(profileAvatar || myProfile?.avatar_url) && (
+                          <button type="button" className="ndg-profile-remove-btn" onClick={() => setProfileAvatar('')}
+                            aria-label="Remove profile picture">&times;</button>
+                        )}
                       </div>
                       <label style={{ ...label, marginTop: '16px' }}>Phone</label>
                       <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} style={field} placeholder="Contact number" />
@@ -2706,8 +2722,7 @@ const handleAddDiscipline = async (e) => {
                     </div>
                     <div className="ndg-profile-foot">
                       <button className="ndg-ov-ghost-btn" onClick={() => { setProfileOpen(false); setProfileMsg(''); }}>Cancel</button>
-                      <button className="ndg-ov-ghost-btn" onClick={() => { setProfileOpen(false); setProfileMsg(''); }}>Cancel</button>
-                  <button className="ndg-ov-primary-btn" onClick={handleSaveProfile} disabled={profileSaving}>{profileSaving ? 'Saving…' : 'Save changes'}</button>
+                      <button className="ndg-ov-primary-btn" onClick={handleSaveProfile} disabled={profileSaving || profileUploading}>{profileSaving ? 'Saving…' : 'Save changes'}</button>
                     </div>
                   </div>
                 </div>

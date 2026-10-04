@@ -1124,7 +1124,7 @@ app.put('/api/me', authMiddleware, async (req, res) => {
       .from('users')
       .update(patch)
       .eq('id', req.auth.profile.id)
-      .select('id, name, email, phone, designation')
+      .select('id, name, email, phone, designation, avatar_url')
       .single();
     if (error) throw error;
     res.json(data);
