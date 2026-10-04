@@ -518,7 +518,29 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     return { label: def.label, value: rows.length, sub: def.sub(dbData) };
   };
 
-  const getDefaultWidth = (k) => ['platform_activity', 'quick_actions_card', 'live_classes_card'].includes(k) ? 2 : 1;
+  const ELASTIC_WIDGETS = ['platform_activity', 'quick_actions_card', 'live_classes_card'];
+  const getDefaultWidth = (k) => ELASTIC_WIDGETS.includes(k) ? 2 : 1;
+
+  // A line holds 4 units. Statistic and module tiles are fixed at 1 unit, so a
+  // line of three tiles leaves one slot empty. Section cards pack at the
+  // default 2 and then stretch to close a gap — but only when they are the sole
+  // section card on their line, so two of them still share it 2+2.
+  const packOverviewWidgets = (list) => {
+    const rows = [];
+    let row = [];
+    let used = 0;
+    list.forEach(w => {
+      const units = ELASTIC_WIDGETS.includes(w.module_key) ? 2 : 1;
+      if (used + units > 4) { rows.push([row, used]); row = []; used = 0; }
+      row.push(w);
+      used += units;
+    });
+    if (row.length) rows.push([row, used]);
+    return rows.flatMap(([members, taken]) => {
+      const grow = members.filter(w => ELASTIC_WIDGETS.includes(w.module_key)).length === 1 ? 4 - taken : 0;
+      return members.map(w => ({ ...w, width: ELASTIC_WIDGETS.includes(w.module_key) ? 2 + grow : 1 }));
+    });
+  };
 
   // Layout is per-user: an empty response means first visit, so seed defaults
   // from the modules this role can actually see.
@@ -2946,6 +2968,15 @@ const handleAddDiscipline = async (e) => {
                     };
 
                     const visible = widgets.filter(w => w.visible);
+
+                    if (!editMode) {
+                      return (
+                        <div className="ndg-widget-grid" style={{ marginTop: 12 }}>
+                          {packOverviewWidgets(visible).map(renderWidget)}
+                        </div>
+                      );
+                    }
+
                     const stats = visible.filter(w => w.module_key.startsWith('metric_'));
                     const modules = visible.filter(w => !w.module_key.startsWith('metric_'));
                     return (
@@ -2963,7 +2994,7 @@ const handleAddDiscipline = async (e) => {
                         {modules.length > 0 && (
                           <>
                             <div className="ndg-ov-blockhead" style={{ marginTop: 28 }}>
-                              <h2>Modules</h2>
+                              <h2>Sections</h2>
                             </div>
                             <div className="ndg-widget-grid" style={{ marginTop: 12 }}>
                               {modules.map(renderWidget)}
