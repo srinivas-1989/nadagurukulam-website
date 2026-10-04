@@ -2729,14 +2729,13 @@ const handleAddDiscipline = async (e) => {
                     </div>
                   )}
 
-                  {/* Dashboard Cards Grid (Rendered in order defined in `widgets`) */}
-                  <div className="ndg-widget-grid" style={{ marginTop: 16 }}>
-                    {widgets.map((w, i) => {
-                      if (!w.visible) return null;
+                  {/* Overview: statistics row, then one miniature card per module */}
+                  {(() => {
+                    const renderWidget = (w) => {
                       const k = w.module_key;
                       const st = widgetStat(k);
-
-                      const widthClass = `span-${w.width || 1}`;
+                      const isStat = k.startsWith('metric_');
+                      const widthClass = isStat ? 'span-1' : `span-${w.width || 1}`;
                       const renderCtl = () => editMode && (
                         <div className="ndg-widget-ctl" onClick={e => e.stopPropagation()}>
                           <button
@@ -2763,13 +2762,15 @@ const handleAddDiscipline = async (e) => {
                             e.preventDefault();
                             setDragOver(k);
                             const from = widgets.findIndex(x => x.module_key === dragging);
-                            if (from >= 0 && from !== i) dropWidget(from, i);
+                            const to = widgets.findIndex(x => x.module_key === k);
+                            if (from >= 0 && to >= 0 && from !== to) dropWidget(from, to);
                           }
                         },
                         onDrop: e => {
                           e.preventDefault();
                           const from = widgets.findIndex(x => x.module_key === dragging);
-                          if (from >= 0) dropWidget(from, i);
+                          const to = widgets.findIndex(x => x.module_key === k);
+                          if (from >= 0 && to >= 0) dropWidget(from, to);
                           setDragging(null); setDragOver(null);
                         }
                       };
@@ -2942,8 +2943,36 @@ const handleAddDiscipline = async (e) => {
                           <div className="ndg-widget-sub">{st.sub}</div>
                         </div>
                       );
-                    })}
-                  </div>
+                    };
+
+                    const visible = widgets.filter(w => w.visible);
+                    const stats = visible.filter(w => w.module_key.startsWith('metric_'));
+                    const modules = visible.filter(w => !w.module_key.startsWith('metric_'));
+                    return (
+                      <>
+                        {stats.length > 0 && (
+                          <>
+                            <div className="ndg-ov-blockhead" style={{ marginTop: 20 }}>
+                              <h2>Statistics</h2>
+                            </div>
+                            <div className="ndg-widget-grid" style={{ marginTop: 12 }}>
+                              {stats.map(renderWidget)}
+                            </div>
+                          </>
+                        )}
+                        {modules.length > 0 && (
+                          <>
+                            <div className="ndg-ov-blockhead" style={{ marginTop: 28 }}>
+                              <h2>Modules</h2>
+                            </div>
+                            <div className="ndg-widget-grid" style={{ marginTop: 12 }}>
+                              {modules.map(renderWidget)}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               );
             })()}
