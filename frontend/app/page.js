@@ -3,6 +3,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useImageCropper } from './ImageCropModal';
 
+// The column holds a year, but a date picker is far easier to hit than a
+// number box, so the UI collects a date and these take its year.
+const yearOf = (d) => (d ? Number(String(d).slice(0, 4)) || null : null);
+const dateOfYear = (y) => (y ? `${String(y).padStart(4, '0')}-01-01` : '');
+
 const UserPersonalTab = ({ userId, dbData }) => {
   const u = dbData?.users?.find(user => user.id === userId);
   return (
@@ -1880,7 +1885,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const payload = { name: newName.trim(), email: newEmail.trim(), role_key: newUserRole, phone: newPhone.trim() || null,
       employee_id: newEmployeeId.trim() || null, roll_no: newRollNo.trim() || null,
       designation: newDesignation.trim() || null, program_id: newProgramId || null,
-      date_of_joining: newDateOfJoining || null, year_of_commencement: newYearComm ? Number(newYearComm) : null };
+      date_of_joining: newDateOfJoining || null, year_of_commencement: yearOf(newYearComm) };
     if (cat === 'student' && (!payload.roll_no || !payload.program_id || !payload.year_of_commencement)) { alert('Students require Roll No, Course (Program) and Year of commencement'); return; }
     const res = await apiCall(`${apiUrl}/api/users`, { method: 'POST', body: JSON.stringify(payload) });
     const data = await res.json().catch(() => ({}));
@@ -1940,7 +1945,7 @@ const handleAddDiscipline = async (e) => {
     const payload = { name: editUserName.trim(), email: editUserEmail.trim(), role_key: editUserRoleKey,
       phone: editUserPhone.trim() || null, employee_id: editUserEmployeeId.trim() || null, roll_no: editUserRollNo.trim() || null,
       designation: editUserDesignation.trim() || null, program_id: editUserProgramId || null,
-      date_of_joining: editUserDateOfJoining || null, year_of_commencement: editUserYearComm ? Number(editUserYearComm) : null };
+      date_of_joining: editUserDateOfJoining || null, year_of_commencement: yearOf(editUserYearComm) };
     if (!payload.name || !payload.email || !payload.role_key) return;
     const res = await apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Update failed'); return; }
@@ -2493,7 +2498,7 @@ const handleAddDiscipline = async (e) => {
               {signupForm.role_key === 'student' && (
                 <>
                   <input placeholder="Roll number (optional)" value={signupForm.roll_no} onChange={e => setSignupForm({ ...signupForm, roll_no: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
-                  <input type="number" placeholder="Year of commencement" value={signupForm.year_of_commencement} onChange={e => setSignupForm({ ...signupForm, year_of_commencement: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
+                  <input type="date" min="2000-01-01" max="2100-12-31" placeholder="Year of commencement" value={signupForm.year_of_commencement} onChange={e => setSignupForm({ ...signupForm, year_of_commencement: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px' }} />
                 </>
               )}
               {signupForm.role_key === 'faculty' && (
@@ -2509,7 +2514,7 @@ const handleAddDiscipline = async (e) => {
                   const r = await fetch(`${apiUrl}/api/public/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
                     name: f.name, email: f.email, phone: f.phone, password: f.password,
                     role_key: f.role_key, roll_no: f.roll_no, designation: f.designation,
-                    year_of_commencement: f.year_of_commencement ? Number(f.year_of_commencement) : null,
+                    year_of_commencement: yearOf(f.year_of_commencement),
                   })});
                   const j = await r.json().catch(() => ({}));
                   if (!r.ok) { setSignupMsg(j.error || 'Signup failed'); return; }
@@ -3230,7 +3235,7 @@ const handleAddDiscipline = async (e) => {
                         </select>
                       )}
                       {isStaffCat(newRoleCat) && <input type="date" title="Date of joining" value={newDateOfJoining} onChange={e => setNewDateOfJoining(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />}
-                      {isStudentCat(newRoleCat) && <input type="number" min="2000" max="2100" placeholder="Year of commencement *" title="Year of commencement" value={newYearComm} onChange={e => setNewYearComm(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '170px' }} required />}
+                      {isStudentCat(newRoleCat) && <input type="date" min="2000-01-01" max="2100-12-31" placeholder="Year of commencement *" title="Year of commencement" value={newYearComm} onChange={e => setNewYearComm(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '170px' }} required />}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add User</button>
@@ -3298,7 +3303,7 @@ const handleAddDiscipline = async (e) => {
                             </>
                           )}
                           <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
-                          <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(u.year_of_commencement ? String(u.year_of_commencement) : ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
+                          <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
                           <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
                         </div>
                       </div>

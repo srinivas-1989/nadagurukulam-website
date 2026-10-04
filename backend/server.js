@@ -187,7 +187,7 @@ app.post('/api/public/signup', async (req, res) => {
       status: 'pending',
       program_id: program_id || null,
       roll_no: roll_no || null,
-      year_of_commencement: year_of_commencement || null,
+      year_of_commencement: Number(year_of_commencement) || null,
       must_change_password: false
     }]).select();
 
