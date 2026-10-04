@@ -2723,16 +2723,16 @@ const handleAddDiscipline = async (e) => {
                       <label style={{ ...label, marginTop: '16px' }}>Profile Picture</label>
                       <div className="ndg-profile-avatar-row">
                         <span className="ndg-profile-avatar-pick">
-                          {profileAvatar || myProfile?.avatar_url
+                          {(profileAvatar !== '' && (profileAvatar || myProfile?.avatar_url))
                             ? <img src={profileAvatar || myProfile.avatar_url} alt="" />
                             : initialsFor(myProfile)}
                         </span>
                         <label className="ndg-profile-file-btn">
-                          {profileUploading ? 'Uploading…' : (profileAvatar || myProfile?.avatar_url) ? 'Replace picture' : 'Upload picture'}
+                          {profileUploading ? 'Uploading…' : (profileAvatar !== '' && (profileAvatar || myProfile?.avatar_url)) ? 'Replace picture' : 'Upload picture'}
                           <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={profileUploading}
                             onChange={e => { handlePickAvatar(e.target.files[0]); e.target.value = ''; }} />
                         </label>
-                        {(profileAvatar || myProfile?.avatar_url) && (
+                        {(profileAvatar !== '' && (profileAvatar || myProfile?.avatar_url)) && (
                           <button type="button" className="ndg-profile-remove-btn" onClick={() => setProfileAvatar('')}
                             aria-label="Remove profile picture">&times;</button>
                         )}

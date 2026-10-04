@@ -1,8 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Free (0) lets the viewport be dragged to any shape; the rest lock the box to
-// a preset. Locking lets the corner handle drive width and derive height.
+// Free (0) lets every edge move on its own; the rest pin the box to a preset.
 const RATIOS = [
   { label: 'Free', value: 0 },
   { label: '1:1', value: 1 },
@@ -12,13 +11,33 @@ const RATIOS = [
   { label: '9:16', value: 9 / 16 },
 ];
 const SIZES = [512, 1024, 2048];
-const MIN_BOX = 140;
-const MAX_BOX = 520;
+
+// The stage is a fixed logical size that gets scaled by CSS, so pointer maths
+// only ever deals in these units.
+import { resizeBox, reshape, SW, SH } from './cropMath.mjs';
 const ACCEPTED = /^image\/(jpeg|png|webp)$/;
+
+// Anchored on the opposite edge, like every other crop tool.
+const HANDLES = [
+  { id: 'nw', fx: 0, fy: 0, cur: 'nwse-resize' },
+  { id: 'n', fx: 0.5, fy: 0, cur: 'ns-resize' },
+  { id: 'ne', fx: 1, fy: 0, cur: 'nesw-resize' },
+  { id: 'e', fx: 1, fy: 0.5, cur: 'ew-resize' },
+  { id: 'se', fx: 1, fy: 1, cur: 'nwse-resize' },
+  { id: 's', fx: 0.5, fy: 1, cur: 'ns-resize' },
+  { id: 'sw', fx: 0, fy: 1, cur: 'nesw-resize' },
+  { id: 'w', fx: 0, fy: 0.5, cur: 'ew-resize' },
+];
+
+const fitBox = (ratio) => {
+  const w = SW * 0.8;
+  const h = ratio ? w / ratio : SH * 0.8;
+  return { x: (SW - w) / 2, y: (SH - Math.min(h, SH)) / 2, w, h: Math.min(h, SH) };
+};
 
 /**
  * Reusable crop dialog. Owns nothing about the app: it takes an opened file and
- * hands back a new cropped File, so every existing upload path keeps working by
+ * hands back a cropped File, so every existing upload path keeps working by
  * receiving a File exactly as it did before.
  *
  * Open it through `useImageCropper()` rather than rendering it directly — the
@@ -26,13 +45,14 @@ const ACCEPTED = /^image\/(jpeg|png|webp)$/;
  */
 export default function ImageCropModal({ target, onCancel }) {
   const { file, onCrop } = target;
-  const canvasRef = useRef(null);
+  const stageRef = useRef(null);
+  const cvRef = useRef(null);
   const imgRef = useRef(null);
+  const panRef = useRef(null);
   const dragRef = useRef(null);
-  const resizeRef = useRef(null);
 
-  const [src, setSrc] = useState('');
   const [nat, setNat] = useState({ w: 0, h: 0 });
+  const [box, setBox] = useState(() => fitBox(1));
   const [zoom, setZoom] = useState(1);
   const [off, setOff] = useState({ x: 0, y: 0 });
   const [rot, setRot] = useState(0);
@@ -40,151 +60,153 @@ export default function ImageCropModal({ target, onCancel }) {
   const [flipY, setFlipY] = useState(false);
   const [ratioIdx, setRatioIdx] = useState(1);
   const [size, setSize] = useState(1024);
-  const [box, setBox] = useState({ w: 360, h: 360 });
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
   const ratio = RATIOS[ratioIdx].value;
 
-  // Locked ratios derive the short side from the long one, so the viewport on
-  // screen and the exported canvas always share the same shape.
-  const view = ratio
-    ? (box.w >= box.h
-        ? { w: box.w, h: box.w / ratio }
-        : { w: box.h * ratio, h: box.h })
-    : { w: box.w, h: box.h };
-
-  // Longest edge of the export equals the chosen size; the rest follows the
-  // framing the user set, which keeps a free crop free.
-  const k = size / Math.max(view.w, view.h);
-  const outW = Math.max(1, Math.round(view.w * k));
-  const outH = Math.max(1, Math.round(view.h * k));
-
   // Load the picked file once per open.
   useEffect(() => {
-    if (!file) return;
     if (!ACCEPTED.test(file.type)) { setErr('Use a JPG, PNG or WebP image.'); return; }
     if (file.size > 15 * 1024 * 1024) { setErr('Image too large (max 15 MB).'); return; }
-    setErr(''); setBusy(true);
-    setZoom(1); setOff({ x: 0, y: 0 }); setRot(0); setFlipX(false); setFlipY(false);
+    setErr('');
     const url = URL.createObjectURL(file);
-    setSrc(url);
     const img = new Image();
-    img.onload = () => { imgRef.current = img; setNat({ w: img.naturalWidth, h: img.naturalHeight }); setBusy(false); };
-    img.onerror = () => { setErr('Could not read that image.'); setBusy(false); };
+    img.onload = () => { imgRef.current = img; setNat({ w: img.naturalWidth, h: img.naturalHeight }); setReady(true); };
+    img.onerror = () => { URL.revokeObjectURL(url); setErr('Could not read that image.'); };
     img.src = url;
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // The drawn footprint after rotation — a 90° turn swaps the axes.
   const foot = rot % 180 === 0 ? { w: nat.w, h: nat.h } : { w: nat.h, h: nat.w };
+  const cover = Math.max(SW / (foot.w || 1), SH / (foot.h || 1)) * zoom;
 
-  // Panning happens in screen pixels, so convert to output pixels via the box.
-  const scaleAt = (z) => Math.max(outW / (foot.w || 1), outH / (foot.h || 1)) * z;
+  // The image is held at cover scale, so no pan can ever expose empty stage
+  // inside the box.
+  const clampOff = useCallback((z, o) => {
+    const s = Math.max(SW / (foot.w || 1), SH / (foot.h || 1)) * z;
+    const lx = Math.max(0, (foot.w * s - SW) / 2);
+    const ly = Math.max(0, (foot.h * s - SH) / 2);
+    return { x: Math.max(-lx, Math.min(lx, o.x)), y: Math.max(-ly, Math.min(ly, o.y)) };
+  }, [foot.w, foot.h]);
 
-  // `off` is stored in output pixels but measured from the viewport, so resizing
-  // the box rescales the existing pan rather than snapping it.
-  const clampOff = useCallback((z, o, vw, vh) => {
-    const s = Math.max(outW / (foot.w || 1), outH / (foot.h || 1)) * z;
-    const lx = Math.max(0, (foot.w * s - outW) / 2);
-    const ly = Math.max(0, (foot.h * s - outH) / 2);
-    const k = Math.max(outW / (vw || outW), outH / (vh || outH));
-    return { x: Math.max(-lx, Math.min(lx, o.x * k)), y: Math.max(-ly, Math.min(ly, o.y * k)) };
-  }, [foot.w, foot.h, outW, outH]);
-
-  // Redraw whenever the transform or the output box changes.
   useEffect(() => {
-    const cv = canvasRef.current, img = imgRef.current;
+    const cv = cvRef.current, img = imgRef.current;
     if (!cv || !img || !nat.w) return;
-    cv.width = outW; cv.height = outH;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = SW * dpr;
+    cv.height = SH * dpr;
     const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, outW, outH);
-    const s = scaleAt(zoom);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, SW, SH);
     ctx.save();
-    ctx.translate(outW / 2 + off.x, outH / 2 + off.y);
+    ctx.translate(SW / 2 + off.x, SH / 2 + off.y);
     ctx.rotate((rot * Math.PI) / 180);
     ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-    ctx.scale(s, s);
+    ctx.scale(cover, cover);
     ctx.drawImage(img, -nat.w / 2, -nat.h / 2, nat.w, nat.h);
     ctx.restore();
-  }, [nat, zoom, off, rot, flipX, flipY, outW, outH, scaleAt]);
 
-  const onPointerDown = (e) => {
+    // Dim everything outside the box via an even-odd fill.
+    ctx.fillStyle = 'rgba(24, 10, 16, 0.55)';
+    ctx.beginPath();
+    ctx.rect(0, 0, SW, SH);
+    ctx.rect(box.x, box.y, box.w, box.h);
+    ctx.fill('evenodd');
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(box.x + (box.w * i) / 3, box.y);
+      ctx.lineTo(box.x + (box.w * i) / 3, box.y + box.h);
+      ctx.moveTo(box.x, box.y + (box.h * i) / 3);
+      ctx.lineTo(box.x + box.w, box.y + (box.h * i) / 3);
+      ctx.stroke();
+    }
+  }, [nat, zoom, off, rot, flipX, flipY, box, cover]);
+
+  // Pointer position in stage units.
+  const at = (e) => {
+    const r = stageRef.current.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (SW / r.width), y: (e.clientY - r.top) * (SH / r.height) };
+  };
+
+  const onPanDown = (e) => {
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y };
+    const p = at(e);
+    panRef.current = { x: p.x, y: p.y, ox: off.x, oy: off.y };
   };
-  const onPointerMove = (e) => {
-    if (!dragRef.current) return;
-    const d = dragRef.current;
-    setOff(clampOff(zoom, { x: d.ox + (e.clientX - d.x), y: d.oy + (e.clientY - d.y) }, view.w, view.h));
+  const onPanMove = (e) => {
+    if (!panRef.current) return;
+    const p = at(e), d = panRef.current;
+    setOff(clampOff(zoom, { x: d.ox + (p.x - d.x), y: d.oy + (p.y - d.y) }));
   };
-  const onPointerUp = () => { dragRef.current = null; };
 
-  // Corner handle: locked ratios drive width and derive height, free mode moves
-  // width and height independently.
-  const onResizeDown = (e) => {
+  const onHandleDown = (e, id) => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    resizeRef.current = { x: e.clientX, y: e.clientY, w: box.w, h: box.h };
+    dragRef.current = { id, x: e.clientX, y: e.clientY, box };
   };
-  const onResizeMove = (e) => {
-    if (!resizeRef.current) return;
-    const r = resizeRef.current;
-    const w = Math.max(MIN_BOX, Math.min(MAX_BOX, r.w + (e.clientX - r.x)));
-    const h = ratio
-      ? Math.max(MIN_BOX, Math.min(MAX_BOX, w / ratio))
-      : Math.max(MIN_BOX, Math.min(MAX_BOX, r.h + (e.clientY - r.y)));
-    setBox({ w, h });
+  const onHandleMove = (e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    const rx = SW / stageRef.current.getBoundingClientRect().width;
+    const ry = SH / stageRef.current.getBoundingClientRect().height;
+    setBox(resizeBox(d.box, d.id, dx * rx, dy * ry, ratio));
   };
-  const onResizeUp = () => { resizeRef.current = null; };
+  const endDrag = () => { dragRef.current = null; panRef.current = null; };
 
   // Wheel zoom needs a non-passive native listener to stop the page scrolling.
   useEffect(() => {
-    const el = canvasRef.current?.parentElement;
+    const el = stageRef.current;
     if (!el) return;
     const onWheel = (e) => {
       e.preventDefault();
       setZoom(z => {
         const next = Math.max(1, Math.min(8, z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)));
-        // Re-clamp with the current viewport or a zoom-in can push the image out of frame.
-        setOff(o => clampOff(next, o, view.w, view.h));
+        setOff(o => clampOff(next, o));
         return next;
       });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [src, view.w, view.h, clampOff]);
+  }, [clampOff]);
 
-  // Changing the shape can leave the image uncovered, so pull the pan back in.
-  useEffect(() => { setOff(o => clampOff(zoom, o, view.w, view.h)); }, [view.w, view.h, ratioIdx]);
-
-  // Fit the viewport inside the stage on open and whenever the ratio changes.
-  useEffect(() => {
-    setBox(b => {
-      if (!ratio) return b;
-      const w = Math.min(MAX_BOX, Math.max(MIN_BOX, Math.min(b.w, b.h * ratio)));
-      return { w, h: w / ratio };
-    });
-  }, [ratioIdx]);
-
-  const finish = (blob, mime) => {
-    const base = (file.name || 'image').replace(/\.[^.]+$/, '') || 'image';
-    const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
-    onCrop(new File([blob], `${base}-cropped.${ext}`, { type: mime }), url);
+  const reset = () => {
+    setZoom(1); setOff({ x: 0, y: 0 }); setRot(0); setFlipX(false); setFlipY(false);
+    setBox(fitBox(RATIOS[ratioIdx].value));
   };
 
   const emit = () => {
-    const cv = canvasRef.current;
+    const cv = cvRef.current;
     if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const k = size / Math.max(box.w, box.h);
+    const outW = Math.max(1, Math.round(box.w * k));
+    const outH = Math.max(1, Math.round(box.h * k));
     setBusy(true);
+    const out = document.createElement('canvas');
+    out.width = outW; out.height = outH;
+    out.getContext('2d').drawImage(
+      cv,
+      box.x * dpr, box.y * dpr, box.w * dpr, box.h * dpr,
+      0, 0, outW, outH,
+    );
     const mime = file.type === 'image/png' ? 'image/png' : file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
-    cv.toBlob(blob => {
-      if (!blob) { setErr('Crop failed — try a smaller output size.'); setBusy(false); return; }
-      finish(blob, mime);
+    out.toBlob(blob => {
+      setBusy(false);
+      if (!blob) { setErr('Crop failed — try a smaller output size.'); return; }
+      const base = (file.name || 'image').replace(/\.[^.]+$/, '') || 'image';
+      const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+      onCrop(new File([blob], `${base}-cropped.${ext}`, { type: mime }));
     }, mime, 0.92);
   };
-
-  const useOriginal = () => onCrop(file, URL.createObjectURL(file));
 
   return (
     <div className="ndg-crop-overlay" role="dialog" aria-modal="true" aria-label="Crop picture">
@@ -192,33 +214,41 @@ export default function ImageCropModal({ target, onCancel }) {
         <div className="ndg-crop-head">
           <div>
             <h2 className="ndg-crop-title">Crop picture</h2>
-            <p className="ndg-crop-sub">Drag to reposition, scroll or use the slider to zoom.</p>
+            <p className="ndg-crop-sub">Drag the image to reposition, or drag any edge or corner to resize.</p>
           </div>
           <button className="ndg-icon-btn" onClick={onCancel} aria-label="Close crop">&times;</button>
         </div>
 
         <div className="ndg-crop-stage">
           <div
-            className="ndg-crop-viewport"
-            style={{ width: view.w, height: view.h }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
+            ref={stageRef}
+            className="ndg-crop-canvas"
+            onPointerDown={onPanDown}
+            onPointerMove={onPanMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
           >
-            {busy && !src && <span className="ndg-crop-busy">Loading…</span>}
-            <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', borderRadius: ratio ? '2px' : 0 }} />
-            {ratio === 0 && (
+            <canvas ref={cvRef} className="ndg-crop-img" />
+            {ready && HANDLES.map(h => (
               <span
-                className="ndg-crop-handle"
-                onPointerDown={onResizeDown}
-                onPointerMove={onResizeMove}
-                onPointerUp={onResizeUp}
-                onPointerCancel={onResizeUp}
+                key={h.id}
+                className="ndg-crop-grip"
                 role="separator"
-                aria-label="Resize crop area"
+                aria-label={`Resize ${h.id} edge`}
+                style={{
+                  left: `${(box.x + box.w * h.fx) / SW * 100}%`,
+                  top: `${(box.y + box.h * h.fy) / SH * 100}%`,
+                  width: h.fx === 0.5 ? 48 : 16,
+                  height: h.fy === 0.5 ? 48 : 16,
+                  transform: 'translate(-50%, -50%)',
+                  cursor: h.cur,
+                }}
+                onPointerDown={e => onHandleDown(e, h.id)}
+                onPointerMove={onHandleMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
               />
-            )}
+            ))}
           </div>
         </div>
 
@@ -226,15 +256,16 @@ export default function ImageCropModal({ target, onCancel }) {
           <div className="ndg-crop-row">
             <label className="ndg-crop-check">
               <input type="checkbox" checked={ratio !== 0}
-                onChange={e => {
-                  const next = e.target.checked ? (ratio === 0 ? 1 : ratio) : 0;
-                  const i = RATIOS.findIndex(r => r.value === next);
-                  setRatioIdx(i < 0 ? 1 : i);
-                }} />
+                onChange={e => setRatioIdx(e.target.checked ? 1 : 0)} />
               Lock aspect ratio
             </label>
             <select className="ndg-crop-select" value={ratioIdx} disabled={ratio === 0}
-              onChange={e => setRatioIdx(Number(e.target.value))}>
+              onChange={e => {
+                const i = Number(e.target.value);
+                setRatioIdx(i);
+                // Reshape about the box centre so the framing the user set holds.
+                setBox(b => reshape(b, RATIOS[i].value));
+              }}>
               {RATIOS.map((r, i) => <option key={r.label} value={i}>{r.label}</option>)}
             </select>
             <select className="ndg-crop-select" value={size} onChange={e => setSize(Number(e.target.value))}>
@@ -245,28 +276,30 @@ export default function ImageCropModal({ target, onCancel }) {
           <div className="ndg-crop-row">
             <span className="ndg-crop-lbl">Zoom</span>
             <input type="range" min="1" max="8" step="0.01" value={zoom} className="ndg-crop-range"
-              onChange={e => { const z = Number(e.target.value); setZoom(z); setOff(o => clampOff(z, o, view.w, view.h)); }} />
+              onChange={e => { const z = Number(e.target.value); setZoom(z); setOff(o => clampOff(z, o)); }} />
             <button className="ndg-crop-mini" aria-label="Zoom out"
-              onClick={() => setZoom(z => Math.max(1, z - 0.25))}>&minus;</button>
+              onClick={() => { setZoom(z => { const n = Math.max(1, z - 0.25); setOff(o => clampOff(n, o)); return n; }); }}>&minus;</button>
             <button className="ndg-crop-mini" aria-label="Zoom in"
-              onClick={() => setZoom(z => Math.min(8, z + 0.25))}>+</button>
+              onClick={() => { setZoom(z => { const n = Math.min(8, z + 0.25); setOff(o => clampOff(n, o)); return n; }); }}>+</button>
           </div>
 
           <div className="ndg-crop-row">
-            <button className="ndg-crop-mini" onClick={() => { setRot(r => (r + 270) % 360); }} aria-label="Rotate left">&#8630;</button>
-            <button className="ndg-crop-mini" onClick={() => { setRot(r => (r + 90) % 360); }} aria-label="Rotate right">&#8631;</button>
+            <button className="ndg-crop-mini" onClick={() => setRot(r => (r + 270) % 360)} aria-label="Rotate left">&#8630;</button>
+            <button className="ndg-crop-mini" onClick={() => setRot(r => (r + 90) % 360)} aria-label="Rotate right">&#8631;</button>
             <button className="ndg-crop-mini" onClick={() => setFlipX(v => !v)} aria-pressed={flipX}>Flip H</button>
             <button className="ndg-crop-mini" onClick={() => setFlipY(v => !v)} aria-pressed={flipY}>Flip V</button>
-            <button className="ndg-crop-mini" onClick={() => { setZoom(1); setOff({ x: 0, y: 0 }); setRot(0); setFlipX(false); setFlipY(false); }}>Reset</button>
+            <button className="ndg-crop-mini" onClick={reset}>Reset</button>
           </div>
         </div>
 
         {err && <div className="ndg-crop-err">{err}</div>}
 
         <div className="ndg-crop-foot">
-          <button className="ndg-ov-ghost-btn" onClick={useOriginal}>Use original</button>
+          <button className="ndg-ov-ghost-btn" onClick={() => onCrop(file)}>Use original</button>
           <button className="ndg-ov-ghost-btn" onClick={onCancel}>Cancel</button>
-          <button className="ndg-ov-primary-btn" onClick={emit} disabled={busy || !!err || !nat.w}>{busy ? 'Working…' : 'Apply crop'}</button>
+          <button className="ndg-ov-primary-btn" onClick={emit} disabled={busy || !!err || !nat.w}>
+            {busy ? 'Working…' : 'Apply crop'}
+          </button>
         </div>
       </div>
     </div>
