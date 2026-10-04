@@ -221,7 +221,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const resolveRole = (uid) =>
     supabase.from('users').select('role_key, id, email, must_change_password, status').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
-    supabase.from('users').select('id, role_key, name, email, phone, designation, program_id, discipline_id').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+    supabase.from('users').select('id, role_key, name, email, phone, designation, program_id, avatar_url').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
 
   // Entering the portal is only legal once the account no longer owes a password
   // swap; a session alone just means Supabase let us in. Without this gate a
@@ -261,6 +261,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     setProfileName(myProfile.name || '');
     setProfilePhone(myProfile.phone || '');
     setProfileDesignation(myProfile.designation || '');
+    setProfileAvatar(null);
     setProfileMsg('');
   }, [profileOpen, myProfile]);
 
@@ -361,14 +362,34 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     }
   };
 
+  const handlePickAvatar = async (file) => {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { setProfileMsg('Use a JPG, PNG or WebP image.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setProfileMsg('Image too large (max 5 MB).'); return; }
+    setProfileUploading(true); setProfileMsg('');
+    try {
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const res = await apiCall(`${apiUrl}/api/upload`, { method: 'POST', body: JSON.stringify({ filename: file.name, mime: file.type, data: String(dataUrl).split(',')[1] }) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Upload failed'); }
+      setProfileAvatar((await res.json()).url);
+    } catch (error) { setProfileMsg(error.message); }
+    finally { setProfileUploading(false); }
+  };
+
   const handleSaveProfile = async () => {
     const nextName = profileName.trim();
     if (!nextName) { setProfileMsg('Name cannot be empty.'); return; }
     setProfileSaving(true); setProfileMsg('');
     try {
-      const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify({ name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim() }) });
+      const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify({ name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim(), avatar_url: profileAvatar || null }) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Save failed'); }
-      setMyProfile(prev => (prev ? { ...prev, name: nextName, phone: profilePhone.trim() || null, designation: profileDesignation.trim() || null } : prev));
+      const saved = await res.json();
+      setMyProfile(prev => (prev ? { ...prev, ...saved } : prev));
       setProfileMsg('Saved.');
       fetchData();
     } catch (error) { setProfileMsg(error.message); }
@@ -792,6 +813,8 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [profileName, setProfileName] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
   const [profileDesignation, setProfileDesignation] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState(null); // local preview URL before save
+  const [profileUploading, setProfileUploading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
@@ -2663,6 +2686,14 @@ const handleAddDiscipline = async (e) => {
                     <div className="ndg-profile-body">
                       <label style={label}>Display Name</label>
                       <input value={profileName} onChange={e => setProfileName(e.target.value)} style={field} placeholder="Your full name" />
+                      <label style={{ ...label, marginTop: '16px' }}>Profile Picture</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: '#666', overflow: 'hidden' }}>
+                          {profileAvatar ? <img src={profileAvatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (myProfile?.name?.[0] || 'A').toUpperCase()}
+                        </div>
+                        <input type="file" accept="image/*" onChange={e => handlePickAvatar(e.target.files[0])} disabled={profileUploading} />
+                        {profileUploading && <span>Uploading…</span>}
+                      </div>
                       <label style={{ ...label, marginTop: '16px' }}>Phone</label>
                       <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} style={field} placeholder="Contact number" />
                       <label style={{ ...label, marginTop: '16px' }}>Designation</label>
