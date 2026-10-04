@@ -13,6 +13,10 @@ const RATIOS = [
 ];
 const SIZES = [512, 1024, 2048];
 
+// Source canvas density for the export. Above the stage's own device pixels on
+// purpose, so a crop of a small region still has real pixels to export.
+const RAW_SCALE = 3;
+
 // The stage is a fixed logical size that gets scaled by CSS, so pointer maths
 // only ever deals in these units.
 const ACCEPTED = /^image\/(jpeg|png|webp)$/;
@@ -96,14 +100,18 @@ export default function ImageCropModal({ target, onCancel }) {
     const cv = cvRef.current, img = imgRef.current;
     if (!cv || !img || !nat.w) return;
     const dpr = window.devicePixelRatio || 1;
-    // Painted without the dim overlay and guides, so the crop never bakes them in.
+    // The raw canvas holds no overlay or guides, so the crop never bakes them
+    // in. It is painted at a fixed 2x stage scale rather than at dpr, so a
+    // small crop box still exports real pixels instead of a blurry upscale.
     if (!rawRef.current) rawRef.current = document.createElement('canvas');
     const raw = rawRef.current;
-    raw.width = cv.width = SW * dpr;
-    raw.height = cv.height = SH * dpr;
+    raw.width = SW * RAW_SCALE;
+    raw.height = SH * RAW_SCALE;
+    cv.width = SW * dpr;
+    cv.height = SH * dpr;
 
-    const paint = (ctx) => {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const paint = (ctx, scale) => {
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
       ctx.clearRect(0, 0, SW, SH);
       ctx.save();
       ctx.translate(SW / 2 + off.x, SH / 2 + off.y);
@@ -113,10 +121,10 @@ export default function ImageCropModal({ target, onCancel }) {
       ctx.drawImage(img, -nat.w / 2, -nat.h / 2, nat.w, nat.h);
       ctx.restore();
     };
-    paint(raw.getContext('2d'));
+    paint(raw.getContext('2d'), RAW_SCALE);
 
     const ctx = cv.getContext('2d');
-    paint(ctx);
+    paint(ctx, dpr);
 
     // Dim everything outside the box via an even-odd fill.
     ctx.fillStyle = 'rgba(24, 10, 16, 0.55)';
@@ -196,15 +204,18 @@ export default function ImageCropModal({ target, onCancel }) {
   const emit = () => {
     const raw = rawRef.current;
     if (!raw) return;
-    const k = size / Math.max(box.w, box.h);
+    // `size` is a wish, not a command: upscaling past the source pixels only
+    // makes a blurry file, so cap at 1:1 with the raw canvas.
+    const k = Math.min(size / Math.max(box.w, box.h), RAW_SCALE);
     const outW = Math.max(1, Math.round(box.w * k));
     const outH = Math.max(1, Math.round(box.h * k));
     setBusy(true);
     const out = document.createElement('canvas');
     out.width = outW; out.height = outH;
+    // Source rect is in raw's backing-store pixels; box is in stage units.
     out.getContext('2d').drawImage(
       raw,
-      box.x, box.y, box.w, box.h,
+      box.x * RAW_SCALE, box.y * RAW_SCALE, box.w * RAW_SCALE, box.h * RAW_SCALE,
       0, 0, outW, outH,
     );
     const mime = file.type === 'image/png' ? 'image/png' : file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';

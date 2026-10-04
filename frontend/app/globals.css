@@ -2222,3 +2222,12 @@ input, select, textarea {
 .ndg-crop-err { padding: 10px 20px; color: #81171a; font-size: 13px; font-weight: 600; }
 .ndg-crop-foot { padding: 15px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
 .ndg-crop-busy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.7); }
+
+/* Full-size picture preview */
+.ndg-lightbox { position: fixed; inset: 0; background: rgba(24, 8, 12, 0.88); display: flex; align-items: center; justify-content: center; z-index: 2100; padding: 32px; cursor: zoom-out; }
+.ndg-lightbox img { max-width: 100%; max-height: 100%; border-radius: var(--radius-lg); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
+.ndg-lightbox-close { position: absolute; top: 20px; right: 24px; width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 26px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ndg-lightbox-close:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Clicking the avatar opens the preview, so say so. */
+.ndg-profile-avatar-pick img { cursor: zoom-in; }

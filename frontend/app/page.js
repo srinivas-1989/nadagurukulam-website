@@ -845,6 +845,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [profilePhone, setProfilePhone] = useState('');
   const [profileDesignation, setProfileDesignation] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null); // local preview URL before save
+  const [profilePreview, setProfilePreview] = useState('');
   const [profileInitials, setProfileInitials] = useState('');
   const [profileUploading, setProfileUploading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -2732,7 +2733,17 @@ const handleAddDiscipline = async (e) => {
                       <div className="ndg-profile-avatar-row">
                         <span className="ndg-profile-avatar-pick">
                           {(profileAvatar !== '' && (profileAvatar || myProfile?.avatar_url))
-                            ? <img src={profileAvatar || myProfile.avatar_url} alt="" />
+                            ? <img
+                                src={profileAvatar || myProfile.avatar_url}
+                                alt=""
+                                role="button"
+                                tabIndex={0}
+                                title="Click to preview full size"
+                                onClick={() => setProfilePreview(
+                                  profileAvatar || myProfile?.avatar_url || '',
+                                )}
+                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfilePreview(profileAvatar || myProfile?.avatar_url || ''); } }}
+                              />
                             : initialsFor(myProfile)}
                         </span>
                         <label className="ndg-profile-file-btn">
@@ -2766,6 +2777,19 @@ const handleAddDiscipline = async (e) => {
                 </div>
               );
             })()}
+
+            {profilePreview && (
+              <div
+                className="ndg-lightbox"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Profile picture preview"
+                onClick={() => setProfilePreview('')}
+              >
+                <img src={profilePreview} alt="Profile picture preview" />
+                <button className="ndg-lightbox-close" onClick={() => setProfilePreview('')} aria-label="Close preview">&times;</button>
+              </div>
+            )}
 
             {cropperNode}
 
