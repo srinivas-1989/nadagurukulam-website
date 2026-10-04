@@ -2173,3 +2173,22 @@ input, select, textarea {
   border-top: 1px solid var(--border);
   background: var(--bg-saffron);
 }
+
+/* Image cropper */
+.ndg-crop-overlay { position: fixed; inset: 0; background: rgba(35, 10, 18, 0.7); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+.ndg-crop-card { background: var(--bg); border-radius: var(--radius-xl); width: 100%; max-width: 600px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden; }
+.ndg-crop-head { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+.ndg-crop-title { font-size: 18px; color: var(--primary-deep); margin: 0; }
+.ndg-crop-sub { font-size: 12px; color: var(--text-faint); margin: 4px 0 0; }
+.ndg-crop-stage { padding: 20px; display: flex; align-items: center; justify-content: center; background: #eee; min-height: 300px; }
+.ndg-crop-viewport { position: relative; border: 2px solid var(--primary); cursor: move; overflow: hidden; }
+.ndg-crop-handle { position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; background: var(--primary); cursor: nwse-resize; }
+.ndg-crop-controls { padding: 15px 20px; display: flex; flex-direction: column; gap: 10px; background: var(--bg-saffron); }
+.ndg-crop-row { display: flex; align-items: center; gap: 10px; }
+.ndg-crop-check { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.ndg-crop-select { min-width: 90px; }
+.ndg-crop-range { flex: 1; }
+.ndg-crop-mini { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 12px; }
+.ndg-crop-err { padding: 10px 20px; color: #81171a; font-size: 13px; font-weight: 600; }
+.ndg-crop-foot { padding: 15px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+.ndg-crop-busy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.7); }

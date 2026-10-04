@@ -1,6 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { useImageCropper } from './ImageCropModal';
 
 const UserPersonalTab = ({ userId, dbData }) => {
   const u = dbData?.users?.find(user => user.id === userId);
@@ -139,6 +140,7 @@ const UserKycTab = ({ userId, kycDocs, onAddDoc, onDeleteDoc, docType, setDocTyp
 
 
 export default function Home() {
+  const { openCrop, cropperNode } = useImageCropper();
   // Roles are data (the `roles` table, seeded by the Phase 4 schema) — the picker renders the API's response.
 
   // Modules are the app's own screens — structural, this code implements them.
@@ -372,10 +374,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     }
   };
 
-  const handlePickAvatar = async (file) => {
-    if (!file) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { setProfileMsg('Use a JPG, PNG or WebP image.'); return; }
-    if (file.size > 5 * 1024 * 1024) { setProfileMsg('Image too large (max 5 MB).'); return; }
+  const uploadAvatar = async (file) => {
     setProfileUploading(true); setProfileMsg('');
     try {
       const dataUrl = await new Promise((res, rej) => {
@@ -389,6 +388,14 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       setProfileAvatar((await res.json()).url);
     } catch (error) { setProfileMsg(error.message); }
     finally { setProfileUploading(false); }
+  };
+
+  const handlePickAvatar = (file) => {
+    if (!file) return;
+    if (!IMAGE.test(file.type)) { setProfileMsg('Use a JPG, PNG or WebP image.'); return; }
+    if (file.size > 15 * 1024 * 1024) { setProfileMsg('Image too large (max 15 MB).'); return; }
+    // Cropping happens before upload, so a bad pick never touches the network.
+    openCrop(file, uploadAvatar);
   };
 
   const handleSaveProfile = async () => {
@@ -657,7 +664,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     return next;
   });
 
-  const uploadFile = async (file, onUrl) => {
+  const sendFile = async (file, onUrl) => {
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) { alert('File too large (max 15 MB)'); return; }
     const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(file); });
@@ -668,6 +675,16 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       if (!resp.ok) { alert(j.error || 'Upload failed — create Storage bucket "attachments" in Supabase'); return; }
       onUrl(j.url);
     } finally { setUploadingKey(null); }
+  };
+
+  const IMAGE = /^image\/(jpeg|png|webp)$/;
+
+  // Images get the crop dialog first; everything else goes straight through. This
+  // is the one hook every upload site already calls, so no per-site wiring.
+  const uploadFile = (file, onUrl) => {
+    if (!file) return;
+    if (IMAGE.test(file.type)) openCrop(file, cropped => sendFile(cropped, onUrl));
+    else sendFile(file, onUrl);
   };
 
   // Public-site copy is data too: a cms/home block in MongoDB, edited inline by Super Admin.
@@ -2741,6 +2758,8 @@ const handleAddDiscipline = async (e) => {
                 </div>
               );
             })()}
+
+            {cropperNode}
 
             {activeModule !== 'overview' && (() => {
               const m = MODULES.find(mod => mod.key === activeModule);
