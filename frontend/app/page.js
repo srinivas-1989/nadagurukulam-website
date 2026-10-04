@@ -475,7 +475,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   // A module absent from this map falls back to its record count, so a newly
   // added module still renders a block instead of a blank.
   const WIDGET_DEFS = {
-    users: { label: 'Users', sub: d => `${(d.users || []).filter(u => !u.is_verified).length} unverified` },
+    users: { label: 'Users', sub: d => `${(d.users || []).filter(u => u.status === 'pending').length} awaiting approval` },
     curriculum: { label: 'Disciplines', sub: d => `${(d.courses || []).length} courses` },
     timetable: { label: 'Timetable Slots', sub: d => `${(d.timetable_periods || []).length} periods defined` },
     batches: { label: 'Batches', sub: d => `${(d.batches || []).filter(b => b.status === 'active').length} active` },
@@ -2636,7 +2636,7 @@ const handleAddDiscipline = async (e) => {
               // Each stat belongs to a module, so a user who cannot reach that
               // module should not see a number that would be unreadable in place.
               const heroStats = [
-                { label: 'pending verifications', val: dbData.users.filter(u => !u.verified).length, mod: 'users' },
+                { label: 'pending approvals', val: dbData.users.filter(u => u.status === 'pending').length, mod: 'users' },
                 { label: 'ungraded submissions', val: dbData.assignment_submissions.filter(s => !s.grade).length, mod: 'assignments' },
                 { label: 'total students', val: dbData.users.filter(u => u.role === 'student').length, mod: 'users' },
               ].filter(s => perm(s.mod));
