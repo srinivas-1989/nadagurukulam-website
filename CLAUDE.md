@@ -8,14 +8,15 @@ Where things are and how they wire. Not docs, not onboarding. Read before editin
 - **Design**: `NDG_Design Guidelines_V1_20260609.pdf` — maroon/saffron/cream, two-side-rounded corners
 - **Deploy**: `render.yaml` (backend blueprint) + Vercel root dir `frontend`. See `DEPLOY.md`.
 
-## Status (2026-09-26)
+## Status (2026-10-04)
 - Portal shell renders for **all authenticated roles** (`view === 'portal'`)
 - Dashboard: burgundy hero, 4 metric cards, CSS activity bars, quick actions, live classes
+- Overview Layout: Unified grid in normal view with dynamic row-packing (order-agnostic, auto-fill sections), distinct Statistics/Sections groups visible only in "Edit Layout" mode
 - Sidebar (fixed, maroon) + top bar (sticky) + main (max-width 940px)
 - Permission gates `perm()/canCreate()/canAdmin()/isFull()` preserved
 - Build passes (`npm run build` exit 0, no warnings after `turbopack.root` pinned)
 - Phases 1–6 complete; next: production stability, student analytics, lesson plans
-- **Unverified**: the `</nav>` + topbar fixes render only inside the authenticated shell — build-verified, not browser-verified (needs a login)
+- **Unverified**: authenticated portal shell and overview dashboard visual layouts are build-verified, not browser-verified (needs a login)
 
 ## Codebase map
 ```
@@ -55,10 +56,12 @@ DEPLOY.md, README.md, plan_of_action.md
 
 ## Dashboard (activeModule === 'overview')
 - Dark burgundy hero (`var(--primary-deep)`, `var(--radius-xl)`)
-- 4 metric cards: Users, Disciplines, Courses, Live Sessions
-- CSS-only activity bar (6 metrics)
-- Quick actions: top 5 modules where `canCreate()`
-- Live classes: up to 3 active/scheduled from `dbData.live_sessions`
+- Unified responsive 4-column widget grid (`.ndg-widget-grid`)
+- Row-packing algorithm: 4 units/line, Stat cards fixed at 1 unit, Section cards (Platform Activity, Quick Actions, Live Classes) auto-fill empty line space (default 2 units, stretches to 3 or 4)
+- Any sequence/order supported seamlessly (order-agnostic)
+- Edit Mode: Displays separated, labelled grids for "Statistics" and "Sections"
+- Quick actions: modules where `canCreate()`
+- Live classes: active/scheduled from `dbData.live_sessions`
 
 ## Key helpers (page.js)
 - `fetchData()` — loads all `dbData` from API
