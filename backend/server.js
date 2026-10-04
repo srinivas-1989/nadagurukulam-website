@@ -1114,6 +1114,8 @@ app.put('/api/me', authMiddleware, async (req, res) => {
     const patch = {};
     for (const [k, max] of Object.entries(SELF_EDITABLE)) {
       if (req.body?.[k] === undefined) continue;
+      // An explicit null clears the column; String(null) would store "null".
+      if (req.body[k] === null) { patch[k] = null; continue; }
       const v = String(req.body[k]).trim();
       if (k === 'name' && !v) return res.status(400).json({ error: 'Name is required' });
       if (v.length > max) return res.status(400).json({ error: `${k} too long` });

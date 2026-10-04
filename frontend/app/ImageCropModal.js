@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { resizeBox, reshape, SW, SH } from './cropMath.mjs';
 
 // Free (0) lets every edge move on its own; the rest pin the box to a preset.
 const RATIOS = [
@@ -14,7 +15,6 @@ const SIZES = [512, 1024, 2048];
 
 // The stage is a fixed logical size that gets scaled by CSS, so pointer maths
 // only ever deals in these units.
-import { resizeBox, reshape, SW, SH } from './cropMath.mjs';
 const ACCEPTED = /^image\/(jpeg|png|webp)$/;
 
 // Anchored on the opposite edge, like every other crop tool.
@@ -47,6 +47,7 @@ export default function ImageCropModal({ target, onCancel }) {
   const { file, onCrop } = target;
   const stageRef = useRef(null);
   const cvRef = useRef(null);
+  const rawRef = useRef(null);
   const imgRef = useRef(null);
   const panRef = useRef(null);
   const dragRef = useRef(null);
@@ -95,18 +96,27 @@ export default function ImageCropModal({ target, onCancel }) {
     const cv = cvRef.current, img = imgRef.current;
     if (!cv || !img || !nat.w) return;
     const dpr = window.devicePixelRatio || 1;
-    cv.width = SW * dpr;
-    cv.height = SH * dpr;
+    // Painted without the dim overlay and guides, so the crop never bakes them in.
+    if (!rawRef.current) rawRef.current = document.createElement('canvas');
+    const raw = rawRef.current;
+    raw.width = cv.width = SW * dpr;
+    raw.height = cv.height = SH * dpr;
+
+    const paint = (ctx) => {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, SW, SH);
+      ctx.save();
+      ctx.translate(SW / 2 + off.x, SH / 2 + off.y);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+      ctx.scale(cover, cover);
+      ctx.drawImage(img, -nat.w / 2, -nat.h / 2, nat.w, nat.h);
+      ctx.restore();
+    };
+    paint(raw.getContext('2d'));
+
     const ctx = cv.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, SW, SH);
-    ctx.save();
-    ctx.translate(SW / 2 + off.x, SH / 2 + off.y);
-    ctx.rotate((rot * Math.PI) / 180);
-    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-    ctx.scale(cover, cover);
-    ctx.drawImage(img, -nat.w / 2, -nat.h / 2, nat.w, nat.h);
-    ctx.restore();
+    paint(ctx);
 
     // Dim everything outside the box via an even-odd fill.
     ctx.fillStyle = 'rgba(24, 10, 16, 0.55)';
@@ -184,9 +194,8 @@ export default function ImageCropModal({ target, onCancel }) {
   };
 
   const emit = () => {
-    const cv = cvRef.current;
-    if (!cv) return;
-    const dpr = window.devicePixelRatio || 1;
+    const raw = rawRef.current;
+    if (!raw) return;
     const k = size / Math.max(box.w, box.h);
     const outW = Math.max(1, Math.round(box.w * k));
     const outH = Math.max(1, Math.round(box.h * k));
@@ -194,8 +203,8 @@ export default function ImageCropModal({ target, onCancel }) {
     const out = document.createElement('canvas');
     out.width = outW; out.height = outH;
     out.getContext('2d').drawImage(
-      cv,
-      box.x * dpr, box.y * dpr, box.w * dpr, box.h * dpr,
+      raw,
+      box.x, box.y, box.w, box.h,
       0, 0, outW, outH,
     );
     const mime = file.type === 'image/png' ? 'image/png' : file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
@@ -205,6 +214,7 @@ export default function ImageCropModal({ target, onCancel }) {
       const base = (file.name || 'image').replace(/\.[^.]+$/, '') || 'image';
       const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
       onCrop(new File([blob], `${base}-cropped.${ext}`, { type: mime }));
+      onCancel();
     }, mime, 0.92);
   };
 

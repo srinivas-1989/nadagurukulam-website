@@ -2299,7 +2299,15 @@ const handleAddDiscipline = async (e) => {
                   className="ndg-header-user"
                   onClick={() => setView('portal')}
                   title="Back to academic portal"
-                >{myProfile?.name || 'My account'}</button>
+                  style={{ display: 'flex', alignItems: 'center', gap: '9px' }}
+                >
+                  <span className="ndg-header-avatar">
+                    {myProfile?.avatar_url
+                      ? <img src={myProfile.avatar_url} alt="" />
+                      : <span>{initialsFor(myProfile)}</span>}
+                  </span>
+                  <span className="ndg-header-user-name">{myProfile?.name || 'My account'}</span>
+                </button>
                 <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
                   Log out
                 </button>
