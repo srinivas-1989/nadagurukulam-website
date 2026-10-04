@@ -1105,6 +1105,32 @@ app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
 });
 
 // Admin: user password/OTP management
+// Self-service profile edit. Deliberately separate from PUT /api/users/:id,
+// which requires Manage on the Users module. Only descriptive, non-privileged
+// fields are exposed — role_key, status, email and program stay admin-owned.
+const SELF_EDITABLE = { name: 120, phone: 20, designation: 80 };
+app.put('/api/me', authMiddleware, async (req, res) => {
+  try {
+    const patch = {};
+    for (const [k, max] of Object.entries(SELF_EDITABLE)) {
+      if (req.body?.[k] === undefined) continue;
+      const v = String(req.body[k]).trim();
+      if (k === 'name' && !v) return res.status(400).json({ error: 'Name is required' });
+      if (v.length > max) return res.status(400).json({ error: `${k} too long` });
+      patch[k] = v || null;
+    }
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
+    const { data, error } = await supabase
+      .from('users')
+      .update(patch)
+      .eq('id', req.auth.profile.id)
+      .select('id, name, email, phone, designation')
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // `mode` picks what the admin issues: 'otp' refreshes the one-time code only,
 // 'both' (default) issues a fresh temporary password and demands an OTP swap.
 app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res) => {

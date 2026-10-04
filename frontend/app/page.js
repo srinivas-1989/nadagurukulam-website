@@ -193,6 +193,7 @@ export default function Home() {
   const [dragOver, setDragOver] = useState(null);
   const [addBlockOpen, setAddBlockOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 // Add width/custom_title to widgets state
 const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, sort_order, width, custom_title}
 
@@ -220,7 +221,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const resolveRole = (uid) =>
     supabase.from('users').select('role_key, id, email, must_change_password, status').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
-    supabase.from('users').select('id, role_key, name, email').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+    supabase.from('users').select('id, role_key, name, email, phone, designation, program_id, discipline_id').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
 
   // Entering the portal is only legal once the account no longer owes a password
   // swap; a session alone just means Supabase let us in. Without this gate a
@@ -253,6 +254,15 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     setRole(profile?.role_key || null);
     setView('portal');
   };
+
+  // Seed the profile form each time it opens, so it always shows saved values.
+  useEffect(() => {
+    if (!profileOpen || !myProfile) return;
+    setProfileName(myProfile.name || '');
+    setProfilePhone(myProfile.phone || '');
+    setProfileDesignation(myProfile.designation || '');
+    setProfileMsg('');
+  }, [profileOpen, myProfile]);
 
   // Load initial session and data
   useEffect(() => {
@@ -349,6 +359,20 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     } catch (error) {
       alert(error.message);
     }
+  };
+
+  const handleSaveProfile = async () => {
+    const nextName = profileName.trim();
+    if (!nextName) { setProfileMsg('Name cannot be empty.'); return; }
+    setProfileSaving(true); setProfileMsg('');
+    try {
+      const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify({ name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim() }) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Save failed'); }
+      setMyProfile(prev => (prev ? { ...prev, name: nextName, phone: profilePhone.trim() || null, designation: profileDesignation.trim() || null } : prev));
+      setProfileMsg('Saved.');
+      fetchData();
+    } catch (error) { setProfileMsg(error.message); }
+    finally { setProfileSaving(false); }
   };
 
   const handleAdminApproveSignup = async (user) => {
@@ -765,6 +789,11 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [signupForm, setSignupForm] = useState({ name: '', email: '', phone: '', password: '', role_key: 'student', roll_no: '', designation: '', year_of_commencement: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
+  const [profileName, setProfileName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileDesignation, setProfileDesignation] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
   const [editUserPhone, setEditUserPhone] = useState('');
   const [editUserRoleKey, setEditUserRoleKey] = useState('');
@@ -2201,24 +2230,26 @@ const handleAddDiscipline = async (e) => {
           boxShadow: 'var(--shadow-md)', height: view === 'public' ? 'auto' : '60px',
           position: view === 'public' ? 'relative' : 'sticky', top: 0, zIndex: view === 'public' ? 'auto' : 50,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setView('public')} title="Nada Gurukulam — home">
-            <a href="/" title="Public site" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}><img src="/ndg-mark-cream-transparent.png" alt="Nada Gurukulam" style={{ height: view === 'public' ? '46px' : '36px', width: 'auto', background: 'transparent', display: 'block' }} /><span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '19px', letterSpacing: '0.01em', color: '#fff', lineHeight: 1.1 }}>Nada Gurukulam</span></a>
-            {view !== 'public' && (
-              <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '18px', letterSpacing: '0.02em' }}>Nada Gurukulam</span>
-            )}
+          <div className="ndg-side-logo" onClick={() => setView('public')} style={{ cursor: 'pointer' }} title="Nada Gurukulam — home">
+            <img src="/ndg-mark-cream-transparent.png" alt="" />
+            <div className="ndg-side-brand-copy">
+              <div className="ndg-side-brand-name">Nada Gurukulam</div>
+              <div className="ndg-side-brand-sub">Classical Arts Academy</div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {role && (
-              <span style={{ background: 'rgba(255,255,255,0.15)', padding: '6px 16px', borderRadius: '99px', fontSize: '14.5px' }}>
-                Role: <b>{roles.find(r => r.key === role)?.name || role}</b>
-              </span>
-            )}
-            {view !== 'public' && (
-              <button onClick={() => setView('public')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
-                Public Site
-              </button>
-            )}
-            {!role ? (
+            {role ? (
+              <>
+                <button
+                  className="ndg-header-user"
+                  onClick={() => setView('portal')}
+                  title="Back to academic portal"
+                >{myProfile?.name || 'My account'}</button>
+                <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
+                  Log out
+                </button>
+              </>
+            ) : (
               <>
                 <button onClick={() => { setSignupMode(true); setSignupMsg(''); setView('login'); }} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
                   Sign Up
@@ -2227,10 +2258,6 @@ const handleAddDiscipline = async (e) => {
                   Sign In
                 </button>
               </>
-            ) : (
-              <button onClick={handleLogout} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '7px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
-                Log out
-              </button>
             )}
           </div>
         </header>
@@ -2512,7 +2539,11 @@ const handleAddDiscipline = async (e) => {
                 {(myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
               </span>
               <div className="ndg-side-brand-copy">
-                <div className="ndg-side-user-name">{myProfile?.name || 'Administrator'}</div>
+                <button
+                  className="ndg-side-user-name ndg-side-user-link"
+                  onClick={() => { setProfileOpen(true); setDrawerOpen(false); }}
+                  title="Edit your profile"
+                >{myProfile?.name || 'Administrator'}</button>
                 <span className="ndg-side-role-pill">{String(role).replace(/_/g, ' ')}</span>
               </div>
             </div>
@@ -2615,6 +2646,42 @@ const handleAddDiscipline = async (e) => {
             </header>
 
             <main className={`portal-content${activeModule === 'timetable' ? ' is-wide' : ''}`} style={{ overflow: activeModule === 'timetable' ? 'visible' : undefined }}>
+
+            {profileOpen && (() => {
+              const field = { width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '13.5px', background: 'var(--surface)', color: 'var(--text)' };
+              const label = { display: 'block', fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', marginBottom: '6px' };
+              return (
+                <div className="ndg-profile-overlay" role="dialog" aria-modal="true" aria-label="My profile settings">
+                  <div className="ndg-profile-card">
+                    <div className="ndg-profile-head">
+                      <div>
+                        <h2 className="ndg-profile-title">My Profile</h2>
+                        <p className="ndg-profile-sub">How you appear across the portal and public site.</p>
+                      </div>
+                      <button className="ndg-icon-btn" onClick={() => { setProfileOpen(false); setProfileMsg(''); }} aria-label="Close profile settings">&times;</button>
+                    </div>
+                    <div className="ndg-profile-body">
+                      <label style={label}>Display Name</label>
+                      <input value={profileName} onChange={e => setProfileName(e.target.value)} style={field} placeholder="Your full name" />
+                      <label style={{ ...label, marginTop: '16px' }}>Phone</label>
+                      <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} style={field} placeholder="Contact number" />
+                      <label style={{ ...label, marginTop: '16px' }}>Designation</label>
+                      <input value={profileDesignation} onChange={e => setProfileDesignation(e.target.value)} style={field} placeholder="e.g. Vocal Teacher" />
+                      <div className="ndg-profile-readonly">
+                        <div><b>Email</b> {myProfile?.email || '—'}</div>
+                        <div><b>Role</b> {myProfile?.role_key ? String(myProfile.role_key).replace(/_/g, ' ') : '—'}</div>
+                      </div>
+                      {profileMsg && <div className="ndg-profile-msg">{profileMsg}</div>}
+                    </div>
+                    <div className="ndg-profile-foot">
+                      <button className="ndg-ov-ghost-btn" onClick={() => { setProfileOpen(false); setProfileMsg(''); }}>Cancel</button>
+                      <button className="ndg-ov-ghost-btn" onClick={() => { setProfileOpen(false); setProfileMsg(''); }}>Cancel</button>
+                  <button className="ndg-ov-primary-btn" onClick={handleSaveProfile} disabled={profileSaving}>{profileSaving ? 'Saving…' : 'Save changes'}</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {activeModule !== 'overview' && (() => {
               const m = MODULES.find(mod => mod.key === activeModule);

@@ -10,6 +10,7 @@
 - **Portal shell**: Authenticated view rendering correctly for all roles.
 - **Overview Layout**: Unified grid with dynamic order-agnostic row-packing.
 - **Widget Customization**: User-toggleable [Stat]/[Section] kinds in Edit Mode, fully persisted in Supabase (`dashboard_widgets.kind`).
+- **Self-service Profile**: Sidebar username and public-header name open a profile modal; `PUT /api/me` edits only `SELF_EDITABLE` fields.
 - **Next Focus**: Building out complete module creation workflows module by module.
 
 ## Codebase map
@@ -33,6 +34,12 @@ render.yaml                 # Render blueprint
 - `packOverviewWidgets(list)` — Calculates dynamic spans based on widget `kind`.
 - `isSectionWidget(w)` — `kind === 'section'`.
 - `perm(m)`, `canCreate(m)`, `canAdmin(m)` — Permission gates.
+- `loadMyProfile(uid)` — sets `myProfile`; sidebar avatar/name + public-header name read from it.
+
+## Self-service profile
+- `PUT /api/me` — allowlist `SELF_EDITABLE = { name: 120, phone: 20, designation: 80 }`; every other field stays admin-only.
+- `handleSaveProfile()` writes those three fields, patches `myProfile` locally, refetches.
+- Email + role shown read-only in the modal.
 
 ## Roles & permissions
 - 7 Levels: None(0) < View(1) < Self(2) < Submits(3) < Own(4) < Manage(5) < Full(6).
