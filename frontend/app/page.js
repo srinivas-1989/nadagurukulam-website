@@ -221,7 +221,15 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const resolveRole = (uid) =>
     supabase.from('users').select('role_key, id, email, must_change_password, status').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
-    supabase.from('users').select('id, role_key, name, email, phone, designation, program_id, avatar_url').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+    supabase.from('users').select('id, role_key, name, email, phone, designation, program_id, avatar_url, avatar_initials').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+
+  // A user who sets initials keeps them verbatim; otherwise fall back to the
+  // first two words of the display name.
+  const initialsFor = (p) => {
+    const custom = (p?.avatar_initials || '').trim();
+    if (custom) return custom.toUpperCase();
+    return (p?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  };
 
   // Entering the portal is only legal once the account no longer owes a password
   // swap; a session alone just means Supabase let us in. Without this gate a
@@ -262,6 +270,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     setProfileName(myProfile.name || '');
     setProfilePhone(myProfile.phone || '');
     setProfileDesignation(myProfile.designation || '');
+    setProfileInitials(myProfile.avatar_initials || '');
     setProfileAvatar(null);
     setProfileMsg('');
   }, [profileOpen, myProfile]);
@@ -389,7 +398,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     try {
       // avatar_url is sent only when the picture actually changed — omitting it keeps
       // whatever is stored, and clearing sends an explicit null.
-      const patch = { name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim() };
+      const patch = { name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim(), avatar_initials: profileInitials.trim().toUpperCase() };
       if (profileAvatar !== null) patch.avatar_url = profileAvatar || null;
       const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify(patch) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Save failed'); }
@@ -819,6 +828,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [profilePhone, setProfilePhone] = useState('');
   const [profileDesignation, setProfileDesignation] = useState('');
   const [profileAvatar, setProfileAvatar] = useState(null); // local preview URL before save
+  const [profileInitials, setProfileInitials] = useState('');
   const [profileUploading, setProfileUploading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
@@ -2570,7 +2580,7 @@ const handleAddDiscipline = async (e) => {
               <span className="ndg-side-avatar">
                 {myProfile?.avatar_url
                   ? <img src={myProfile.avatar_url} alt="" />
-                  : (myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                  : initialsFor(myProfile)}
               </span>
               <span className="ndg-side-brand-copy">
                 <span className="ndg-side-user-name">{myProfile?.name || 'Administrator'}</span>
@@ -2698,7 +2708,7 @@ const handleAddDiscipline = async (e) => {
                         <span className="ndg-profile-avatar-pick">
                           {profileAvatar || myProfile?.avatar_url
                             ? <img src={profileAvatar || myProfile.avatar_url} alt="" />
-                            : (myProfile?.name || 'A').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                            : initialsFor(myProfile)}
                         </span>
                         <label className="ndg-profile-file-btn">
                           {profileUploading ? 'Uploading…' : (profileAvatar || myProfile?.avatar_url) ? 'Replace picture' : 'Upload picture'}
@@ -2710,6 +2720,9 @@ const handleAddDiscipline = async (e) => {
                             aria-label="Remove profile picture">&times;</button>
                         )}
                       </div>
+                      <label style={{ ...label, marginTop: '16px' }}>Initials <span style={{ fontWeight: 400 }}>— shown when no picture is set</span></label>
+                      <input value={profileInitials} onChange={e => setProfileInitials(e.target.value.toUpperCase())} style={field}
+                        placeholder={initialsFor({ name: profileName })} maxLength={3} />
                       <label style={{ ...label, marginTop: '16px' }}>Phone</label>
                       <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} style={field} placeholder="Contact number" />
                       <label style={{ ...label, marginTop: '16px' }}>Designation</label>

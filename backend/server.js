@@ -1108,7 +1108,7 @@ app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
 // Self-service profile edit. Deliberately separate from PUT /api/users/:id,
 // which requires Manage on the Users module. Only descriptive, non-privileged
 // fields are exposed — role_key, status, email and program stay admin-owned.
-const SELF_EDITABLE = { name: 120, phone: 20, designation: 80, avatar_url: 500 };
+const SELF_EDITABLE = { name: 120, phone: 20, designation: 80, avatar_url: 500, avatar_initials: 3 };
 app.put('/api/me', authMiddleware, async (req, res) => {
   try {
     const patch = {};
@@ -1124,7 +1124,7 @@ app.put('/api/me', authMiddleware, async (req, res) => {
       .from('users')
       .update(patch)
       .eq('id', req.auth.profile.id)
-      .select('id, name, email, phone, designation, avatar_url')
+      .select('id, name, email, phone, designation, avatar_url, avatar_initials')
       .single();
     if (error) throw error;
     res.json(data);
