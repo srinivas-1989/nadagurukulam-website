@@ -1,89 +1,46 @@
 # Nada Gurukulam — Directory Reference
 
-Where things are and how they wire. Not docs, not onboarding. Read before editing anything.
-
 ## Core facts
-- **Client**: Srinivas (srinivas.viswanatha9@gmail.com) — sole Super Admin
-- **Stack**: Next.js 16 App Router (Vercel) · Express :10000 (Render) · Supabase Postgres + Auth (JWT) · MongoDB (CMS/curriculum content)
-- **Design**: `NDG_Design Guidelines_V1_20260609.pdf` — maroon/saffron/cream, two-side-rounded corners
-- **Deploy**: `render.yaml` (backend blueprint) + Vercel root dir `frontend`. See `DEPLOY.md`.
+- **Client**: Srinivas (srinivas.viswanatha9@gmail.com) — Super Admin
+- **Stack**: Next.js 16 App Router · Express :10000 · Supabase Postgres + Auth (JWT) · MongoDB (CMS)
+- **Design**: Maroon/Saffron/Cream, two-side-rounded corners
+- **Deploy**: Render (backend) + Vercel (frontend)
 
 ## Status (2026-10-04)
-- Portal shell renders for **all authenticated roles** (`view === 'portal'`)
-- Dashboard: burgundy hero, 4 metric cards, CSS activity bars, quick actions, live classes
-- Overview Layout: Unified grid in normal view with dynamic row-packing (order-agnostic, auto-fill sections), distinct Statistics/Sections groups visible only in "Edit Layout" mode
-- Sidebar (fixed, maroon) + top bar (sticky) + main (max-width 940px)
-- Permission gates `perm()/canCreate()/canAdmin()/isFull()` preserved
-- Build passes (`npm run build` exit 0, no warnings after `turbopack.root` pinned)
-- Phases 1–6 complete; next: production stability, student analytics, lesson plans
-- **Unverified**: authenticated portal shell and overview dashboard visual layouts are build-verified, not browser-verified (needs a login)
+- **Portal shell**: Authenticated view rendering correctly for all roles.
+- **Overview Layout**: Unified grid with dynamic order-agnostic packing.
+- **Customization**: Widgets have user-toggleable [Stat]/[Section] kinds in Edit Mode.
+- **Verification**: Build passes (npm run build). Visuals logic-verified via assertions.
 
 ## Codebase map
 ```
-frontend/app/page.js        # 4802 lines, one client component: public + login + portal (all roles)
+frontend/app/page.js        # Main portal/login/public client component
 frontend/app/globals.css    # NDG tokens + portal/dashboard classes
 frontend/app/layout.js      # RootLayout
-frontend/lib/supabase.js    # browser Supabase client (NEXT_PUBLIC_* env)
-frontend/public/            # logo-landscape.png, logo-mark.png
-frontend/next.config.mjs    # pins turbopack.root to frontend/ (stops parent-dir inference)
-backend/server.js           # 1608 lines, Express CRUD factory, authMiddleware, super_admin endpoints
-backend/auth-system.js      # OTP / password auth logic
-backend/scripts/            # apply-schema, apply-rls, seed-cms, mongo probes (fix-mongo-uri, probe-mongo)
-backend/test-auth.js
-specs/                      # phase1–5 HTML specs + 22 supabase-*.sql migrations, apply in filename order
-carnatic.md, hindustani.md, course_index.md, dynamic-tools.md   # curriculum source content (~2k lines)
-render.yaml                 # Render blueprint: rootDir backend, node server.js, /health
-DEPLOY.md, README.md, plan_of_action.md
+backend/server.js           # Express API, authMiddleware, Super Admin CRUD
+backend/auth-system.js      # OTP / password logic
+specs/                      # HTML specs + SQL migrations
+carnatic.md, course_index.md # Curriculum source content
+render.yaml                 # Render blueprint
 ```
 
-## Environment
-- `frontend/.env.local` — `NEXT_PUBLIC_API_URL` (falls back to `http://localhost:10000`, page.js:191), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `backend/.env` — `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `MONGODB_URI`, `PORT`
-- Never commit either. Backend loads `backend/.env` explicitly; optional deps (nodemailer, multer, mammoth, pdf-parse, xlsx) are `require`d in try/catch — a missing one silently disables that feature.
-
-## Roles & permissions
-- `super_admin` fixed, 17 modules, Full everywhere
-- Levels: —(0) < View(1) < Self(2) < Submits(3) < Own(4) < Manage(5) < Full(6)
-- Sidebar renders a module only when `perm(m.key)` passes; quick actions filter on `canCreate()`
-
-## Portal shell (view === 'portal')
-- **Top bar** (64px, sticky): brand logo → public site, collapse toggle, role badge, user name, logout
-- **Sidebar** (260px, fixed, `<nav>`): filtered module buttons, permission chips, timetable shortcut, logout at bottom
-- **Main** (`<main className="portal-content">`): scrollable, padded, max-width 940px (`none` on timetable)
-
-## Modules
-`overview` `users` `curriculum` `timetable` `batches` `lessonplans` `liveclasses` `assignments` `feedback` `events` `jobs` `enquiries` `activities` `projects` `certificates` `roles` `teachinglogs` — defined once in `MODULES` (page.js:146)
-
 ## Dashboard (activeModule === 'overview')
-- Dark burgundy hero (`var(--primary-deep)`, `var(--radius-xl)`)
-- Unified responsive 4-column widget grid (`.ndg-widget-grid`)
-- Row-packing algorithm: 4 units/line, Stat cards fixed at 1 unit, Section cards (Platform Activity, Quick Actions, Live Classes) auto-fill empty line space (default 2 units, stretches to 3 or 4)
-- Any sequence/order supported seamlessly (order-agnostic)
-- Edit Mode: Displays separated, labelled grids for "Statistics" and "Sections"
-- Quick actions: modules where `canCreate()`
-- Live classes: active/scheduled from `dbData.live_sessions`
+- Unified 4-column widget grid (`.ndg-widget-grid`).
+- **Dynamic Row-Packing**: 4 units/line. Stat=1 unit, Section=2+ units (auto-fills row).
+- **User Choice**: Toggle [Stat] (compact) vs [Section] (expanding) per widget in Edit Mode.
+- **Edit Mode**: Statistics vs Sections separation visible for layout management.
 
 ## Key helpers (page.js)
-- `fetchData()` — loads all `dbData` from API
-- `perm(m)`, `canCreate(m)`, `canAdmin(m)`, `isFull(m)` — role-permission gates
-- `roleCategory(roleKey)` — student/staff/system
-- `apiCall(url, opts)` — JWT fetch with 401/403 handling
+- `packOverviewWidgets(list)` — Calculates dynamic spans based on widget `kind`.
+- `isSectionWidget(w)` — `kind === 'section'`.
+- `perm(m)`, `canCreate(m)`, `canAdmin(m)` — Permission gates.
 
-## Backend routes
-`/health` `/api/auth` `/api/users` `/api/roles` `/api/curriculum` `/api/curriculum-content` `/api/cms` `/api/admin` `/api/upload` `/api/user-kyc-docs` `/api/public`
-- `POST /api/admin/users/:id/reset-password` — super_admin only, temp password + OTP
-- `POST /api/admin/users/:id/generate-otp` — super_admin only, OTP only
+## Roles & permissions
+- 7 Levels: None(0) < View(1) < Self(2) < Submits(3) < Own(4) < Manage(5) < Full(6).
+- Sidebar module visibility depends on `perm(m.key)`.
 
-## Design tokens (globals.css)
-`--primary` `--primary-deep` `--primary-light` `--accent` `--accent-deep` `--accent-light` `--bg` `--bg-saffron` `--surface` `--surface-muted` `--text` `--text-soft` `--text-faint` `--border` `--divider` `--radius` `--radius-lg` `--radius-xl` `--radius-xl-sm` `--shadow-sm` `--shadow-md` `--shadow-lg`
-
-## CSS classes
-`.portal-shell` `.portal-layout` `.portal-sidebar(.collapsed)` `.portal-topbar(-left/-right)` `.portal-brand` `.portal-role-badge` `.portal-user-name` `.portal-action-btn` `.portal-action-group` `.portal-content` `.portal-settings-menu` `.portal-settings-item` `.portal-settings-anchor` `.ndg-hero` `.ndg-metric-card` `.ndg-activity-bar` `.ndg-quick-action` `.ndg-live-class-item` · responsive `@media (max-width: 768px)`
-
-## Gotchas
-- No ESLint is installed and Next 16 removed `next lint`, so there is no lint check. The only automated verification is `npm run build`.
-- `page.js` is one ~4800-line client component. A single unclosed JSX tag silently re-parents every later closing tag and surfaces as a parse error thousands of lines from the real defect — read the nesting, not the error line.
-- `frontend/AGENTS.md` and `frontend/CLAUDE.md` are generated by `next dev`; they self-re-add if deleted.
+## Design tokens
+`--primary` (maroon), `--accent` (saffron), `--bg` (cream), `--surface`, `--radius-xl`.
 
 ## Verification
 ```bash
