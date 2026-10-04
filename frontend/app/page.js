@@ -2497,7 +2497,7 @@ const handleAddDiscipline = async (e) => {
           {drawerOpen && <button className="portal-scrim drawer-open" onClick={() => setDrawerOpen(false)} aria-label="Close navigation" />}
           {/* Full-height maroon sidebar */}
           <nav className={`portal-sidebar${collapsed ? ' collapsed' : ''}${drawerOpen ? ' drawer-open' : ''}`}>
-            <div className="ndg-side-logo">
+            <div className="ndg-side-logo" onClick={() => setView('public')} style={{ cursor: 'pointer' }} title="Nada Gurukulam — home">
               <img src="/ndg-mark-cream-transparent.png" alt="" />
               <div className="ndg-side-brand-copy">
                 <div className="ndg-side-brand-name">Nada Gurukulam</div>
