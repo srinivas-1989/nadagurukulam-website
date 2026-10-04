@@ -1893,6 +1893,14 @@ input, select, textarea {
 .ndg-widget-ctl button:hover { background: var(--bg-saffron); color: var(--primary-deep); }
 .ndg-widget-ctl button.drag { cursor: grab; }
 .ndg-widget-ctl button.hide:hover { background: #c23b3b; border-color: #c23b3b; color: #fff; }
+.ndg-widget-ctl button.type-toggle {
+  width: auto;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
 
 .ndg-widget-label {
   font-size: 11px;

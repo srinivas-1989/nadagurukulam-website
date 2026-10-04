@@ -518,29 +518,32 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     return { label: def.label, value: rows.length, sub: def.sub(dbData) };
   };
 
-  const ELASTIC_WIDGETS = ['platform_activity', 'quick_actions_card', 'live_classes_card'];
-  const getDefaultWidth = (k) => ELASTIC_WIDGETS.includes(k) ? 2 : 1;
+  // Kind is a per-widget user choice persisted per widget ('stat' | 'section'),
+  // not a property of the module key — every widget can be either.
+  const getDefaultKind = (k) => ['platform_activity', 'quick_actions_card', 'live_classes_card'].includes(k) ? 'section' : 'stat';
+  const isSectionWidget = (w) => (w.kind || getDefaultKind(w.module_key)) === 'section';
 
-  // A line holds 4 units. Statistic and module tiles are fixed at 1 unit, so a
-  // line of three tiles leaves one slot empty. Section cards pack at the
-  // default 2 and then stretch to close a gap — but only when they are the sole
-  // section card on their line, so two of them still share it 2+2.
+  // A line holds 4 units. Stat tiles take 1. Section cards take 2 and stretch to
+  // close the gap on their line — but only when sole Section card there, so two
+  // of them still share 2+2.
   const packOverviewWidgets = (list) => {
     const rows = [];
     let row = [];
     let used = 0;
     list.forEach(w => {
-      const units = ELASTIC_WIDGETS.includes(w.module_key) ? 2 : 1;
+      const units = isSectionWidget(w) ? 2 : 1;
       if (used + units > 4) { rows.push([row, used]); row = []; used = 0; }
       row.push(w);
       used += units;
     });
     if (row.length) rows.push([row, used]);
     return rows.flatMap(([members, taken]) => {
-      const grow = members.filter(w => ELASTIC_WIDGETS.includes(w.module_key)).length === 1 ? 4 - taken : 0;
-      return members.map(w => ({ ...w, width: ELASTIC_WIDGETS.includes(w.module_key) ? 2 + grow : 1 }));
+      const grow = members.filter(isSectionWidget).length === 1 ? 4 - taken : 0;
+      return members.map(w => ({ ...w, units: isSectionWidget(w) ? 2 + grow : 1 }));
     });
   };
+
+  const seedWidgets = () => widgetKeys.map(module_key => ({ module_key, visible: true, kind: getDefaultKind(module_key), custom_title: null }));
 
   // Layout is per-user: an empty response means first visit, so seed defaults
   // from the modules this role can actually see.
@@ -548,13 +551,13 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (view !== 'portal' || !session || !widgetKeys.length) return;
     apiCall(`${apiUrl}/api/dashboard-widgets`).then(r => r.json()).then(rows => {
       if (Array.isArray(rows) && rows.length) {
-        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false, width: r.width || getDefaultWidth(r.module_key), custom_title: r.custom_title || null })).filter(w => widgetKeys.includes(w.module_key));
-        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true, width: getDefaultWidth(module_key), custom_title: null }));
+        const saved = rows.map(r => ({ module_key: r.module_key, visible: r.visible !== false, kind: r.kind || getDefaultKind(r.module_key), custom_title: r.custom_title || null })).filter(w => widgetKeys.includes(w.module_key));
+        const missing = widgetKeys.filter(k => !saved.some(w => w.module_key === k)).map(module_key => ({ module_key, visible: true, kind: getDefaultKind(module_key), custom_title: null }));
         setWidgets([...saved, ...missing]);
       } else {
-        setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: getDefaultWidth(module_key), custom_title: null })));
+        setWidgets(seedWidgets());
       }
-    }).catch(() => setWidgets(widgetKeys.map(module_key => ({ module_key, visible: true, width: getDefaultWidth(module_key), custom_title: null }))));
+    }).catch(() => setWidgets(seedWidgets()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, session?.user?.id, role, widgetKeys.join(',')]);
 
@@ -564,7 +567,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const t = setTimeout(() => {
       apiCall(`${apiUrl}/api/dashboard-widgets`, {
         method: 'PUT',
-        body: JSON.stringify({ widgets: widgets.map((w, i) => ({ module_key: w.module_key, sort_order: i, visible: w.visible, width: w.width || 1, custom_title: w.custom_title })) }),
+        body: JSON.stringify({ widgets: widgets.map((w, i) => ({ module_key: w.module_key, sort_order: i, visible: w.visible, kind: w.kind || 'stat', custom_title: w.custom_title })) }),
       }).catch(() => {});
     }, 400);
     return () => clearTimeout(t);
@@ -586,7 +589,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (exists) {
       return ws.map(w => w.module_key === key ? { ...w, visible: true } : w);
     }
-    return [...ws, { module_key: key, visible: true, width: getDefaultWidth(key), custom_title: null }];
+    return [...ws, { module_key: key, visible: true, kind: getDefaultKind(key), custom_title: null }];
   });
   const dropWidget = (from, to) => setWidgets(ws => {
     const next = [...ws];
@@ -2756,10 +2759,18 @@ const handleAddDiscipline = async (e) => {
                     const renderWidget = (w) => {
                       const k = w.module_key;
                       const st = widgetStat(k);
-                      const isStat = k.startsWith('metric_');
-                      const widthClass = isStat ? 'span-1' : `span-${w.width || 1}`;
+                      const isSec = isSectionWidget(w);
+                      const widthClass = `span-${w.units || (isSec ? 2 : 1)}`;
                       const renderCtl = () => editMode && (
                         <div className="ndg-widget-ctl" onClick={e => e.stopPropagation()}>
+                          <button
+                            className="type-toggle"
+                            onClick={() => updateWidget(k, { kind: isSec ? 'stat' : 'section' })}
+                            aria-label={`Toggle ${k} to ${isSec ? 'Stat' : 'Section'}`}
+                            title={`Click to convert to ${isSec ? 'Stat tile (1 unit)' : 'Section card (auto-filling)'}`}
+                          >
+                            {isSec ? 'Section' : 'Stat'}
+                          </button>
                           <button
                             className="drag"
                             draggable
@@ -2977,8 +2988,8 @@ const handleAddDiscipline = async (e) => {
                       );
                     }
 
-                    const stats = visible.filter(w => w.module_key.startsWith('metric_'));
-                    const modules = visible.filter(w => !w.module_key.startsWith('metric_'));
+                    const stats = visible.filter(w => !isSectionWidget(w));
+                    const modules = visible.filter(w => isSectionWidget(w));
                     return (
                       <>
                         {stats.length > 0 && (
