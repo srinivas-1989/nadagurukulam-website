@@ -56,7 +56,9 @@ const UserPersonalTab = ({ userId, dbData }) => {
   );
 };
 
-const UserAdminTab = ({ userId, dbData }) => {
+const PERM_LEVELS = ['View', 'Self', 'Submits', 'Own', 'Manage', 'Full'];
+
+const UserAdminTab = ({ userId, dbData, modules, permsMap, grants = [], onUserPermChange }) => {
   const user = dbData?.users?.find(u => u.id === userId);
   const otpEntries = dbData?.user_otps?.filter(o => o.user_id === userId);
   const recentOtp = otpEntries?.at(-1);
@@ -140,6 +142,38 @@ const UserAdminTab = ({ userId, dbData }) => {
           </div>
         </div>
       )}
+      {role === 'super_admin' && onUserPermChange && (
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px', border: '1px solid var(--border)' }}>
+          <h5 style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--primary)' }}>Extra Permissions</h5>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-soft)' }}>
+            Baseline comes from the person's role. Anything set here raises it — it can never lower access below what the role already gives.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', alignItems: 'center', fontSize: '12.5px' }}>
+            <div style={{ fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Module</div>
+            <div style={{ fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role gives</div>
+            <div style={{ fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Extra</div>
+            {modules.map(m => {
+              const row = grants.find(g => g.module_key === m.key);
+              const base = (permsMap?.[user?.role_key] || {})[m.key]?.level;
+              return (
+                <div key={m.key} style={{ display: 'contents' }}>
+                  <div>{m.name}</div>
+                  <div style={{ color: 'var(--text-soft)' }}>{base || '—'}</div>
+                  <select
+                    value={row?.access_level || '—'}
+                    onChange={e => onUserPermChange(userId, m.key, e.target.value, row?.id)}
+                    style={{ padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', background: row ? '#fdf3e0' : 'var(--bg)' }}
+                  >
+                    <option value="—">No extra</option>
+                    {PERM_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {role === 'super_admin' && (
         <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px', border: '1px solid var(--border)' }}>
           <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Admin Password Reset Controls</h5>
@@ -227,6 +261,7 @@ export default function Home() {
 // All state declarations at top (fix: move undefined state hooks to prevent errors)
   const [view, setView] = useState('public'); // public | login | portal
   const [role, setRole] = useState(null);
+  const [myPerms, setMyPerms] = useState({}); // module_key -> effective access level
   const [activeModule, setActiveModule] = useState('overview');
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -375,10 +410,12 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
           const rolesData = rolesResponse.ok ? await rolesResponse.json() : [];
           setRoles(rolesData);
 
-          // Fetch role_permissions data
-          const rolePermsResponse = await fetch(`${apiUrl}/api/role_permissions`, { headers });
-          const rolePermsData = rolePermsResponse.ok ? await rolePermsResponse.json() : [];
-          setDbData(prev => ({ ...prev, role_permissions: rolePermsData }));
+          // Effective access per module: role baseline raised by any personal grant.
+          const myPermsResponse = await fetch(`${apiUrl}/api/my-permissions`, { headers });
+          if (myPermsResponse.ok) {
+            const mine = await myPermsResponse.json();
+            setMyPerms(mine.perms || {});
+          }
         } catch (error) {
           console.error('Failed to load API data:', error);
         }
@@ -650,11 +687,17 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     return res;
   };
 
-  // Permission matrix as data (role_permissions table): permsMap[role_key][module_key] = { id, level }.
+  // Effective access, already folded from the role baseline and any personal
+  // grant by /api/my-permissions. Level gates here only steer the UI; the
+  // backend re-checks every write.
   const LEVELS = ['View', 'Self', 'Submits', 'Own', 'Manage', 'Full'];
+  const perm = (m) => (role === 'super_admin' ? 'Full' : myPerms[m]) || null;
+  // Role baseline only, for the Roles & Permissions matrix where the baseline
+  // itself is what gets edited.
   const permsMap = {};
-  dbData.role_permissions.forEach(p => { (permsMap[p.role_key] = permsMap[p.role_key] || {})[p.module_key] = { id: p.id, level: p.access_level }; });
-  const perm = (m) => (role && permsMap[role]?.[m]?.level) || null;
+  (dbData.role_permissions || []).forEach(p => {
+    (permsMap[p.role_key] = permsMap[p.role_key] || {})[p.module_key] = { id: p.id, level: p.access_level };
+  });
   const canCreate = (m) => ['Submits', 'Own', 'Manage', 'Full'].includes(perm(m));
   const canAdmin = (m) => ['Manage', 'Full'].includes(perm(m));
   const isFull = (m) => perm(m) === 'Full';
@@ -898,7 +941,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['examination_types', 'examination_types'], ['program_categories', 'program_categories'], ['course_syllabi', 'course_syllabi'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
-        ['role_permissions', 'role_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
+        ['role_permissions', 'role_permissions'], ['user_permissions', 'user_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
         apiCall(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])
@@ -1028,62 +1071,95 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
 
   // Ordered levels a category declared, e.g. [{key:'designation',name:'Designation'}].
   const catLevels = (categoryKey) => (userCategories.find(c => c.key === categoryKey) || {}).levels || [];
+  // Tree shape lives in category_level_values.parent_id, so a category's depth is
+  // whatever rows exist rather than a fixed template on the category itself.
+  const nodesFor = (roleKey) => levelValues.filter(v => v.role_key === roleKey);
 
   const newRoleCat = roleCategory(newUserRole);
   const editRoleCat = roleCategory(editUserRoleKey);
   const isStudentCat = (c) => c === 'student' || c === 'both';
   const isStaffCat = (c) => c !== 'student';
-  const levelNames = (valuesObj) => {
-    const res = {};
-    for (const [k, id] of Object.entries(valuesObj)) {
-      const v = levelValues.find(x => x.id === id);
-      if (v) res[k] = v.name;
+  // users.level_values holds tree node ids. A person's placement is the single
+  // chain from their role's root node downward, so rebuilding that chain from
+  // the held set is enough to redraw every dropdown.
+  const roleRoot = (roleKey) => levelValues.find(v => v.role_key === roleKey && !v.parent_id) || null;
+  const childrenOf = (parentId) => levelValues.filter(v => v.parent_id === parentId);
+  const heldChain = (roleKey, values) => {
+    const root = roleRoot(roleKey);
+    if (!root) return [];
+    const chain = [root.id];
+    let cur = root.id;
+    for (;;) {
+      const kid = childrenOf(cur).find(v => values[v.id]);
+      if (!kid) break;
+      chain.push(kid.id);
+      cur = kid.id;
     }
-    return res;
+    return chain;
   };
-  // users.level_values stores names; the selects work in ids.
-  const hydrateLevels = (roleKey, saved) => {
-    const res = {};
-    for (const [k, name] of Object.entries(saved || {})) {
-      const v = levelValues.find(x => x.level_key === k && x.role_key === roleKey && x.name === name);
-      if (v) res[k] = v.id;
+  // How many dropdowns to show = the deepest path that exists for this role, so
+  // an unassigned person still sees the full shape waiting for them.
+  const roleDepth = (roleKey) => {
+    const root = roleRoot(roleKey);
+    if (!root) return 0;
+    let depth = 1, cur = root.id;
+    for (;;) {
+      const kids = childrenOf(cur);
+      if (!kids.length) return depth;
+      depth++;
+      cur = kids[0].id;
     }
+  };
+  const levelNames = (valuesObj) => Object.fromEntries(Object.keys(valuesObj || {}).filter(k => valuesObj[k]).map(k => [k, true]));
+  const hydrateLevels = (roleKey, saved) => {
+    const held = Object.fromEntries(Object.keys(saved || {}).filter(k => saved[k]).map(k => [k, true]));
+    const res = {};
+    for (const id of heldChain(roleKey, held)) res[id] = true;
     return res;
   };
   const hasSuperAdminUser = (dbData.users || []).some(u => u.role_key === 'super_admin');
 
-  // One dropdown per configured level. Each level's options come from the value
-  // chosen above it, so any depth cascades without the UI knowing the schema.
+  // One dropdown per depth of the role's own subtree. Each depth's options are
+  // the children of the node chosen above it, so the UI never needs to know the
+  // schema — adding a row in the tree manager adds a field here by itself.
   const LevelSelects = ({ roleKey, values, onChange, disabled }) => {
-    const levels = catLevels(roleCategory(roleKey));
-    if (!levels.length) return null;
-    const choicesFor = (idx) => {
-      const lvl = levels[idx];
-      const parentId = idx === 0 ? null : (values[levels[idx - 1].key] || null);
-      return levelValues.filter(v =>
-        v.role_key === roleKey && v.level_key === lvl.key &&
-        (idx === 0 ? !v.parent_id : v.parent_id === parentId)
-      );
-    };
-    return levels.map((l, i) => (
-      <span key={l.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', flex: '1 1 160px', minWidth: 0 }}>
-        <span style={{ fontSize: '11px', color: 'var(--text-soft)' }}>{l.name}</span>
-        <select
-          value={values[l.key] || ''}
-          disabled={disabled || (i > 0 && !values[levels[i - 1].key])}
-          onChange={e => {
-            const next = { ...values, [l.key]: e.target.value };
-            // Changing an earlier level invalidates everything nested under it.
-            for (let j = i + 1; j < levels.length; j++) delete next[levels[j].key];
-            onChange(next);
-          }}
-          style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
-        >
-          <option value="">Select {l.name}</option>
-          {choicesFor(i).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
-      </span>
-    ));
+    const held = Object.fromEntries(Object.entries(values || {}).filter(([, v]) => v));
+    const root = roleKey ? roleRoot(roleKey) : null;
+    if (!root) return null;
+    const chain = heldChain(roleKey, held);
+    // Slot 0 is the role's own node (already fixed by the role picker); each
+    // slot after it offers the children of whatever the slot above holds.
+    const slots = [{ id: chain[0] || root.id, label: 'Role', options: [root], fixed: true }];
+    for (let i = 1; i < roleDepth(roleKey); i++) {
+      const parentId = chain[i - 1] || null;
+      const kids = parentId ? childrenOf(parentId) : [];
+      slots.push({ id: chain[i] || '', label: kids[0]?.name || 'Bucket', options: kids });
+    }
+    return (
+      <>
+        {slots.map((s, i) => (
+          <span key={i} style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', flex: '1 1 160px', minWidth: 0 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-soft)' }}>{s.label}</span>
+            <select
+              value={s.id}
+              disabled={disabled || s.fixed || (i > 0 && !slots[i - 1].id)}
+              onChange={e => {
+                // Choosing here drops everything nested below it — those nodes
+                // were only reachable through the previous answer.
+                const next = {};
+                for (let j = 0; j < i; j++) if (slots[j].id) next[slots[j].id] = true;
+                if (e.target.value) next[e.target.value] = true;
+                onChange(next);
+              }}
+              style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
+            >
+              <option value="">Select {s.label}</option>
+              {s.options.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </span>
+        ))}
+      </>
+    );
   };
 
   useEffect(() => {
@@ -2049,6 +2125,18 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     fetchData();
   };
 
+  // A grant only ever raises that person's access above their role baseline.
+  // '—' clears the grant and drops them back to whatever the role says.
+  const handleUserPermChange = async (userId, moduleKey, level, rowId) => {
+    const res = level === '—'
+      ? await apiCall(`${apiUrl}/api/user_permissions/${rowId}`, { method: 'DELETE' })
+      : rowId
+        ? await apiCall(`${apiUrl}/api/user_permissions/${rowId}`, { method: 'PUT', body: JSON.stringify({ access_level: level }) })
+        : await apiCall(`${apiUrl}/api/user_permissions`, { method: 'POST', body: JSON.stringify({ user_id: userId, module_key: moduleKey, access_level: level }) });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Could not save permission'); }
+    fetchData();
+  };
+
   // Categories & Level Values — a category declares its own ordered levels below
   // Role, and every value at any depth hangs off a Role in that category.
   const slug = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -2057,7 +2145,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [editingCat, setEditingCat] = useState(null);
   const [editCatName, setEditCatName] = useState('');
   const [editCatLevels, setEditCatLevels] = useState([]);
-  const [newVal, setNewVal] = useState({ name: '', role_key: '', level_key: '', parent_id: '' });
+  const [newVal, setNewVal] = useState({ name: '', parent_id: '' });
   const [editingVal, setEditingVal] = useState(null);
   const [editValName, setEditValName] = useState('');
 
@@ -2100,20 +2188,18 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       method: 'POST',
       body: JSON.stringify({
         key,
-        name: newCatName.trim(),
-        levels: newCatLevels.filter(l => l.name.trim()).map(l => ({ key: slug(l.name), name: l.name.trim() }))
+        name: newCatName.trim()
       })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create category failed'); return; }
-    setNewCatName(''); setNewCatLevels([]); fetchData();
+    setNewCatName(''); fetchData();
   };
 
   const handleUpdateCategory = async (id) => {
     const res = await apiCall(`${apiUrl}/api/user_categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify({
-        name: editCatName,
-        levels: editCatLevels.map(l => ({ key: slug(l.key) || slug(l.name), name: (l.name || '').trim() }))
+        name: editCatName
       })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
@@ -2129,16 +2215,14 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
 
   const handleAddLevelValue = async (e) => {
     e.preventDefault();
-    if (!newVal.name.trim() || !newVal.role_key || !newVal.level_key) return;
-    const role = roles.find(r => r.key === newVal.role_key);
+    if (!newVal.name.trim() || !newVal.parent_id) return;
+    // category_key is inherited from the parent node server-side, so only the
+    // parent and the name travel.
     const res = await apiCall(`${apiUrl}/api/category_level_values`, {
       method: 'POST',
       body: JSON.stringify({
         name: newVal.name.trim(),
-        category_key: role?.category || 'staff',
-        role_key: newVal.role_key,
-        level_key: newVal.level_key,
-        parent_id: newVal.parent_id || null
+        parent_id: newVal.parent_id
       })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create value failed'); return; }
@@ -3762,35 +3846,60 @@ const handleAddDiscipline = async (e) => {
                       ))}
                     </select>
                   </label>
-                  {((usersFilterRole && usersFilterRole !== 'ALL') ? catLevels(roleCategory(usersFilterRole)) : ((usersFilterCategory && usersFilterCategory !== 'ALL') ? catLevels(usersFilterCategory) : [])).map((l, i, levels) => {
-                    // Category-wide: the same name can exist under several roles, so
-                    // match the parent by name instead of by the one id we kept.
+                  {(() => {
+                    // Role-scoped filtering starts at that role's own node; category-scoped
+                    // starts at the category's root nodes. Either way the dropdowns are
+                    // whatever depth the tree currently has.
                     const roleScoped = !!(usersFilterRole && usersFilterRole !== 'ALL');
                     const catScoped = !!(usersFilterCategory && usersFilterCategory !== 'ALL');
-                    const inScope = (v) => roleScoped ? v.role_key === usersFilterRole : catScoped ? v.category_key === usersFilterCategory : false;
-                    const parentName = i === 0 ? null : (levelValues.find(v => v.id === (usersFilterLevels[levels[i - 1].key] || '')) || {}).name || null;
-                    return (
-                      <label key={l.key} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: i > 0 && !parentName ? 0.6 : 1 }}>Filter by {l.name}:
-                        <select
-                          disabled={i > 0 && !parentName}
-                          value={usersFilterLevels[l.key] || ''}
-                          onChange={e => {
-                            const next = { ...usersFilterLevels, [l.key]: e.target.value };
-                            for (let j = i + 1; j < levels.length; j++) delete next[levels[j].key];
-                            setUsersFilterLevels(next); setUsersFilterStatus(''); setUsersSearch('');
-                          }}
-                          style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (i > 0 && !parentName) ? 'var(--surface)' : 'var(--bg)', cursor: (i > 0 && !parentName) ? 'not-allowed' : 'pointer' }}
-                        >
-                          <option value="">Select {l.name}</option>
-                          <option value="ALL">All {l.name}s</option>
-                          {levelValues.filter(v => inScope(v) && v.level_key === l.key
-                              && (i === 0 ? !v.parent_id : ((levelValues.find(p => p.id === v.parent_id) || {}).name || null) === parentName))
-                            .filter((v, _i, arr) => arr.findIndex(x => x.name === v.name) === _i)
-                            .map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                        </select>
-                      </label>
+                    if (!roleScoped && !catScoped) return null;
+                    const roots = levelValues.filter(v =>
+                      !v.parent_id && (roleScoped ? v.role_key === usersFilterRole : v.category_key === usersFilterCategory)
                     );
-                  })}
+                    if (!roots.length) return null;
+                    let parentIds = roots.map(r => r.id);
+                    let depth = 0;
+                    const slots = [];
+                    while (parentIds.length && depth < 6) {
+                      const kids = levelValues.filter(v => parentIds.includes(v.parent_id));
+                      slots.push({ parentIds, kids });
+                      if (!kids.length) break;
+                      parentIds = kids.map(k => k.id);
+                      depth++;
+                    }
+                    return slots.map((slot, i) => {
+                      // The first level sits under the role/category, so it never
+                      // needs its own gate; deeper ones do.
+                      const gateOk = i === 0 || slot.parentIds.some(pid => usersFilterLevels[pid] || usersFilterLevels[pid] === 'ALL');
+                      const options = i === 0
+                        ? roots.filter((r, ix) => roots.findIndex(x => x.name === r.name) === ix)
+                        : slot.kids.filter((v, ix, arr) => arr.findIndex(x => x.name === v.name) === ix);
+                      const chosen = slot.parentIds.find(pid => usersFilterLevels[pid]);
+                      const chosenName = (levelValues.find(v => v.id === chosen) || {}).name || '';
+                      return (
+                        <label key={i} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: gateOk ? 1 : 0.6 }}>Filter by {chosenName || (i === 0 ? 'Bucket' : 'Sub-bucket')}:
+                          <select
+                            disabled={!gateOk}
+                            value={chosen || ''}
+                            onChange={e => {
+                              // Keep every parent chain above this level, drop the rest.
+                              const next = {};
+                              for (let j = 0; j < i; j++) {
+                                for (const pid of slots[j].parentIds) if (usersFilterLevels[pid]) next[pid] = usersFilterLevels[pid];
+                              }
+                              if (e.target.value) for (const pid of slot.parentIds) next[pid] = e.target.value;
+                              setUsersFilterLevels(next); setUsersFilterStatus(''); setUsersSearch('');
+                            }}
+                            style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: gateOk ? 'var(--bg)' : 'var(--surface)', cursor: gateOk ? 'pointer' : 'not-allowed' }}
+                          >
+                            <option value="">Select {chosenName || (i === 0 ? 'Bucket' : 'Sub-bucket')}</option>
+                            <option value="ALL">All {chosenName || 'this level'}s</option>
+                            {options.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                          </select>
+                        </label>
+                      );
+                    });
+                  })()}
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Status:
                     <select value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', cursor: 'pointer' }}>
                       <option value="">Select Status</option>
@@ -3816,12 +3925,28 @@ const handleAddDiscipline = async (e) => {
                     const catOn = usersFilterCategory && usersFilterCategory !== 'ALL';
                     const roleOn = usersFilterRole && usersFilterRole !== 'ALL';
                     const statusOn = usersFilterStatus && usersFilterStatus !== 'ALL';
-                    const levelSel = Object.entries(usersFilterLevels).filter(([, id]) => id && id !== 'ALL');
+                    // Each filter entry is [parentNodeId, chosenId]. ALL means "any
+                    // node directly under that parent"; a chosen node also matches
+                    // the people sitting further down beneath it.
+                    const levelSel = Object.entries(usersFilterLevels).filter(([, id]) => id);
+                    const holdsUnder = (u, parentId, id) => {
+                      const held = Object.keys(u.level_values || {}).filter(k => u.level_values[k]);
+                      if (id === 'ALL') return held.some(k => (levelValues.find(v => v.id === k) || {}).parent_id === parentId);
+                      if ((u.level_values || {})[id]) return true;
+                      return held.some(k => {
+                        let cur = levelValues.find(v => v.id === k);
+                        while (cur && cur.parent_id) {
+                          if (cur.parent_id === id) return true;
+                          cur = levelValues.find(v => v.id === cur.parent_id);
+                        }
+                        return false;
+                      });
+                    };
 
                     const filteredUsers = dbData.users
                       .filter(u => userTab !== 'pending' || u.status === 'pending')
                       .filter(u => !roleOn || u.role_key === usersFilterRole)
-                      .filter(u => levelSel.every(([k, id]) => (u.level_values || {})[k] === (levelValues.find(v => v.id === id) || {}).name))
+                      .filter(u => levelSel.every(([pid, id]) => holdsUnder(u, pid, id)))
                       .filter(u => !statusOn || u.status === usersFilterStatus)
                       .filter(u => !catOn || roleCategory(u.role_key) === usersFilterCategory)
                       .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()));
@@ -3909,7 +4034,7 @@ const handleAddDiscipline = async (e) => {
                           <UserKycTab userId={viewProfileUser} kycDocs={userKycDocs} onAddDoc={handleAddKycDoc} onDeleteDoc={handleDeleteKycDoc} docType={kycDocType} setDocType={setKycDocType} docNumber={kycDocNumber} setDocNumber={setKycDocNumber} fileUrl={kycFileUrl} setFileUrl={setKycFileUrl} />
                         )}
                         {viewProfileTab === 'admin' && (
-                          <UserAdminTab userId={viewProfileUser} dbData={dbData} />
+                          <UserAdminTab userId={viewProfileUser} dbData={dbData} modules={MODULES} permsMap={permsMap} grants={(dbData.user_permissions || []).filter(g => g.user_id === viewProfileUser)} onUserPermChange={handleUserPermChange} />
                         )}
                       </div>
                     </div>
@@ -6118,78 +6243,53 @@ const handleAddDiscipline = async (e) => {
 
                 {/* Categories decide what the hierarchy below a role looks like */}
                 <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '0 0 10px' }}>Categories</h4>
-                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                  <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <input placeholder="Category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                    {levelRows(newCatLevels, setNewCatLevels)}
-                  </div>
+                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input placeholder="Category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
                   <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
                 </form>
                 {userCategories.map(c => (
-                  <div key={c.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                  <div key={c.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     {editingCat === c.id ? (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <input value={editCatName} onChange={e => setEditCatName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', maxWidth: '260px' }} />
-                        {levelRows(editCatLevels, setEditCatLevels)}
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button onClick={() => handleUpdateCategory(c.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
-                          <button onClick={() => setEditingCat(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                        </div>
+                      <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input value={editCatName} onChange={e => setEditCatName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: 1 }} />
+                        <button onClick={() => handleUpdateCategory(c.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
+                        <button onClick={() => setEditingCat(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
                       </div>
                     ) : (
                       <>
                         <b style={{ color: 'var(--primary)', fontSize: '14px' }}>{c.name}</b>
                         <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{c.key}</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-soft)', flex: 1 }}>
-                          Role → {(c.levels || []).map(l => l.name).join(' → ') || 'Role only'}
-                        </span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{roles.filter(r => r.category === c.key).length} role(s)</span>
-                        <button onClick={() => { setEditingCat(c.id); setEditCatName(c.name); setEditCatLevels((c.levels || []).map(l => ({ key: l.key, name: l.name }))); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
+                        <span style={{ fontSize: '12px', color: 'var(--text-soft)', flex: 1 }}>{roles.filter(r => r.category === c.key).length} role(s)</span>
+                        <button onClick={() => { setEditingCat(c.id); setEditCatName(c.name); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
                         <button onClick={() => handleDeleteCategory(c)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>
                       </>
                     )}
                   </div>
                 ))}
 
-                {/* Every value below Role lives under the role it belongs to */}
-                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Level Values by Role</h4>
+                {/* The tree is the schema: a role is its own root node and every
+                    bucket hangs off a parent, so depth is just however deep you edit it. */}
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Category Tree</h4>
                 <form onSubmit={handleAddLevelValue} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="Value name (e.g. Head of Dept)" value={newVal.name} onChange={e => setNewVal(v => ({ ...v, name: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                  <select value={newVal.role_key} onChange={e => { const r = roles.find(x => x.key === e.target.value); setNewVal(v => ({ ...v, role_key: e.target.value, level_key: (catLevels(r?.category)[0] || {}).key || '', parent_id: '' })); }} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Role">
-                    <option value="">Select Role</option>
-                    {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                  <input placeholder="Bucket name (e.g. Carnatic Music)" value={newVal.name} onChange={e => setNewVal(v => ({ ...v, name: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                  <select value={newVal.parent_id} onChange={e => setNewVal(v => ({ ...v, parent_id: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 260px' }} title="Under which node">
+                    <option value="">Select parent node</option>
+                    {levelValues.map(v => {
+                      const depth = (() => { let d = 0, cur = v; while (cur && cur.parent_id) { d++; cur = levelValues.find(x => x.id === cur.parent_id); } return d; })();
+                      return <option key={v.id} value={v.id}>{'— '.repeat(depth)}{v.name}</option>;
+                    })}
                   </select>
-                  {newVal.role_key && (
-                    <select value={newVal.level_key} onChange={e => setNewVal(v => ({ ...v, level_key: e.target.value, parent_id: '' }))} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Level">
-                      {catLevels(roleCategory(newVal.role_key)).map(l => <option key={l.key} value={l.key}>{l.name}</option>)}
-                    </select>
-                  )}
-                  {newVal.role_key && newVal.level_key !== (catLevels(roleCategory(newVal.role_key))[0] || {}).key && (
-                    <select value={newVal.parent_id} onChange={e => setNewVal(v => ({ ...v, parent_id: e.target.value }))} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Under which value">
-                      <option value="">Top level (no parent)</option>
-                      {levelValues.filter(v => v.role_key === newVal.role_key && v.level_key !== newVal.level_key).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
-                  )}
-                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Value</button>
+                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Bucket</button>
                 </form>
-                {roles.map(r => {
-                  const mine = levelValues.filter(v => v.role_key === r.key);
-                  if (!mine.length) return null;
+                {userCategories.map(c => {
+                  const roots = levelValues.filter(v => !v.parent_id && v.category_key === c.key);
+                  if (!roots.length) return null;
                   return (
-                    <div key={r.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px' }}>
-                      <b style={{ fontSize: '14px', color: 'var(--primary)' }}>{r.name}</b>
-                      {catLevels(r.category).map(l => {
-                        const parents = mine.filter(v => v.level_key === l.key && !v.parent_id);
-                        if (!parents.length) return null;
-                        return (
-                          <div key={l.key} style={{ marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid var(--border)' }}>
-                            <div style={{ fontSize: '11px', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{l.name}</div>
-                            {parents.map(p => (
-                              <ValBranch key={p.id} parent={p} all={mine} editingVal={editingVal} setEditingVal={setEditingVal} editName={editValName} setEditName={setEditValName} onSave={handleUpdateLevelValue} onDelete={handleDeleteLevelValue} />
-                            ))}
-                          </div>
-                        );
-                      })}
+                    <div key={c.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px' }}>
+                      <b style={{ fontSize: '14px', color: 'var(--primary)' }}>{c.name}</b>
+                      {roots.map(p => (
+                        <ValBranch key={p.id} parent={p} all={levelValues.filter(v => v.category_key === c.key)} editingVal={editingVal} setEditingVal={setEditingVal} editName={editValName} setEditName={setEditValName} onSave={handleUpdateLevelValue} onDelete={handleDeleteLevelValue} />
+                      ))}
                     </div>
                   );
                 })}
