@@ -139,7 +139,7 @@ app.get('/api/public/disciplines', async (req, res) => {
 // Curriculum import template — XLSX with 2 sheets: Courses + Modules/Topics
 app.get('/api/curriculum/template', authMiddleware, async (req, res) => {
   try {
-    const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+    const level = await getAccessLevel(req.auth.profile, 'curriculum');
     if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Manage on Curriculum required.' });
     if (!XLSX) return res.status(503).json({ error: 'XLSX not installed on server' });
     const wb = XLSX.utils.book_new();
@@ -302,15 +302,21 @@ async function authMiddleware(req, res, next) {
 // ============================================================================
 const LEVEL_ORDER = { '—': 0, 'View': 1, 'Self': 2, 'Submits': 3, 'Own': 4, 'Manage': 5, 'Full': 6 };
 
-async function getAccessLevel(roleKey, moduleKey) {
-  const { data, error } = await supabase
-    .from('role_permissions')
-    .select('access_level')
-    .eq('role_key', roleKey)
-    .eq('module_key', moduleKey)
-    .single();
-  if (error || !data) return null; // no row = module hidden
-  return data.access_level;
+// A role grants its baseline on every module; a user grant only ever raises the
+// level, never lowers it, so a role can't be used to quietly cap a person. No
+// row anywhere = module hidden.
+async function getAccessLevel(profile, moduleKey) {
+  if (profile.role_key === 'super_admin') return 'Full';
+  const [byRole, byUser] = await Promise.all([
+    supabase.from('role_permissions').select('access_level')
+      .eq('role_key', profile.role_key).eq('module_key', moduleKey).maybeSingle(),
+    supabase.from('user_permissions').select('access_level')
+      .eq('user_id', profile.id).eq('module_key', moduleKey).maybeSingle(),
+  ]);
+  const rank = (l) => LEVEL_ORDER[l] ?? 0;
+  const role = byRole.data?.access_level;
+  const user = byUser.data?.access_level;
+  return rank(user) > rank(role) ? user : role || user || null;
 }
 
 function canAccess(level, action) {
@@ -327,7 +333,7 @@ const API_TO_MODULE = {
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   timetable_periods: 'timetable',
-  roles: 'roles', role_permissions: 'roles',
+  roles: 'roles', role_permissions: 'roles', user_permissions: 'roles',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
@@ -489,36 +495,13 @@ async function checkTimetableConflict(candidate) {
   return null;
 }
 
-// A category's shape is Super Admin's call: it declares an ordered list of
-// levels that sit below Role (e.g. Designation, then Department). Role stays
-// level 1 because permissions hang off it; `levels` is everything under it.
 const slugKey = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-const validateLevels = (levels) => {
-  if (!Array.isArray(levels)) return 'Levels must be an array.';
-  if (levels.length > 4) return 'A category can have at most 4 levels below Role.';
-  const seen = new Set();
-  for (const l of levels) {
-    const key = slugKey(l?.key || l?.name);
-    if (!key) return 'Every level needs a name.';
-    if (!/^[a-z0-9_]{2,40}$/.test(key)) return 'Level keys must be lowercase letters, numbers or underscores.';
-    if (key === 'role') return '"Role" is the fixed first level — name your levels below it.';
-    if (seen.has(key)) return `Duplicate level "${key}".`;
-    seen.add(key);
-  }
-  return null;
-};
 
 const BUILT_IN_CATEGORY_KEYS = ['staff', 'student', 'administration'];
 const validateMasterMeta = async (table, body = {}) => {
   if (table === 'user_categories') {
     if (body.key !== undefined && !/^[a-z0-9_]{2,40}$/.test(String(body.key))) return 'Category key must be lowercase letters, numbers or underscores.';
     if (body.name !== undefined && !String(body.name).trim()) return 'Category name is required.';
-    if (body.levels !== undefined) {
-      const levels = (body.levels || []).map(l => ({ key: slugKey(l?.key || l?.name), name: String(l?.name || l?.key || '').trim() }));
-      const err = validateLevels(levels);
-      if (err) return err;
-      body.levels = levels;
-    }
     if (body.key !== undefined && BUILT_IN_CATEGORY_KEYS.includes(body.key)) {
       const { data: clash } = await supabase.from('user_categories').select('id').eq('key', body.key).maybeSingle();
       if (!clash) return `"${body.key}" is a built-in category key.`;
@@ -526,10 +509,18 @@ const validateMasterMeta = async (table, body = {}) => {
   }
   if (table === 'category_level_values') {
     if (body.name !== undefined && !String(body.name).trim()) return 'Value name is required.';
-    if (body.level_key !== undefined && !slugKey(body.level_key)) return 'Level is required.';
-    if (body.category_key !== undefined && !BUILT_IN_CATEGORY_KEYS.includes(body.category_key)) {
+    // A node inherits its category from its parent, so only a root node states one.
+    if (body.parent_id) {
+      const { data: parent } = await supabase.from('category_level_values').select('id, category_key').eq('id', body.parent_id).maybeSingle();
+      if (!parent) return 'Unknown parent node.';
+      body.category_key = parent.category_key;
+    } else if (body.category_key !== undefined && body.category_key !== null) {
       const { data: cat } = await supabase.from('user_categories').select('key').eq('key', body.category_key).maybeSingle();
       if (!cat) return 'Unknown category. Create it in Roles & Permissions first.';
+    }
+    if (body.role_key) {
+      const { data: role } = await supabase.from('roles').select('key').eq('key', body.role_key).maybeSingle();
+      if (!role) return 'Unknown role.';
     }
   }
   if (table === 'roles' && body.category !== undefined && !BUILT_IN_CATEGORY_KEYS.includes(body.category)) {
@@ -544,7 +535,7 @@ const crud = (table, orderCol = 'created_at') => ({
   list: async (req, res) => {
     try {
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
-      const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+      const level = await getAccessLevel(req.auth.profile, moduleKey);
       if (!level || !canAccess(level, 'list')) {
         return res.status(403).json({ error: 'You do not have View access for this module.' });
       }
@@ -566,7 +557,7 @@ const crud = (table, orderCol = 'created_at') => ({
   create: async (req, res) => {
     try {
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
-      const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+      const level = await getAccessLevel(req.auth.profile, moduleKey);
       const isSelfSubmission = table === 'assignment_submissions' && String(req.body.student_id) === String(req.auth?.profile?.id);
       const isSelfProject = table === 'projects' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
       const isSelfCert = table === 'certificates' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
@@ -779,7 +770,7 @@ const crud = (table, orderCol = 'created_at') => ({
   update: async (req, res) => {
     try {
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
-      const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+      const level = await getAccessLevel(req.auth.profile, moduleKey);
       if (table === 'assignment_submissions') {
         const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
         if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
@@ -843,7 +834,7 @@ const crud = (table, orderCol = 'created_at') => ({
       if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
       const gateErr = await checkPublishGate(table, req.body, level);
       if (gateErr) return res.status(403).json({ error: gateErr });
-      const blocked = await guard(table, req.params.id, req.body);
+      const blocked = await guard(table, req.params.id, req.body, req);
       if (blocked) return res.status(403).json({ error: blocked });
       let updateData = { ...req.body };
       if (table === 'users') {
@@ -949,7 +940,7 @@ const crud = (table, orderCol = 'created_at') => ({
   delete: async (req, res) => {
     try {
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
-      const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+      const level = await getAccessLevel(req.auth.profile, moduleKey);
       if (table === 'projects' || table === 'certificates') {
         const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
         if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
@@ -969,7 +960,7 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'course_module_topics' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
         return res.status(403).json({ error: 'Managing module topics requires Manage access on Curriculum.' });
       }
-      const blocked = await guard(table, req.params.id);
+      const blocked = await guard(table, req.params.id, {}, req);
       if (blocked) return res.status(403).json({ error: blocked });
       const { error } = await supabase.from(table).delete().eq('id', req.params.id);
       if (error) throw error;
@@ -981,7 +972,7 @@ const crud = (table, orderCol = 'created_at') => ({
 // Super Admin is the one fixed role — the anchor of the whole permission chain.
 // Its row can't be deleted, its key can't be renamed, and its Full permissions can't be revoked.
 // Only one super_admin user may exist — it cannot be deleted or demoted, and a second cannot be created.
-const guard = async (table, id, body = {}) => {
+const guard = async (table, id, body = {}, req = null) => {
   if (table === 'roles' && id) {
     const { data } = await supabase.from('roles').select('key').eq('id', id).single();
     if (data?.key === 'super_admin') {
@@ -992,12 +983,13 @@ const guard = async (table, id, body = {}) => {
     }
   }
   if (table === 'category_level_values' && id) {
-    const { data: v } = await supabase.from('category_level_values').select('name, level_key').eq('id', id).single();
-    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq(`level_values->>${v?.level_key || 'designation'}`, v?.name || ' ');
-    if ((count || 0) > 0) return `${count} user(s) still hold this. Reassign them first.`;
+    // level_values is keyed by node id, so a user holds a node when that key is
+    // present. PostgREST can't test jsonb key existence, so read and filter here.
+    const { data: holders } = await supabase.from('users').select('level_values').not('level_values', 'is', null);
+    const held = (holders || []).filter(lv => Object.prototype.hasOwnProperty.call(lv.level_values || {}, id)).length;
+    if (held > 0) return `${held} user(s) still hold this. Reassign them first.`;
     const { count: kids } = await supabase.from('category_level_values').select('id', { count: 'exact', head: true }).eq('parent_id', id);
-    if ((kids || 0) > 0) return `This has ${kids} value(s) below it. Delete those first.`;
-    if ((count || 0) > 0) return `${count} user(s) still hold this. Reassign them first.`;
+    if ((kids || 0) > 0) return `This has ${kids} bucket(s) below it. Delete those first.`;
   }
   if (table === 'user_categories' && id) {
     const { data } = await supabase.from('user_categories').select('key').eq('id', id).single();
@@ -1015,6 +1007,20 @@ const guard = async (table, id, body = {}) => {
     const { data } = await supabase.from('role_permissions').select('role_key').eq('id', id).single();
     if (data?.role_key === 'super_admin')
       return 'Super Admin permissions are fixed — Full access everywhere.';
+  }
+  // A grant only raises access, so a Super Admin never needs one; refuse to
+  // write grants that would look like they grant more than the writer holds.
+  if (table === 'user_permissions' && req?.auth?.profile) {
+    const writer = req.auth.profile;
+    const payload = body && Object.keys(body).length ? body : null;
+    const targetUserId = payload ? payload.user_id : (await supabase.from('user_permissions').select('user_id').eq('id', id).single()).data?.user_id;
+    const { data: target } = await supabase.from('users').select('role_key').eq('id', targetUserId).maybeSingle();
+    if (target?.role_key === 'super_admin') return 'Super Admin already has Full access everywhere.';
+    if (writer.role_key !== 'super_admin') {
+      const writerLevel = await getAccessLevel(writer, 'users');
+      if (LEVEL_ORDER[writerLevel] < LEVEL_ORDER['Full'])
+        return 'Only Super Admin can grant permissions to other users.';
+    }
   }
   if (table === 'users' && id) {
     const { data } = await supabase.from('users').select('role_key').eq('id', id).single();
@@ -1095,7 +1101,7 @@ app.post('/api/auth/first-password-change', async (req, res) => {
 const rolesList = async (req, res) => {
   try {
     const moduleKey = 'roles';
-    const level = await getAccessLevel(req.auth.profile.role_key, moduleKey);
+    const level = await getAccessLevel(req.auth.profile, moduleKey);
     if (!level || !canAccess(level, 'list')) return res.status(403).json({ error: 'You do not have View access for this module.' });
     const { data, error } = await supabase.from('roles').select('*').order('name');
     if (error) throw error;
@@ -1104,7 +1110,7 @@ const rolesList = async (req, res) => {
 };
 const rolesCreate = async (req, res) => {
   try {
-    const level = await getAccessLevel(req.auth.profile.role_key, 'roles');
+    const level = await getAccessLevel(req.auth.profile, 'roles');
     if (!level || !canAccess(level, 'create')) return res.status(403).json({ error: 'You do not have Create access for this module.' });
     const body = { ...req.body };
     if (!body.key || !body.name) return res.status(400).json({ error: 'key and name are required' });
@@ -1115,12 +1121,15 @@ const rolesCreate = async (req, res) => {
     if (catErr) return res.status(400).json({ error: catErr });
     const { data, error } = await supabase.from('roles').insert([body]).select();
     if (error) throw error;
+    // A role is just a tree node that carries role_key, so give it a root node
+    // in its category — otherwise it exists in the picker but nowhere assignable.
+    await supabase.from('category_level_values').insert([{ category_key: body.category, role_key: body.key, name: body.name }]);
     res.status(201).json(data[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 };
 const rolesUpdate = async (req, res) => {
   try {
-    const level = await getAccessLevel(req.auth.profile.role_key, 'roles');
+    const level = await getAccessLevel(req.auth.profile, 'roles');
     if (!level || !canAccess(level, 'update')) return res.status(403).json({ error: 'You do not have Manage access for this module.' });
     const blocked = await guard('roles', req.params.id, req.body);
     if (blocked) return res.status(403).json({ error: blocked });
@@ -1143,7 +1152,7 @@ const rolesUpdate = async (req, res) => {
 };
 const rolesDelete = async (req, res) => {
   try {
-    const level = await getAccessLevel(req.auth.profile.role_key, 'roles');
+    const level = await getAccessLevel(req.auth.profile, 'roles');
     if (!level || !canAccess(level, 'delete')) return res.status(403).json({ error: 'You do not have Full access for this module.' });
     const blocked = await guard('roles', req.params.id, req.body);
     if (blocked) return res.status(403).json({ error: blocked });
@@ -1156,9 +1165,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
@@ -1175,6 +1184,31 @@ app.get('/api/roles', authMiddleware, rolesList);
 app.post('/api/roles', authMiddleware, rolesCreate);
 app.put('/api/roles/:id', authMiddleware, rolesUpdate);
 app.delete('/api/roles/:id', authMiddleware, rolesDelete);
+
+// The caller's own effective access per module, role baseline folded together
+// with their own grants. The portal renders its navigation from this, so a
+// person never needs read access to the whole grant tables.
+app.get('/api/my-permissions', authMiddleware, async (req, res) => {
+  try {
+    const me = req.auth.profile;
+    const isSuper = me.role_key === 'super_admin';
+    if (isSuper) {
+      res.json({ role_key: me.role_key, module_key: null, access_level: 'Full', perms: {} });
+      return;
+    }
+    const [{ data: byRole }, { data: byUser }] = await Promise.all([
+      supabase.from('role_permissions').select('module_key, access_level').eq('role_key', me.role_key),
+      supabase.from('user_permissions').select('module_key, access_level').eq('user_id', me.id),
+    ]);
+    const perms = {};
+    const rank = (l) => LEVEL_ORDER[l] ?? 0;
+    (byRole || []).forEach(p => { perms[p.module_key] = p.access_level; });
+    (byUser || []).forEach(p => {
+      if (rank(p.access_level) > rank(perms[p.module_key])) perms[p.module_key] = p.access_level;
+    });
+    res.json({ role_key: me.role_key, perms });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // Overview widget layout — a personal preference scoped to the caller.
 // Not a module, so it stays out of the `modules` CRUD loop above: that loop
@@ -1229,16 +1263,16 @@ app.put('/api/me', authMiddleware, async (req, res) => {
       if (v.length > max) return res.status(400).json({ error: `${k} too long` });
       patch[k] = v || null;
     }
-    // level_values is free-form, but every key must be a level some category
-    // actually declares — otherwise users would collect junk nobody can render.
+    // level_values is keyed by tree node id, so every key must be a node that
+    // actually exists — otherwise users would collect junk nobody can render.
     if (req.body?.level_values !== undefined) {
       const lv = req.body.level_values && typeof req.body.level_values === 'object' ? req.body.level_values : {};
       const keys = Object.keys(lv).filter(k => lv[k]);
       if (keys.length) {
-        const { data: cats } = await supabase.from('user_categories').select('levels');
-        const known = new Set((cats || []).flatMap(c => (c.levels || []).map(l => l.key)));
+        const { data: nodes } = await supabase.from('category_level_values').select('id').in('id', keys);
+        const known = new Set((nodes || []).map(n => n.id));
         const bad = keys.find(k => !known.has(k));
-        if (bad) return res.status(400).json({ error: `Unknown level "${bad}".` });
+        if (bad) return res.status(400).json({ error: `Unknown level node "${bad}".` });
       }
       patch.level_values = lv;
     }
@@ -1854,7 +1888,7 @@ app.post('/api/curriculum/parse', authMiddleware, (req, res, next) => {
   next();
 }, async (req, res) => {
   try {
-    const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+    const level = await getAccessLevel(req.auth.profile, 'curriculum');
     if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Manage on Curriculum required to parse syllabus files.' });
     let buffer = null, orig = '', mime = '', size = 0;
     if (req.file && req.file.buffer) {
@@ -1892,7 +1926,7 @@ app.get('/api/curriculum-content/:key', async (req, res) => {
 app.put('/api/curriculum-content/:key', authMiddleware, async (req, res) => {
   try {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
-    const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+    const level = await getAccessLevel(req.auth.profile, 'curriculum');
     if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
       return res.status(403).json({ error: 'You do not have Manage access for curriculum content.' });
     }
@@ -1927,7 +1961,7 @@ app.put('/api/cms/:key', authMiddleware, async (req, res) => {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
     const isSuper = req.auth.profile.role_key === 'super_admin';
     if (!isSuper) {
-      const level = await getAccessLevel(req.auth.profile.role_key, 'curriculum');
+      const level = await getAccessLevel(req.auth.profile, 'curriculum');
       if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) {
         return res.status(403).json({ error: 'Only Super Admin (or Full on Curriculum) can edit site content.' });
       }
