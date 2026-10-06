@@ -328,6 +328,7 @@ const API_TO_MODULE = {
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   timetable_periods: 'timetable',
   roles: 'roles', role_permissions: 'roles',
+  designations: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
@@ -338,6 +339,7 @@ const TABLE_TO_MODULE = {
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
+  designations: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
@@ -487,6 +489,34 @@ async function checkTimetableConflict(candidate) {
   return null;
 }
 
+// Categories and Designations are master data whose shape Super Admin chooses:
+// a category's hierarchy_type decides whether it drills through Role → Designation
+// or Role → Course. Validated here so the invariants hold for any caller.
+const BUILT_IN_CATEGORY_KEYS = ['staff', 'student', 'administration'];
+const validateMasterMeta = async (table, body = {}) => {
+  if (table === 'user_categories') {
+    if (body.key !== undefined && !/^[a-z0-9_]{2,40}$/.test(String(body.key))) return 'Category key must be lowercase letters, numbers or underscores.';
+    if (body.name !== undefined && !String(body.name).trim()) return 'Category name is required.';
+    if (body.hierarchy_type !== undefined && !['role_designation', 'course'].includes(body.hierarchy_type)) return 'Invalid hierarchy type.';
+    if (body.key !== undefined && BUILT_IN_CATEGORY_KEYS.includes(body.key)) {
+      const { data: clash } = await supabase.from('user_categories').select('id').eq('key', body.key).maybeSingle();
+      if (!clash) return `"${body.key}" is a built-in category key.`;
+    }
+  }
+  if (table === 'designations') {
+    if (body.name !== undefined && !String(body.name).trim()) return 'Designation name is required.';
+    if (body.category_key !== undefined && body.category_key !== null && body.category_key !== '') {
+      const { data: cat } = await supabase.from('user_categories').select('key').eq('key', body.category_key).maybeSingle();
+      if (!cat) return 'Unknown category for this designation.';
+    }
+  }
+  if (table === 'roles' && body.category !== undefined && !BUILT_IN_CATEGORY_KEYS.includes(body.category)) {
+    const { data: cat } = await supabase.from('user_categories').select('key').eq('key', body.category).maybeSingle();
+    if (!cat) return 'Unknown category. Create it in Roles & Permissions first.';
+  }
+  return null;
+};
+
 // Enhanced CRUD — server-side permission + ownership + transition gates
 const crud = (table, orderCol = 'created_at') => ({
   list: async (req, res) => {
@@ -529,6 +559,8 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'course_module_topics' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
         return res.status(403).json({ error: 'Managing module topics requires Manage access on Curriculum.' });
       }
+      const metaErr = await validateMasterMeta(table, req.body);
+      if (metaErr) return res.status(400).json({ error: metaErr });
       const gateErr = await checkPublishGate(table, req.body, level);
       if (gateErr) return res.status(403).json({ error: gateErr });
       if (table === 'timetable_slots') {
@@ -539,7 +571,7 @@ const crud = (table, orderCol = 'created_at') => ({
       }
       // ── users: custom create with Supabase Auth + OTP ──────────────────
       if (table === 'users') {
-        const ALLOWED = ['name','email','phone','role_key','status','employee_id','roll_no','designation','program_id','date_of_joining','year_of_commencement'];
+        const ALLOWED = ['name','email','phone','role_key','status','employee_id','roll_no','designation','designation_id','program_id','date_of_joining','year_of_commencement'];
         const body = {};
         for (const k of ALLOWED) if (req.body[k] !== undefined) body[k] = req.body[k];
         if (!body.name || !body.email || !body.role_key) {
@@ -554,6 +586,7 @@ const crud = (table, orderCol = 'created_at') => ({
         else if (body.year_of_commencement !== undefined) body.year_of_commencement = Number(body.year_of_commencement) || null;
         if (body.phone === '') body.phone = null;
         if (body.designation === '') body.designation = null;
+        if (body.designation_id === '') body.designation_id = null;
         const { data: roleRow } = await supabase.from('roles').select('category').eq('key', body.role_key).single();
         const cat = roleRow?.category || 'staff';
         if (body.role_key === 'super_admin') {
@@ -781,6 +814,8 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'course_module_topics' && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
         return res.status(403).json({ error: 'Managing module topics requires Manage access on Curriculum.' });
       }
+      const metaErrU = await validateMasterMeta(table, req.body);
+      if (metaErrU) return res.status(400).json({ error: metaErrU });
       const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
       if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
       const gateErr = await checkPublishGate(table, req.body, level);
@@ -789,7 +824,7 @@ const crud = (table, orderCol = 'created_at') => ({
       if (blocked) return res.status(403).json({ error: blocked });
       let updateData = { ...req.body };
       if (table === 'users') {
-        const ALLOWED_U = ['name','email','phone','role_key','status','employee_id','roll_no','designation','program_id','date_of_joining','year_of_commencement','must_change_password'];
+        const ALLOWED_U = ['name','email','phone','role_key','status','employee_id','roll_no','designation','designation_id','program_id','date_of_joining','year_of_commencement','must_change_password'];
         const filtered = {};
         for (const k of ALLOWED_U) if (updateData[k] !== undefined) filtered[k] = updateData[k];
         if (filtered.employee_id === '') filtered.employee_id = null;
@@ -800,6 +835,7 @@ const crud = (table, orderCol = 'created_at') => ({
         else if (filtered.year_of_commencement !== undefined) filtered.year_of_commencement = Number(filtered.year_of_commencement) || null;
         if (filtered.phone === '') filtered.phone = null;
         if (filtered.designation === '') filtered.designation = null;
+        if (filtered.designation_id === '') filtered.designation_id = null;
         updateData = filtered;
       }
       if (table === 'courses') {
@@ -931,6 +967,22 @@ const guard = async (table, id, body = {}) => {
         return 'The Super Admin role cannot be deleted.';
     }
   }
+  if (table === 'designations' && id) {
+    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('designation_id', id);
+    if ((count || 0) > 0) return `${count} user(s) still hold this designation. Reassign them first.`;
+  }
+  if (table === 'user_categories' && id) {
+    const { data } = await supabase.from('user_categories').select('key').eq('id', id).single();
+    if (BUILT_IN_CATEGORY_KEYS.includes(data?.key)) {
+      if (!body || Object.keys(body).length === 0) return `The ${data.name} category cannot be deleted.`;
+      if (body.key !== undefined && body.key !== data.key) return `The ${data.name} category is built-in and its key cannot be changed.`;
+      return null;
+    }
+    if (!body || Object.keys(body).length === 0) {
+      const { count } = await supabase.from('roles').select('key', { count: 'exact', head: true }).eq('category', data?.key);
+      if ((count || 0) > 0) return `${count} role(s) still belong to this category. Reassign them first.`;
+    }
+  }
   if (table === 'role_permissions' && id) {
     const { data } = await supabase.from('role_permissions').select('role_key').eq('id', id).single();
     if (data?.role_key === 'super_admin')
@@ -1031,7 +1083,8 @@ const rolesCreate = async (req, res) => {
     body.key = String(body.key).trim().toLowerCase().replace(/\s+/g, '_');
     if (body.key === 'super_admin') return res.status(403).json({ error: 'Cannot create super_admin' });
     if (!body.category) body.category = 'staff';
-    if (!['staff','student','both'].includes(body.category)) return res.status(400).json({ error: 'Invalid category' });
+    const catErr = await validateMasterMeta('roles', { category: body.category });
+    if (catErr) return res.status(400).json({ error: catErr });
     const { data, error } = await supabase.from('roles').insert([body]).select();
     if (error) throw error;
     res.status(201).json(data[0]);
@@ -1046,7 +1099,10 @@ const rolesUpdate = async (req, res) => {
     if (req.body.category !== undefined) {
       const { data: existing } = await supabase.from('roles').select('key').eq('id', req.params.id).single();
       if (existing?.key === 'super_admin' && req.body.category !== 'system') return res.status(403).json({ error: 'Super Admin category cannot be changed' });
-      if (existing?.key !== 'super_admin' && !['staff','student','both'].includes(req.body.category)) return res.status(400).json({ error: 'Invalid category' });
+      if (existing?.key !== 'super_admin') {
+        const uCatErr = await validateMasterMeta('roles', { category: req.body.category });
+        if (uCatErr) return res.status(400).json({ error: uCatErr });
+      }
     }
     if (req.body.key !== undefined) {
       const { data: existing } = await supabase.from('roles').select('key').eq('id', req.params.id).single();
@@ -1072,9 +1128,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', designations: 'name', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'designations', 'user_categories'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
@@ -1133,6 +1189,8 @@ app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
 // which requires Manage on the Users module. Only descriptive, non-privileged
 // fields are exposed — role_key, status, email and program stay admin-owned.
 const SELF_EDITABLE = { name: 120, phone: 20, designation: 80, avatar_url: 500, avatar_initials: 3 };
+// `designation_id` is a UUID column, so it bypasses the length cap loop below.
+const SELF_EDITABLE_UUID = ['designation_id'];
 app.put('/api/me', authMiddleware, async (req, res) => {
   try {
     const patch = {};
@@ -1145,12 +1203,19 @@ app.put('/api/me', authMiddleware, async (req, res) => {
       if (v.length > max) return res.status(400).json({ error: `${k} too long` });
       patch[k] = v || null;
     }
+    for (const k of SELF_EDITABLE_UUID) {
+      if (req.body?.[k] === undefined) continue;
+      if (req.body[k] === null || req.body[k] === '') { patch[k] = null; continue; }
+      const { data: d } = await supabase.from('designations').select('id').eq('id', req.body[k]).maybeSingle();
+      if (!d) return res.status(400).json({ error: 'Unknown designation' });
+      patch[k] = d.id;
+    }
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
     const { data, error } = await supabase
       .from('users')
       .update(patch)
       .eq('id', req.auth.profile.id)
-      .select('id, name, email, phone, designation, avatar_url, avatar_initials')
+      .select('id, name, email, phone, designation, designation_id, avatar_url, avatar_initials')
       .single();
     if (error) throw error;
     res.json(data);
@@ -1272,7 +1337,7 @@ app.post('/api/admin/password-resets/:id/action', authMiddleware, async (req, re
 app.post('/api/admin/users/:id/approve', authMiddleware, async (req, res) => {
   try {
     if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can approve signups' });
-    const { role_key, program_id, designation } = req.body || {};
+    const { role_key, program_id, designation, designation_id } = req.body || {};
     const { data: user } = await supabase.from('users').select('id, email, status').eq('id', req.params.id).single();
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.status !== 'pending') return res.status(409).json({ error: 'Only pending signups can be approved' });
@@ -1280,7 +1345,7 @@ app.post('/api/admin/users/:id/approve', authMiddleware, async (req, res) => {
 
     const { error: roleErr } = await supabase
       .from('users')
-      .update({ status: 'active', role_key, program_id: program_id || null, designation: designation || null })
+      .update({ status: 'active', role_key, program_id: program_id || null, designation: designation || null, designation_id: designation_id || null })
       .eq('id', user.id);
     if (roleErr) throw roleErr;
 

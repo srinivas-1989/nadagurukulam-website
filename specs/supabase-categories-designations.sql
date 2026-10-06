@@ -32,10 +32,11 @@ create policy "Super admin manage user_categories"
     )
   );
 
--- 2. Designations master table
+-- 2. Designations master table, scoped to the category that owns it
 create table if not exists public.designations (
   id uuid default uuid_generate_v4() primary key,
   name text unique not null,
+  category_key text references public.user_categories(key) on update cascade on delete restrict default 'staff',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -60,3 +61,8 @@ create policy "Admin manage designations"
 -- 3. Add designation_id FK to users
 alter table public.users add column if not exists designation_id uuid references public.designations(id) on delete set null;
 create index if not exists users_designation_id_idx on public.users(designation_id) where designation_id is not null;
+
+-- 4. Rename the 'system' category to 'administration', then relax the
+--    roles.category check so custom categories can hold roles.
+alter table public.roles drop constraint if exists roles_category_check;
+update public.roles set category = 'administration' where category = 'system';

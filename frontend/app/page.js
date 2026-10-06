@@ -227,6 +227,10 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     class_entries: [], class_confirmations: []
   });
   const [roles, setRoles] = useState([]);
+  const [userCategories, setUserCategories] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [newDesignationId, setNewDesignationId] = useState('');
+  const [editUserDesignationId, setEditUserDesignationId] = useState('');
   const [myProfile, setMyProfile] = useState(null);
   const [timetableBatch, setTimetableBatch] = useState(null);
   const [otpMode, setOtpMode] = useState(false);
@@ -878,6 +882,8 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       endpoints.forEach(([ep, key], idx) => { mapped[key] = Array.isArray(results[idx]) ? results[idx] : []; });
       setDbData(mapped);
       apiCall(`${apiUrl}/api/roles`).then(r => r.json()).then(d => Array.isArray(d) && setRoles(d)).catch(() => {});
+      apiCall(`${apiUrl}/api/user_categories`).then(r => r.json()).then(d => Array.isArray(d) && setUserCategories(d)).catch(() => {});
+      apiCall(`${apiUrl}/api/designations`).then(r => r.json()).then(d => Array.isArray(d) && setDesignations(d)).catch(() => {});
     } catch (err) { console.error('Fetch error:', err); }
   };
 
@@ -998,7 +1004,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const found = Array.isArray(roles) ? roles.find(r => r.key === key) : null;
     if (found?.category) return found.category;
     if (key === 'student' || key === 'students') return 'student';
-    if (key === 'super_admin') return 'system';
+    if (key === 'super_admin') return 'administration';
     if (key === 'teacher' || key === 'teaching_faculty') return 'staff';
     return 'staff';
   };
@@ -1006,16 +1012,20 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const newRoleCat = roleCategory(newUserRole);
   const editRoleCat = roleCategory(editUserRoleKey);
   const isStudentCat = (c) => c === 'student' || c === 'both';
-  const isStaffCat = (c) => c === 'staff' || c === 'both' || c === 'system';
+  const isStaffCat = (c) => c !== 'student';
+  // A category's hierarchy is data, not code: role_designation walks Role →
+  // Designation, course walks Role → Course.
+  const catHierarchy = (key) =>
+    (userCategories.find(c => c.key === key) || {}).hierarchy_type || 'role_designation';
   const hasSuperAdminUser = (dbData.users || []).some(u => u.role_key === 'super_admin');
   useEffect(() => {
-    if (newRoleCat === 'student') { setNewEmployeeId(''); setNewDesignation(''); setNewDateOfJoining(''); }
-    else if (newRoleCat === 'staff' || newRoleCat === 'system') { setNewRollNo(''); setNewProgramId(''); setNewYearComm(''); }
+    if (newRoleCat === 'student') { setNewEmployeeId(''); setNewDesignation(''); setNewDesignationId(''); setNewDateOfJoining(''); }
+    else { setNewRollNo(''); setNewProgramId(''); setNewYearComm(''); }
   }, [newRoleCat]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!editingUser) return;
-    if (editRoleCat === 'student') { setEditUserEmployeeId(''); setEditUserDesignation(''); setEditUserDateOfJoining(''); }
-    else if (editRoleCat === 'staff' || editRoleCat === 'system') { setEditUserRollNo(''); setEditUserProgramId(''); setEditUserYearComm(''); }
+    if (editRoleCat === 'student') { setEditUserEmployeeId(''); setEditUserDesignation(''); setEditUserDesignationId(''); setEditUserDateOfJoining(''); }
+    else { setEditUserRollNo(''); setEditUserProgramId(''); setEditUserYearComm(''); }
   }, [editRoleCat, editingUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // First-login OTP flow
@@ -1924,18 +1934,18 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [editRoleName, setEditRoleName] = useState('');
   const [editRoleDesc, setEditRoleDesc] = useState('');
 
-  const [newRoleCategory, setNewRoleCategory] = useState('staff');
-  const [editRoleCategory, setEditRoleCategory] = useState('staff');
+  const [newRoleCategory, setNewRoleCategory] = useState('');
+  const [editRoleCategory, setEditRoleCategory] = useState('');
   const handleAddRole = async (e) => {
     e.preventDefault();
-    const key = newRoleName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    if (!key) return;
+    const key = newRoleName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!key || !newRoleCategory) return;
     const res = await apiCall(`${apiUrl}/api/roles`, {
       method: 'POST',
       body: JSON.stringify({ key, name: newRoleName, description: newRoleDesc, category: newRoleCategory })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return; }
-    setNewRoleName(''); setNewRoleDesc(''); setNewRoleCategory('staff'); fetchData();
+    setNewRoleName(''); setNewRoleDesc(''); setNewRoleCategory(''); fetchData();
   };
 
   const handleUpdateRole = async (id) => {
@@ -1971,6 +1981,73 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     fetchData();
   };
 
+  // Categories & Designations — the hierarchy shape is data, chosen per category
+  // by Super Admin: role_designation walks Role → Designation, course walks Role → Course.
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatHierarchy, setNewCatHierarchy] = useState('role_designation');
+  const [editingCat, setEditingCat] = useState(null);
+  const [editCatName, setEditCatName] = useState('');
+  const [editCatHierarchy, setEditCatHierarchy] = useState('role_designation');
+  const [newDesigName, setNewDesigName] = useState('');
+  const [newDesigCategory, setNewDesigCategory] = useState('');
+  const [editingDesig, setEditingDesig] = useState(null);
+  const [editDesigName, setEditDesigName] = useState('');
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    const key = newCatName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!key) return;
+    const res = await apiCall(`${apiUrl}/api/user_categories`, {
+      method: 'POST',
+      body: JSON.stringify({ key, name: newCatName.trim(), hierarchy_type: newCatHierarchy })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create category failed'); return; }
+    setNewCatName(''); fetchData();
+  };
+
+  const handleUpdateCategory = async (id) => {
+    const res = await apiCall(`${apiUrl}/api/user_categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: editCatName, hierarchy_type: editCatHierarchy })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
+    setEditingCat(null); fetchData();
+  };
+
+  const handleDeleteCategory = async (c) => {
+    if (!confirm(`Delete category "${c.name}"? Roles in it must be reassigned first.`)) return;
+    const res = await apiCall(`${apiUrl}/api/user_categories/${c.id}`, { method: 'DELETE' });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
+    fetchData();
+  };
+
+  const handleAddDesignation = async (e) => {
+    e.preventDefault();
+    if (!newDesigName.trim()) return;
+    const res = await apiCall(`${apiUrl}/api/designations`, {
+      method: 'POST',
+      body: JSON.stringify({ name: newDesigName.trim(), category_key: newDesigCategory })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create designation failed'); return; }
+    setNewDesigName(''); fetchData();
+  };
+
+  const handleUpdateDesignation = async (id) => {
+    const res = await apiCall(`${apiUrl}/api/designations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: editDesigName })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
+    setEditingDesig(null); fetchData();
+  };
+
+  const handleDeleteDesignation = async (d) => {
+    if (!confirm(`Delete designation "${d.name}"? Users holding it must be reassigned first.`)) return;
+    const res = await apiCall(`${apiUrl}/api/designations/${d.id}`, { method: 'DELETE' });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
+    fetchData();
+  };
+
   // Resolves true once the account exists, so the caller can close its form.
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -1978,14 +2055,14 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const cat = roleCategory(newUserRole);
     const payload = { name: newName.trim(), email: newEmail.trim(), role_key: newUserRole, phone: newPhone.trim() || null,
       employee_id: newEmployeeId.trim() || null, roll_no: newRollNo.trim() || null,
-      designation: newDesignation.trim() || null, program_id: newProgramId || null,
+      designation: newDesignation.trim() || null, designation_id: newDesignationId || null, program_id: newProgramId || null,
       date_of_joining: newDateOfJoining || null, year_of_commencement: yearOf(newYearComm) };
     if (cat === 'student' && (!payload.roll_no || !payload.program_id || !payload.year_of_commencement)) { alert('Students require Roll No, Course (Program) and Year of commencement'); return false; }
     const res = await apiCall(`${apiUrl}/api/users`, { method: 'POST', body: JSON.stringify(payload) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { alert(data.error || 'Create user failed'); return false; }
     if (data.tempPassword || data.otp) setUserNotice({ tempPassword: data.tempPassword, otp: data.otp, email: data.email || payload.email, emailSent: data.emailSent });
-    setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewDesignation(''); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
+    setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewDesignation(''); setNewDesignationId(''); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
     fetchData();
     return true;
   };
@@ -2039,7 +2116,7 @@ const handleAddDiscipline = async (e) => {
   const handleUpdateUser = async (u) => {
     const payload = { name: editUserName.trim(), email: editUserEmail.trim(), role_key: editUserRoleKey,
       phone: editUserPhone.trim() || null, employee_id: editUserEmployeeId.trim() || null, roll_no: editUserRollNo.trim() || null,
-      designation: editUserDesignation.trim() || null, program_id: editUserProgramId || null,
+      designation: editUserDesignation.trim() || null, designation_id: editUserDesignationId || null, program_id: editUserProgramId || null,
       date_of_joining: editUserDateOfJoining || null, year_of_commencement: yearOf(editUserYearComm) };
     if (!payload.name || !payload.email || !payload.role_key) return;
     const res = await apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -3487,7 +3564,10 @@ const handleAddDiscipline = async (e) => {
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Designation</label>
-                                      <input placeholder="e.g. Professor" value={newDesignation} onChange={e => setNewDesignation(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                                      <select value={newDesignationId} onChange={e => { setNewDesignationId(e.target.value); const d = designations.find(x => x.id === e.target.value); setNewDesignation(d ? d.name : ''); }} required style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                         <option value="">Select Designation</option>
+                                         {designations.filter(d => d.category_key === newRoleCat).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                       </select>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Date of Joining</label>
@@ -3561,39 +3641,36 @@ const handleAddDiscipline = async (e) => {
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
                     <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterDesignation(''); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
                       <option value="">Select Category</option>
-                      <option value="staff">Staff</option>
-                      <option value="student">Student</option>
-                      <option value="system">System</option>
+                      {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterCategory ? 0.6 : 1 }}>Filter by Role:
                     <select disabled={!usersFilterCategory} value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterDesignation(''); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterCategory ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterCategory ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Role</option>
-                      <optgroup label="Staff">
-                        {roles.filter(r => r.category === 'staff').filter(r => !usersFilterCategory || r.category === usersFilterCategory).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                      </optgroup>
-                      <optgroup label="Student">
-                        {roles.filter(r => r.category === 'student').filter(r => !usersFilterCategory || r.category === usersFilterCategory).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                      </optgroup>
-                      <optgroup label="System">
-                        {roles.filter(r => r.category === 'system').filter(r => !usersFilterCategory || r.category === usersFilterCategory).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                      </optgroup>
+                      {userCategories.filter(c => !usersFilterCategory || c.key === usersFilterCategory).map(c => (
+                        <optgroup key={c.key} label={c.name}>
+                          {roles.filter(r => r.category === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                        </optgroup>
+                      ))}
                     </select>
                   </label>
+                  {catHierarchy(usersFilterCategory) === 'role_designation' ? (
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Designation:
                     <select disabled={!usersFilterRole} value={usersFilterDesignation || ''} onChange={e => { setUsersFilterDesignation(e.target.value); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Designation</option>
-                      {Array.from(new Set(dbData.users.filter(u => !usersFilterRole || u.role_key === usersFilterRole).map(u => u.designation).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                      {designations.filter(d => d.category_key === usersFilterCategory).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterDesignation ? 0.6 : 1 }}>Filter by Course:
-                    <select disabled={!usersFilterDesignation} value={usersFilterProgram || ''} onChange={e => { setUsersFilterProgram(e.target.value); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterDesignation ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterDesignation ? 'not-allowed' : 'pointer' }}>
+                  ) : (
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Course:
+                    <select disabled={!usersFilterRole} value={usersFilterProgram || ''} onChange={e => { setUsersFilterProgram(e.target.value); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Course</option>
                       {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterProgram ? 0.6 : 1 }}>Filter by Status:
-                    <select disabled={!usersFilterProgram} value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterProgram ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterProgram ? 'not-allowed' : 'pointer' }}>
+                  )}
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: (!usersFilterDesignation && !usersFilterProgram) ? 0.6 : 1 }}>Filter by Status:
+                    <select disabled={!usersFilterDesignation && !usersFilterProgram} value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (!usersFilterDesignation && !usersFilterProgram) ? 'var(--surface)' : 'var(--bg)', cursor: (!usersFilterDesignation && !usersFilterProgram) ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Status</option>
                       <option value="pending">Pending</option>
                       <option value="active">Active</option>
@@ -3615,7 +3692,7 @@ const handleAddDiscipline = async (e) => {
                     const filteredUsers = dbData.users
                       .filter(u => userTab !== 'pending' || u.status === 'pending')
                       .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
-                      .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
+                      .filter(u => !usersFilterDesignation || u.designation_id === usersFilterDesignation)
                       .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
                       .filter(u => !usersFilterProgram || u.program_id === usersFilterProgram)
                       .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
@@ -3658,8 +3735,11 @@ const handleAddDiscipline = async (e) => {
                                   )}
 
                                   <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
-                                  <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
+                                  <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserDesignationId(u.designation_id || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
                                   <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
+                                  {(role === 'super_admin' || role === 'admin') && (
+                                    <button onClick={() => { if (confirm(`Delete user ${u.name}?`)) apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'DELETE' }).then(fetchData); }} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -5908,11 +5988,79 @@ const handleAddDiscipline = async (e) => {
                 <p style={{ color: 'var(--text-soft)', marginBottom: '20px' }}>
                   Super Admin is the one fixed role. Create every other role here, and set exactly what each one can do in each module — no row means the module is hidden for that role.
                 </p>
+
+                {/* Categories decide what the hierarchy below a role looks like */}
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '0 0 10px' }}>Categories</h4>
+                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input placeholder="Category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                  <select value={newCatHierarchy} onChange={e => setNewCatHierarchy(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Below each role in this category">
+                    <option value="role_designation">Role → Designation</option>
+                    <option value="course">Role → Course</option>
+                  </select>
+                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
+                </form>
+                {userCategories.map(c => (
+                  <div key={c.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {editingCat === c.id ? (
+                      <>
+                        <input value={editCatName} onChange={e => setEditCatName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
+                        <select value={editCatHierarchy} onChange={e => setEditCatHierarchy(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                          <option value="role_designation">Role → Designation</option>
+                          <option value="course">Role → Course</option>
+                        </select>
+                        <button onClick={() => handleUpdateCategory(c.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
+                        <button onClick={() => setEditingCat(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <b style={{ color: 'var(--primary)', fontSize: '14px' }}>{c.name}</b>
+                        <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{c.key}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-soft)', flex: 1 }}>{c.hierarchy_type === 'course' ? 'Role → Course' : 'Role → Designation'}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{roles.filter(r => r.category === c.key).length} role(s) · {designations.filter(d => d.category_key === c.key).length} designation(s)</span>
+                        <button onClick={() => { setEditingCat(c.id); setEditCatName(c.name); setEditCatHierarchy(c.hierarchy_type || 'role_designation'); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
+                        <button onClick={() => handleDeleteCategory(c)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                {/* Designations hang off a category, and only apply under a role in that category */}
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Designations</h4>
+                <form onSubmit={handleAddDesignation} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input placeholder="Designation name (e.g. Head of Dept)" value={newDesigName} onChange={e => setNewDesigName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                  <select value={newDesigCategory} onChange={e => setNewDesigCategory(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
+                    <option value="">Select Category</option>
+                    {userCategories.filter(c => (c.hierarchy_type || 'role_designation') === 'role_designation').map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
+                  </select>
+                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Designation</button>
+                </form>
+                {designations.map(d => (
+                  <div key={d.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {editingDesig === d.id ? (
+                      <>
+                        <input value={editDesigName} onChange={e => setEditDesigName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
+                        <button onClick={() => handleUpdateDesignation(d.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
+                        <button onClick={() => setEditingDesig(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <b style={{ fontSize: '14px' }}>{d.name}</b>
+                        <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{(userCategories.find(c => c.key === d.category_key) || {}).name || d.category_key}</span>
+                        <span style={{ flex: 1 }} />
+                        <button onClick={() => { setEditingDesig(d.id); setEditDesigName(d.name); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
+                        <button onClick={() => handleDeleteDesignation(d)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Roles</h4>
                 <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <input placeholder="Role name (e.g. Examiner)" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
                   <input placeholder="Description" value={newRoleDesc} onChange={e => setNewRoleDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
-                  <select value={newRoleCategory} onChange={e => setNewRoleCategory(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
-                    <option value="staff">Staff</option><option value="student">Student</option><option value="both">Both</option>
+                  <select value={newRoleCategory} onChange={e => setNewRoleCategory(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
+                    <option value="">Select Category</option>
+                    {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                   </select>
                   <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Role</button>
                 </form>
@@ -5926,8 +6074,9 @@ const handleAddDiscipline = async (e) => {
                           <>
                             <input value={editRoleName} onChange={e => setEditRoleName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
                             <input value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                            <select value={editRoleCategory} onChange={e => setEditRoleCategory(e.target.value)} disabled={fixed} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                              <option value="staff">Staff</option><option value="student">Student</option><option value="both">Both</option>{fixed && <option value="system">System</option>}
+                            <select value={editRoleCategory} onChange={e => setEditRoleCategory(e.target.value)} disabled={fixed} required style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                              <option value="">Select Category</option>
+                              {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                             </select>
                             <button onClick={() => handleUpdateRole(r.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
                             <button onClick={() => setEditingRole(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
@@ -5936,11 +6085,11 @@ const handleAddDiscipline = async (e) => {
                           <>
                             <b style={{ color: 'var(--primary)', fontSize: '15px' }}>{r.name}</b>
                             {fixed && <span style={{ fontSize: '11px', background: 'var(--surface-muted)', padding: '2px 10px', borderRadius: '99px', color: 'var(--text-soft)' }}>fixed</span>}
-                            <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{r.category || 'staff'}</span>
+                            <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{(userCategories.find(c => c.key === r.category) || {}).name || r.category}</span>
                             <span style={{ color: 'var(--text-soft)', fontSize: '13px', flex: '1 1 160px' }}>{r.description}</span>
                             <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{granted} module{granted === 1 ? '' : 's'}</span>
                             <button onClick={() => setOpenRole(openRole === r.key ? null : r.key)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Permissions</button>
-                            {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); setEditRoleCategory(r.category || 'staff'); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>}
+                            {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); setEditRoleCategory(r.category || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>}
                             {!fixed && <button onClick={() => handleDeleteRole(r)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>}
                           </>
                         )}
