@@ -957,6 +957,9 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
 
   const [usersFilterRole, setUsersFilterRole] = useState('');
   const [usersFilterDesignation, setUsersFilterDesignation] = useState('');
+  const [usersFilterStatus, setUsersFilterStatus] = useState('');
+  const [usersFilterCategory, setUsersFilterCategory] = useState('');
+  const [usersFilterProgram, setUsersFilterProgram] = useState('');
   const [usersSearch, setUsersSearch] = useState('');
   const [viewProfileUser, setViewProfileUser] = useState(null); // user id
   const [viewProfileTab, setViewProfileTab] = useState('personal'); // 'personal' | 'kyc' | 'admin'
@@ -3557,16 +3560,44 @@ const handleAddDiscipline = async (e) => {
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
                     <select value={usersFilterRole || ''} onChange={e => setUsersFilterRole(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
-                      <option value="">All</option>
-                      {roles.filter(r => r.category === 'staff').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                      {roles.filter(r => r.category === 'student').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                      {roles.filter(r => r.category === 'system').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                      <option value="">Select Role</option>
+                      <optgroup label="Staff">
+                        {roles.filter(r => r.category === 'staff').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                      </optgroup>
+                      <optgroup label="Student">
+                        {roles.filter(r => r.category === 'student').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                      </optgroup>
+                      <optgroup label="System">
+                        {roles.filter(r => r.category === 'system').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                      </optgroup>
+                    </select>
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
+                    <select value={usersFilterCategory || ''} onChange={e => setUsersFilterCategory(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">Select Category</option>
+                      <option value="staff">Staff</option>
+                      <option value="student">Student</option>
+                      <option value="system">System</option>
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Designation:
                     <select value={usersFilterDesignation || ''} onChange={e => setUsersFilterDesignation(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
-                      <option value="">All</option>
+                      <option value="">Select Designation</option>
                       {Array.from(new Set(dbData.users.map(u => u.designation).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Status:
+                    <select value={usersFilterStatus || ''} onChange={e => setUsersFilterStatus(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">Select Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Course:
+                    <select value={usersFilterProgram || ''} onChange={e => setUsersFilterProgram(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">Select Course</option>
+                      {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Search:
@@ -3580,6 +3611,9 @@ const handleAddDiscipline = async (e) => {
                     .filter(u => userTab !== 'pending' || u.status === 'pending')
                     .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
                     .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
+                    .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
+                    .filter(u => !usersFilterProgram || u.program_id === usersFilterProgram)
+                    .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
                     .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()))
                     .map(u => (
                       <div key={u.id} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 2px 6px rgba(129, 23, 26, 0.05)' }}>
