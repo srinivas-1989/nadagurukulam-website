@@ -3558,6 +3558,14 @@ const handleAddDiscipline = async (e) => {
                 )}
     {/* Filters */}
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
+                    <select value={usersFilterCategory || ''} onChange={e => setUsersFilterCategory(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">Select Category</option>
+                      <option value="staff">Staff</option>
+                      <option value="student">Student</option>
+                      <option value="system">System</option>
+                    </select>
+                  </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
                     <select value={usersFilterRole || ''} onChange={e => setUsersFilterRole(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
                       <option value="">Select Role</option>
@@ -3572,18 +3580,16 @@ const handleAddDiscipline = async (e) => {
                       </optgroup>
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
-                    <select value={usersFilterCategory || ''} onChange={e => setUsersFilterCategory(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
-                      <option value="">Select Category</option>
-                      <option value="staff">Staff</option>
-                      <option value="student">Student</option>
-                      <option value="system">System</option>
-                    </select>
-                  </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Designation:
                     <select value={usersFilterDesignation || ''} onChange={e => setUsersFilterDesignation(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
                       <option value="">Select Designation</option>
                       {Array.from(new Set(dbData.users.map(u => u.designation).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Course:
+                    <select value={usersFilterProgram || ''} onChange={e => setUsersFilterProgram(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                      <option value="">Select Course</option>
+                      {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Status:
@@ -3592,12 +3598,6 @@ const handleAddDiscipline = async (e) => {
                       <option value="pending">Pending</option>
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
-                    </select>
-                  </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Course:
-                    <select value={usersFilterProgram || ''} onChange={e => setUsersFilterProgram(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
-                      <option value="">Select Course</option>
-                      {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Search:
