@@ -3605,42 +3605,69 @@ const handleAddDiscipline = async (e) => {
                   </label>
                 </div>
 
-                {/* Banner List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Banner List with Hierarchy */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {(!usersFilterRole && !usersFilterCategory && !usersFilterDesignation && !usersFilterStatus && !usersFilterProgram && !usersSearch) ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-soft)', background: '#fdf3e0', border: '1px dashed #e0d6c0', borderRadius: 'var(--radius-xl)' }}>
-                      Please select any filter option or search above to view users.
+                      Please select any filter option or search above to view users in a hierarchical structure.
                     </div>
-                  ) : dbData.users
-                    .filter(u => userTab !== 'pending' || u.status === 'pending')
-                    .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
-                    .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
-                    .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
-                    .filter(u => !usersFilterProgram || u.program_id === usersFilterProgram)
-                    .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
-                    .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()))
-                    .map(u => (
-                      <div key={u.id} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 2px 6px rgba(129, 23, 26, 0.05)' }}>
-                        <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{u.name.charAt(0)}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, color: '#81171a' }}>{u.name}</div>
-                          <div style={{ fontSize: '12px', color: '#dd9f3c' }}>{u.designation || 'No designation'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
-                          <div style={{ fontSize: '11px', color: '#a09a8f' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          {u.status === 'pending' && role === 'super_admin' && (
-                            <>
-                              <button onClick={() => handleAdminApproveSignup(u)} style={{ background: '#1d7a4c', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Approve</button>
-                              <button onClick={() => handleAdminRejectSignup(u)} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reject</button>
-                            </>
-                          )}
+                  ) : (() => {
+                    const filteredUsers = dbData.users
+                      .filter(u => userTab !== 'pending' || u.status === 'pending')
+                      .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
+                      .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
+                      .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
+                      .filter(u => !usersFilterProgram || u.program_id === usersFilterProgram)
+                      .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
+                      .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()));
 
-                          <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
-                          <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
-                          <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
+                    if (filteredUsers.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-soft)', background: '#fdf3e0', border: '1px dashed #e0d6c0', borderRadius: 'var(--radius-xl)' }}>
+                          No users found matching the selected filters.
                         </div>
-                      </div>
-                    ))}
+                      );
+                    }
+
+                    const categories = ['staff', 'student', 'system'];
+                    return categories.map(cat => {
+                      const catUsers = filteredUsers.filter(u => roleCategory(u.role_key) === cat);
+                      if (catUsers.length === 0) return null;
+
+                      return (
+                        <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '6px', borderBottom: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>{cat} Category</span>
+                            <span style={{ fontSize: '11px', background: 'var(--surface)', padding: '2px 8px', borderRadius: '12px', border: '1px solid var(--border)' }}>{catUsers.length} user{catUsers.length === 1 ? '' : 's'}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingLeft: '8px' }}>
+                            {catUsers.map(u => (
+                              <div key={u.id} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 2px 6px rgba(129, 23, 26, 0.05)' }}>
+                                <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{u.name.charAt(0)}</div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: 600, color: '#81171a' }}>{u.name}</div>
+                                  <div style={{ fontSize: '12px', color: '#dd9f3c' }}>{u.designation || 'No designation'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
+                                  <div style={{ fontSize: '11px', color: '#a09a8f' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  {u.status === 'pending' && role === 'super_admin' && (
+                                    <>
+                                      <button onClick={() => handleAdminApproveSignup(u)} style={{ background: '#1d7a4c', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Approve</button>
+                                      <button onClick={() => handleAdminRejectSignup(u)} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reject</button>
+                                    </>
+                                  )}
+
+                                  <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
+                                  <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
+                                  <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
 
                 {/* View Profile Modal */}
