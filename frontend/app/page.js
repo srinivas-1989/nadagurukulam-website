@@ -844,6 +844,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [signupMsg, setSignupMsg] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupStep, setSignupStep] = useState(1);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [signupForm, setSignupForm] = useState({ name: '', email: '', phone: '', password: '', role_key: 'student', roll_no: '', designation: '', year_of_commencement: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
@@ -2560,7 +2561,18 @@ const handleAddDiscipline = async (e) => {
                   <div className="ndg-signup-fields">
                     <div className="ndg-signup-field">
                       <label className="ndg-signup-label" htmlFor="su-pass">Password <span className="ndg-signup-req">*</span></label>
-                      <input id="su-pass" type="password" className="ndg-signup-input" value={signupForm.password} onChange={e => setSignupForm({ ...signupForm, password: e.target.value })} />
+                      <div className="ndg-signup-secret">
+                        <input id="su-pass" type={showSignupPassword ? 'text' : 'password'} className="ndg-signup-input" value={signupForm.password} onChange={e => setSignupForm({ ...signupForm, password: e.target.value })} />
+                        <button
+                          type="button"
+                          className="ndg-signup-eye"
+                          onClick={() => setShowSignupPassword(v => !v)}
+                          aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
+                          aria-pressed={showSignupPassword}
+                        >
+                          {showSignupPassword ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
                       <p className="ndg-signup-hint">At least 8 characters.</p>
                     </div>
                   </div>

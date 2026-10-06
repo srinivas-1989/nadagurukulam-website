@@ -2344,6 +2344,39 @@ input, select, textarea {
   cursor: pointer;
 }
 
+.ndg-signup-secret {
+  position: relative;
+}
+
+.ndg-signup-secret .ndg-signup-input {
+  padding-right: 62px;
+}
+
+.ndg-signup-eye {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ndg-signup-eye:hover {
+  color: var(--primary);
+}
+
+.ndg-signup-eye:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
 .ndg-signup-input:focus,
 .ndg-signup-select:focus {
   outline: none;
