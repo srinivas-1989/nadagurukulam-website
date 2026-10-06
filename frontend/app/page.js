@@ -3607,9 +3607,9 @@ const handleAddDiscipline = async (e) => {
 
                 {/* Banner List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {!usersFilterCategory ? (
+                  {(!usersFilterRole && !usersFilterCategory && !usersFilterDesignation && !usersFilterStatus && !usersFilterProgram && !usersSearch) ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-soft)', background: '#fdf3e0', border: '1px dashed #e0d6c0', borderRadius: 'var(--radius-xl)' }}>
-                      Please select a Category from the filter above to view users.
+                      Please select any filter option or search above to view users.
                     </div>
                   ) : dbData.users
                     .filter(u => userTab !== 'pending' || u.status === 'pending')
@@ -3617,7 +3617,7 @@ const handleAddDiscipline = async (e) => {
                     .filter(u => !usersFilterDesignation || u.designation === usersFilterDesignation)
                     .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
                     .filter(u => !usersFilterProgram || u.program_id === usersFilterProgram)
-                    .filter(u => roleCategory(u.role_key) === usersFilterCategory)
+                    .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
                     .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()))
                     .map(u => (
                       <div key={u.id} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 2px 6px rgba(129, 23, 26, 0.05)' }}>
