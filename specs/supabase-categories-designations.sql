@@ -11,7 +11,7 @@ create table if not exists public.user_categories (
 insert into public.user_categories (key, name, hierarchy_type, sort_order) values
   ('staff', 'Staff', 'role_designation', 10),
   ('student', 'Student', 'course', 20),
-  ('administration', 'Administration Category', 'role_designation', 30)
+  ('administration', 'Administration', 'role_designation', 30)
 on conflict (key) do update set name = EXCLUDED.name, hierarchy_type = EXCLUDED.hierarchy_type;
 
 alter table public.user_categories enable row level security;
