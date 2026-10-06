@@ -3741,13 +3741,13 @@ const handleAddDiscipline = async (e) => {
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
                     <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
-                      <option value="">Select Category</option>
+                      <option value="">All Categories</option>
                       {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterCategory ? 0.6 : 1 }}>Filter by Role:
-                    <select disabled={!usersFilterCategory} value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterCategory ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterCategory ? 'not-allowed' : 'pointer' }}>
-                      <option value="">Select Role</option>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
+                    <select value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', cursor: 'pointer' }}>
+                      <option value="">All Roles</option>
                       {userCategories.filter(c => !usersFilterCategory || c.key === usersFilterCategory).map(c => (
                         <optgroup key={c.key} label={c.name}>
                           {roles.filter(r => r.category === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
@@ -3755,37 +3755,42 @@ const handleAddDiscipline = async (e) => {
                       ))}
                     </select>
                   </label>
-                  {usersFilterRole && catLevels(roleCategory(usersFilterRole)).map(l => {
-                    const i = catLevels(roleCategory(usersFilterRole)).findIndex(x => x.key === l.key);
-                    const parentId = i === 0 ? null : (usersFilterLevels[catLevels(roleCategory(usersFilterRole))[i - 1].key] || null);
+                  {(usersFilterRole ? catLevels(roleCategory(usersFilterRole)) : catLevels(usersFilterCategory)).map((l, i, levels) => {
+                    // Category-wide: the same name can exist under several roles, so
+                    // match the parent by name instead of by the one id we kept.
+                    const inScope = (v) => usersFilterRole ? v.role_key === usersFilterRole : v.category_key === usersFilterCategory;
+                    const parentName = i === 0 ? null : (levelValues.find(v => v.id === (usersFilterLevels[levels[i - 1].key] || '')) || {}).name || null;
                     return (
-                      <label key={l.key} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: i > 0 && !parentId ? 0.6 : 1 }}>Filter by {l.name}:
+                      <label key={l.key} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: i > 0 && !parentName ? 0.6 : 1 }}>Filter by {l.name}:
                         <select
-                          disabled={i > 0 && !parentId}
+                          disabled={i > 0 && !parentName}
                           value={usersFilterLevels[l.key] || ''}
                           onChange={e => {
                             const next = { ...usersFilterLevels, [l.key]: e.target.value };
-                            for (let j = i + 1; j < catLevels(roleCategory(usersFilterRole)).length; j++) delete next[catLevels(roleCategory(usersFilterRole))[j].key];
+                            for (let j = i + 1; j < levels.length; j++) delete next[levels[j].key];
                             setUsersFilterLevels(next); setUsersFilterStatus(''); setUsersSearch('');
                           }}
-                          style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (i > 0 && !parentId) ? 'var(--surface)' : 'var(--bg)', cursor: (i > 0 && !parentId) ? 'not-allowed' : 'pointer' }}
+                          style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (i > 0 && !parentName) ? 'var(--surface)' : 'var(--bg)', cursor: (i > 0 && !parentName) ? 'not-allowed' : 'pointer' }}
                         >
-                          <option value="">Select {l.name}</option>
-                          {levelValues.filter(v => v.role_key === usersFilterRole && v.level_key === l.key && v.parent_id === parentId).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                          <option value="">All {l.name}s</option>
+                          {levelValues.filter(v => inScope(v) && v.level_key === l.key
+                              && (i === 0 ? !v.parent_id : ((levelValues.find(p => p.id === v.parent_id) || {}).name || null) === parentName))
+                            .filter((v, _i, arr) => arr.findIndex(x => x.name === v.name) === _i)
+                            .map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                         </select>
                       </label>
                     );
                   })}
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Status:
-                    <select disabled={!usersFilterRole} value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
-                      <option value="">Select Status</option>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Status:
+                    <select value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', cursor: 'pointer' }}>
+                      <option value="">All Statuses</option>
                       <option value="pending">Pending</option>
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterStatus ? 0.6 : 1 }}>Search:
-                    <input disabled={!usersFilterStatus} type="text" placeholder="Name / Email / ID" value={usersSearch || ''} onChange={e => setUsersSearch(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterStatus ? 'var(--surface)' : 'var(--bg)', width: '200px', cursor: !usersFilterStatus ? 'not-allowed' : 'text' }} />
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Search:
+                    <input type="text" placeholder="Name / Email / ID" value={usersSearch || ''} onChange={e => setUsersSearch(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', width: '200px', cursor: 'text' }} />
                   </label>
                 </div>
 
