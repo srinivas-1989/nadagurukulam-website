@@ -1,0 +1,33 @@
+-- User Categories master table for dynamic hierarchy & role association
+create table if not exists public.user_categories (
+  id uuid default uuid_generate_v4() primary key,
+  key text unique not null,
+  name text not null,
+  hierarchy_type text not null default 'role_designation' check (hierarchy_type in ('role_designation', 'course')),
+  sort_order int default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+insert into public.user_categories (key, name, hierarchy_type, sort_order) values
+  ('staff', 'Staff', 'role_designation', 10),
+  ('student', 'Student', 'course', 20),
+  ('administration', 'Administration Category', 'role_designation', 30)
+on conflict (key) do update set name = EXCLUDED.name, hierarchy_type = EXCLUDED.hierarchy_type;
+
+alter table public.user_categories enable row level security;
+
+drop policy if exists "Authenticated users read user_categories" on public.user_categories;
+create policy "Authenticated users read user_categories"
+  on public.user_categories for select to authenticated
+  using (true);
+
+drop policy if exists "Super admin manage user_categories" on public.user_categories;
+create policy "Super admin manage user_categories"
+  on public.user_categories for all to authenticated
+  using (
+    exists (
+      select 1 from public.users
+      where users.auth_user_id = public.my_user_id()
+      and users.role_key = 'super_admin'
+    )
+  );
