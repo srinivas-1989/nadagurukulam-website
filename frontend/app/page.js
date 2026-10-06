@@ -3559,49 +3559,49 @@ const handleAddDiscipline = async (e) => {
     {/* Filters */}
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
-                    <select value={usersFilterCategory || ''} onChange={e => setUsersFilterCategory(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                    <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterDesignation(''); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
                       <option value="">Select Category</option>
                       <option value="staff">Staff</option>
                       <option value="student">Student</option>
                       <option value="system">System</option>
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
-                    <select value={usersFilterRole || ''} onChange={e => setUsersFilterRole(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterCategory ? 0.6 : 1 }}>Filter by Role:
+                    <select disabled={!usersFilterCategory} value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterDesignation(''); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterCategory ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterCategory ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Role</option>
                       <optgroup label="Staff">
-                        {roles.filter(r => r.category === 'staff').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                        {roles.filter(r => r.category === 'staff').filter(r => !usersFilterCategory || r.category === usersFilterCategory).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                       </optgroup>
                       <optgroup label="Student">
-                        {roles.filter(r => r.category === 'student').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                        {roles.filter(r => r.category === 'student').filter(r => !usersFilterCategory || r.category === usersFilterCategory).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                       </optgroup>
                       <optgroup label="System">
-                        {roles.filter(r => r.category === 'system').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                        {roles.filter(r => r.category === 'system').filter(r => !usersFilterCategory || r.category === usersFilterCategory).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                       </optgroup>
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Designation:
-                    <select value={usersFilterDesignation || ''} onChange={e => setUsersFilterDesignation(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Designation:
+                    <select disabled={!usersFilterRole} value={usersFilterDesignation || ''} onChange={e => { setUsersFilterDesignation(e.target.value); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Designation</option>
-                      {Array.from(new Set(dbData.users.map(u => u.designation).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                      {Array.from(new Set(dbData.users.filter(u => !usersFilterRole || u.role_key === usersFilterRole).map(u => u.designation).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Course:
-                    <select value={usersFilterProgram || ''} onChange={e => setUsersFilterProgram(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterDesignation ? 0.6 : 1 }}>Filter by Course:
+                    <select disabled={!usersFilterDesignation} value={usersFilterProgram || ''} onChange={e => { setUsersFilterProgram(e.target.value); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterDesignation ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterDesignation ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Course</option>
                       {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Status:
-                    <select value={usersFilterStatus || ''} onChange={e => setUsersFilterStatus(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterProgram ? 0.6 : 1 }}>Filter by Status:
+                    <select disabled={!usersFilterProgram} value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterProgram ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterProgram ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Status</option>
                       <option value="pending">Pending</option>
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                     </select>
                   </label>
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Search:
-                    <input type="text" placeholder="Name / Email / ID" value={usersSearch || ''} onChange={e => setUsersSearch(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', width: '200px' }} />
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterStatus ? 0.6 : 1 }}>Search:
+                    <input disabled={!usersFilterStatus} type="text" placeholder="Name / Email / ID" value={usersSearch || ''} onChange={e => setUsersSearch(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterStatus ? 'var(--surface)' : 'var(--bg)', width: '200px', cursor: !usersFilterStatus ? 'not-allowed' : 'text' }} />
                   </label>
                 </div>
 
