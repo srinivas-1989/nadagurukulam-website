@@ -115,6 +115,15 @@ const UserAdminTab = ({ userId, dbData }) => {
           </div>
         </div>
       )}
+      {role === 'super_admin' && (
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '16px', border: '1px solid var(--border)' }}>
+          <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>Admin Password Reset Controls</h5>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => handleAdminResetPassword(userId, user, 'otp')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Send OTP</button>
+            <button onClick={() => handleAdminResetPassword(userId, user, 'both')} style={{ background: 'none', border: '1px solid var(--accent-deep)', color: 'var(--accent-deep)', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Reset Password</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -221,6 +230,11 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [myProfile, setMyProfile] = useState(null);
   const [timetableBatch, setTimetableBatch] = useState(null);
   const [otpMode, setOtpMode] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotForm, setForgotForm] = useState({ email: '', reason: '' });
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [passwordResets, setPasswordResets] = useState([]);
   const [editing, setEditing] = useState(null);
   const [uploadingKey, setUploadingKey] = useState(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
@@ -377,6 +391,79 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     } catch (error) {
       alert(error.message);
     }
+  };
+
+  const loadPasswordResets = useCallback(async () => {
+    try {
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      if (!sess?.access_token) return;
+      const response = await fetch(`${apiUrl}/api/admin/password-resets`, {
+        headers: { Authorization: `Bearer ${sess.access_token}` },
+      });
+      if (!response.ok) return;
+      setPasswordResets(await response.json());
+    } catch { /* the tab simply shows nothing on a fetch failure */ }
+  }, []);
+
+  const adminResetCall = async (requestId, action, body) => {
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    if (!sess?.access_token) throw new Error('No session token available');
+    const response = await fetch(`${apiUrl}/api/admin/password-resets/${requestId}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.access_token}` },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotForm.email.trim()) { setForgotMsg('Enter the email on your account.'); return; }
+    setForgotLoading(true); setForgotMsg('');
+    try {
+      const response = await apiCall(`${apiUrl}/api/public/forgot-password`, {
+        method: 'POST', body: JSON.stringify(forgotForm),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not submit the request');
+      setForgotMsg(data.message);
+      setForgotForm({ email: '', reason: '' });
+    } catch (error) { setForgotMsg(error.message); }
+    finally { setForgotLoading(false); }
+  };
+
+  // Reply is the non-credential path: an admin note goes out, no password moves.
+  const handleResetReply = async (requestRow) => {
+    const note = prompt(`Reply to ${requestRow.email}.\n\nWhatever you write is emailed to them as-is.`);
+    if (note === null) return;
+    if (!note.trim()) return;
+    try {
+      const data = await adminResetCall(requestRow.id, 'reply', { note });
+      setUserNotice({
+        noticeTitle: `Reply sent to ${requestRow.email}`,
+        email: requestRow.email, emailSent: data.emailSent,
+      });
+      loadPasswordResets();
+    } catch (error) { alert(error.message); }
+  };
+
+  const handleResetAction = async (requestRow, action) => {
+    const explain = action === 'reject'
+      ? `Mark the request from ${requestRow.email} as rejected? No credentials change.`
+      : action === 'otp'
+        ? `Send a one-time code to ${requestRow.email}? Their current password keeps working.`
+        : `Issue a temporary password to ${requestRow.email}?\n\nThey must swap it at their next sign-in via OTP.`;
+    if (!confirm(explain)) return;
+    try {
+      const data = await adminResetCall(requestRow.id, action);
+      setUserNotice({
+        noticeTitle: action === 'reject' ? `Request closed` : `Password reset issued for ${requestRow.email}`,
+        tempPassword: data.tempPassword, otp: data.otp, email: requestRow.email, emailSent: data.emailSent,
+      });
+      loadPasswordResets();
+    } catch (error) { alert(error.message); }
   };
 
   const uploadAvatar = async (file) => {
@@ -839,7 +926,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [newDateOfJoining, setNewDateOfJoining] = useState('');
   const [newYearComm, setNewYearComm] = useState('');
   const [userNotice, setUserNotice] = useState(null); // { tempPassword, otp, email }
-  const [userTab, setUserTab] = useState('all'); // all | pending
+  const [userTab, setUserTab] = useState('all'); // all | pending | resets
   const [signupMode, setSignupMode] = useState(false);
   const [signupMsg, setSignupMsg] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
@@ -2481,13 +2568,24 @@ const handleAddDiscipline = async (e) => {
       {/* VIEW 2: LOGIN / AUTH — supports first-login OTP password change */}
       {view === 'login' && (
         <div style={{ maxWidth: '720px', margin: '60px auto', padding: '0 24px', flex: 1 }}>
-          <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>{otpMode ? 'Set your password' : signupMode ? 'Request Access' : 'Sign in to Portal'}</h2>
+          <h2 style={{ fontSize: '28px', color: 'var(--primary-deep)', textAlign: 'center', marginBottom: '8px' }}>{otpMode ? 'Set your password' : signupMode ? 'Request Access' : forgotMode ? 'Request Password Reset' : 'Sign in to Portal'}</h2>
           <p style={{ color: 'var(--text-soft)', textAlign: 'center', marginBottom: '24px' }}>
             {otpMode ? 'You must change your temporary password using an OTP sent to your official email.'
               : signupMode ? 'Fill in your details. An administrator reviews every request before your account is activated.'
+              : forgotMode ? 'Tell us which account and why. An administrator reviews every reset request and sends new credentials.'
               : 'Use your Supabase Auth credentials to access the portal.'}
           </p>
-          {signupMode ? (
+          {forgotMode ? (
+            <form onSubmit={handleForgotSubmit} style={{ background: 'var(--surface)', border: '1.5px solid var(--accent)', padding: '24px', borderRadius: 'var(--radius-xl)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <input type="email" placeholder="Email on your account" value={forgotForm.email} onChange={e => setForgotForm({ ...forgotForm, email: e.target.value })} required style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '16px' }} />
+              <textarea placeholder="Reason for the reset (optional)" rows={4} value={forgotForm.reason} onChange={e => setForgotForm({ ...forgotForm, reason: e.target.value })} style={{ padding: '12px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '15px', resize: 'vertical' }} />
+              {forgotMsg && <div style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px', color: 'var(--text-soft)' }}>{forgotMsg}</div>}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="submit" disabled={forgotLoading} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '6px', fontWeight: 600, cursor: forgotLoading ? 'default' : 'pointer', fontSize: '15px' }}>{forgotLoading ? 'Submitting…' : 'Submit Request'}</button>
+                <button type="button" onClick={() => { setForgotMode(false); setForgotMsg(''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '12px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>Back to Sign In</button>
+              </div>
+            </form>
+          ) : signupMode ? (
             <div className="ndg-signup-card">
               <div className="ndg-wizard-steps" aria-hidden="true">
                 {[1, 2, 3].map(n => (
@@ -2699,6 +2797,7 @@ const handleAddDiscipline = async (e) => {
               <div style={{ display: 'flex', gap: '18px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => setOtpMode(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>First login? Set password with OTP</button>
                 <button type="button" onClick={() => { setSignupMode(true); setSignupStep(1); setSignupMsg(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>New here? Request access</button>
+                <button type="button" onClick={() => { setForgotMode(true); setForgotMsg(""); }} style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: "13.5px", textDecoration: "underline" }}>Forgot password?</button>
               </div>
             </>
           )}
@@ -3370,13 +3469,32 @@ const handleAddDiscipline = async (e) => {
                 {/* Tabs: all users vs the self-signup approval queue */}
                 {role === 'super_admin' && (
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--divider)' }}>
-                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`]].map(([key, label]) => (
-                      <button key={key} onClick={() => setUserTab(key)} style={{ background: 'none', border: 'none', borderBottom: userTab === key ? '2px solid var(--primary)' : '2px solid transparent', padding: '9px 16px', cursor: 'pointer', fontSize: '13.5px', fontWeight: userTab === key ? 700 : 500, color: userTab === key ? 'var(--primary-deep)' : 'var(--text-soft)' }}>{label}</button>
+                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`], ['resets', `Password Resets (${passwordResets.filter(r => r.status === 'pending').length})`]].map(([key, label]) => (
+                      <button key={key} onClick={() => { setUserTab(key); if (key === 'resets') loadPasswordResets(); }} style={{ background: 'none', border: 'none', borderBottom: userTab === key ? '2px solid var(--primary)' : '2px solid transparent', padding: '9px 16px', cursor: 'pointer', fontSize: '13.5px', fontWeight: userTab === key ? 700 : 500, color: userTab === key ? 'var(--primary-deep)' : 'var(--text-soft)' }}>{label}</button>
                     ))}
                   </div>
                 )}
 
-                {/* Filters */}
+                
+                {userTab === 'resets' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {passwordResets.map(r => (
+                      <div key={r.id} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl-sm)', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, color: '#81171a' }}>{r.email}</div>
+                          <div style={{ fontSize: '12px', color: '#a09a8f' }}>Reason: {r.reason} · Requested: {new Date(r.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => handleResetAction(r, 'otp')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Send OTP</button>
+                          <button onClick={() => handleResetAction(r, 'both')} style={{ background: 'none', border: '1px solid var(--accent-deep)', color: 'var(--accent-deep)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Reset Password</button>
+                          <button onClick={() => handleResetReply(r)} style={{ background: 'none', border: '1px solid #666', color: '#666', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Reply</button>
+                          <button onClick={() => handleResetAction(r, 'reject')} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Reject</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+    {/* Filters */}
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
                     <select value={usersFilterRole || ''} onChange={e => setUsersFilterRole(e.target.value)} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
@@ -3419,12 +3537,7 @@ const handleAddDiscipline = async (e) => {
                               <button onClick={() => handleAdminRejectSignup(u)} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reject</button>
                             </>
                           )}
-                          {u.status !== 'pending' && role === 'super_admin' && (
-                            <>
-                              <button onClick={() => handleAdminResetPassword(u.id, u, 'otp')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Send OTP</button>
-                              <button onClick={() => handleAdminResetPassword(u.id, u, 'both')} style={{ background: 'none', border: '1px solid var(--accent-deep)', color: 'var(--accent-deep)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>Reset Password</button>
-                            </>
-                          )}
+
                           <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
                           <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
                           <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>

@@ -52,17 +52,25 @@ function getMailer() {
   });
   return mailer;
 }
-async function sendOTPEmail(to, otp, tempPassword) {
+async function sendMail(to, subject, html) {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@nadagurukulam.org';
-  const subject = tempPassword ? 'Your Nada Gurukulam account — temp password & OTP' : 'Your Nada Gurukulam OTP';
-  const html = tempPassword
-    ? `<p>Temp password: <b>${tempPassword}</b></p><p>OTP: <b>${otp}</b> (expires in 10 minutes)</p><p>Log in and change your password when prompted.</p>`
-    : `<p>OTP: <b>${otp}</b> (expires in 10 minutes)</p>`;
   const m = getMailer();
   if (m) {
     try { await m.sendMail({ from, to, subject, html }); return true; } catch (e) { console.error('SMTP send failed:', e.message); return false; }
   }
   return false;
+}
+async function sendNoteEmail(to, subject, body) {
+  // Admin-authored text, so escape it before it goes into HTML mail.
+  const esc = String(body).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return sendMail(to, subject, `<p>${esc.split('\n').join('<br>')}</p>`);
+}
+async function sendOTPEmail(to, otp, tempPassword) {
+  const subject = tempPassword ? 'Your Nada Gurukulam account — temp password & OTP' : 'Your Nada Gurukulam OTP';
+  const html = tempPassword
+    ? `<p>Temp password: <b>${tempPassword}</b></p><p>OTP: <b>${otp}</b> (expires in 10 minutes)</p><p>Log in and change your password when prompted.</p>`
+    : `<p>OTP: <b>${otp}</b> (expires in 10 minutes)</p>`;
+  return sendMail(to, subject, html);
 }
 const otpRateMap = new Map(); // key -> timestamps[]
 function checkOtpRate(key, limit = 5, windowMs = 60000) {
@@ -163,6 +171,22 @@ app.post('/api/public/enquiries', async (req, res) => {
     if (error) throw error;
     res.status(201).json(data[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Public forgot-password request endpoint (rate-limited, uniform response)
+app.post('/api/public/forgot-password', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const reason = String(req.body.reason || '').trim();
+    if (!email) return res.status(400).json({ error: 'email is required' });
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkOtpRate(`fp:${ip}`, 5, 60000) || !checkOtpRate(`fp:${email}`, 3, 60000)) {
+      return res.status(429).json({ error: 'Too many requests — try again shortly' });
+    }
+    // Insert request into queue table regardless of whether email exists (avoids enumeration oracle)
+    await supabase.from('password_reset_requests').insert([{ email, reason: reason || 'Password reset requested', status: 'pending' }]);
+    res.json({ ok: true, message: 'If an account exists for this email, your password reset request has been submitted to the administrator.' });
+  } catch (err) { console.error('forgot-password', err.message); res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/public/signup', async (req, res) => {
@@ -1173,6 +1197,73 @@ app.post('/api/admin/users/:id/generate-otp', authMiddleware, async (req, res) =
     await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: expires }]);
     const emailed = await sendOTPEmail(user.email, otp, null);
     res.json({ ok: true, emailSent: emailed, otp: (process.env.NODE_ENV !== 'production' || !emailed) ? otp : undefined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: the forgot-password queue. Not a module — it bypasses role_permissions
+// like the other /api/admin/users routes and gates on role_key directly.
+app.get('/api/admin/password-resets', authMiddleware, async (req, res) => {
+  try {
+    if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can view password reset requests' });
+    const { data, error } = await supabase
+      .from('password_reset_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Resolve one queue row: 'otp' | 'both' reuses the reset-password machinery by
+// resolving the email to a user id, 'reply' just emails a free-text note, and
+// 'reject' closes it without touching any credential.
+app.post('/api/admin/password-resets/:id/action', authMiddleware, async (req, res) => {
+  try {
+    if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can action password reset requests' });
+    const action = String(req.body?.action || '');
+    const { data: request } = await supabase.from('password_reset_requests').select('*').eq('id', req.params.id).single();
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+
+    const close = (status) => supabase.from('password_reset_requests').update({ status }).eq('id', request.id).then(({ error }) => { if (error) throw error; });
+
+    if (action === 'reject') {
+      await close('rejected');
+      return res.json({ ok: true, status: 'rejected' });
+    }
+
+    const { data: user } = await supabase.from('users').select('id, email, auth_user_id').eq('email', request.email).maybeSingle();
+    if (!user) return res.status(404).json({ error: 'No user found with that email' });
+
+    if (action === 'otp' || action === 'both') {
+      let tempPassword;
+      if (action === 'both') {
+        tempPassword = genTempPassword();
+        const { error: authErr } = await supabase.auth.admin.updateUserById(user.auth_user_id, { password: tempPassword });
+        if (authErr) throw authErr;
+        await supabase.from('users').update({ must_change_password: true }).eq('id', user.id);
+      }
+      await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
+      const otp = genOTP();
+      await supabase.from('user_otps').insert([{ user_id: user.id, otp_code: otp, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() }]);
+      const emailed = await sendOTPEmail(user.email, otp, tempPassword || null);
+      await close('processed');
+      const reveal = process.env.NODE_ENV !== 'production' || !emailed;
+      return res.json({
+        ok: true, status: 'processed', emailSent: emailed,
+        otp: reveal ? otp : undefined,
+        tempPassword: tempPassword && reveal ? tempPassword : undefined,
+      });
+    }
+
+    if (action === 'reply') {
+      const note = String(req.body?.note || '').trim();
+      if (!note) return res.status(400).json({ error: 'note is required' });
+      const emailed = await sendNoteEmail(request.email, 'Your Nada Gurukulam password reset request', note);
+      await close('processed');
+      return res.json({ ok: true, status: 'processed', emailSent: emailed });
+    }
+
+    return res.status(400).json({ error: 'Unknown action' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
