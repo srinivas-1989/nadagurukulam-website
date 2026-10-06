@@ -235,6 +235,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [forgotMsg, setForgotMsg] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [passwordResets, setPasswordResets] = useState([]);
+  const [showAddUser, setShowAddUser] = useState(false);
   const [editing, setEditing] = useState(null);
   const [uploadingKey, setUploadingKey] = useState(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
@@ -1967,21 +1968,23 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     fetchData();
   };
 
+  // Resolves true once the account exists, so the caller can close its form.
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!newName || !newEmail) return;
+    if (!newName || !newEmail) return false;
     const cat = roleCategory(newUserRole);
     const payload = { name: newName.trim(), email: newEmail.trim(), role_key: newUserRole, phone: newPhone.trim() || null,
       employee_id: newEmployeeId.trim() || null, roll_no: newRollNo.trim() || null,
       designation: newDesignation.trim() || null, program_id: newProgramId || null,
       date_of_joining: newDateOfJoining || null, year_of_commencement: yearOf(newYearComm) };
-    if (cat === 'student' && (!payload.roll_no || !payload.program_id || !payload.year_of_commencement)) { alert('Students require Roll No, Course (Program) and Year of commencement'); return; }
+    if (cat === 'student' && (!payload.roll_no || !payload.program_id || !payload.year_of_commencement)) { alert('Students require Roll No, Course (Program) and Year of commencement'); return false; }
     const res = await apiCall(`${apiUrl}/api/users`, { method: 'POST', body: JSON.stringify(payload) });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { alert(data.error || 'Create user failed'); return; }
+    if (!res.ok) { alert(data.error || 'Create user failed'); return false; }
     if (data.tempPassword || data.otp) setUserNotice({ tempPassword: data.tempPassword, otp: data.otp, email: data.email || payload.email, emailSent: data.emailSent });
     setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewDesignation(''); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
     fetchData();
+    return true;
   };
 
 const handleAddDiscipline = async (e) => {
@@ -3437,33 +3440,89 @@ const handleAddDiscipline = async (e) => {
                   </div>
                 )}
                 {canCreate('users') && (
-                  <form onSubmit={handleAddUser} style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      <input type="text" placeholder="Full name *" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} required />
-                      <input type="email" placeholder="Official email *" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }} required />
-                      <input type="text" placeholder="Contact number" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
-                      <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '150px' }}>
-                        {roles.filter(r => !(r.key === 'super_admin' && hasSuperAdminUser)).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {isStaffCat(newRoleCat) && <input placeholder="Employee ID" value={newEmployeeId} onChange={e => setNewEmployeeId(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} />}
-                      {isStudentCat(newRoleCat) && <input placeholder="Roll No. / Reg No. *" value={newRollNo} onChange={e => setNewRollNo(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 140px' }} required={isStudentCat(newRoleCat)} />}
-                      {isStaffCat(newRoleCat) && <input placeholder="Designation" value={newDesignation} onChange={e => setNewDesignation(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 160px' }} />}
-                      {isStudentCat(newRoleCat) && (
-                        <select value={newProgramId} onChange={e => setNewProgramId(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 180px' }} required>
-                          <option value="">Course (Program) *</option>
-                          {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
-                      )}
-                      {isStaffCat(newRoleCat) && <input type="date" title="Date of joining" value={newDateOfJoining} onChange={e => setNewDateOfJoining(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />}
-                      {isStudentCat(newRoleCat) && <input type="date" min="2000-01-01" max="2100-12-31" placeholder="Year of commencement *" title="Year of commencement" value={newYearComm} onChange={e => setNewYearComm(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', width: '170px' }} required />}
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add User</button>
-                      <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>Temp password auto-generated · user must change at first login via OTP to official email</span>
-                    </div>
-                  </form>
+                  <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setShowAddUser(true)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(129, 23, 26, 0.15)' }}>
+                      <span style={{ fontSize: '18px' }}>+</span> Add New User
+                    </button>
+
+                    {showAddUser && (
+                      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowAddUser(false)}>
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', width: '100%', maxWidth: '720px', maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--shadow-xl)' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-deep)' }}>Add New User</h3>
+                            <button onClick={() => setShowAddUser(false)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Close</button>
+                          </div>
+                          <div style={{ padding: '20px' }}>
+                            <form onSubmit={async (e) => { if (await handleAddUser(e)) setShowAddUser(false); }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Full Name *</label>
+                                  <input type="text" placeholder="e.g. John Doe" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} required />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Official Email *</label>
+                                  <input type="email" placeholder="e.g. john@nadagurukulam.org" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} required />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Contact Number</label>
+                                  <input type="text" placeholder="e.g. +91 9876543210" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Role *</label>
+                                  <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                    {roles.filter(r => !(r.key === 'super_admin' && hasSuperAdminUser)).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px' }}>
+                                {isStaffCat(newRoleCat) && (
+                                  <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Employee ID</label>
+                                      <input placeholder="ID number" value={newEmployeeId} onChange={e => setNewEmployeeId(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Designation</label>
+                                      <input placeholder="e.g. Professor" value={newDesignation} onChange={e => setNewDesignation(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Date of Joining</label>
+                                      <input type="date" value={newDateOfJoining} onChange={e => setNewDateOfJoining(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                                    </div>
+                                  </>
+                                )}
+                                {isStudentCat(newRoleCat) && (
+                                  <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Roll No. / Reg No. *</label>
+                                      <input placeholder="ID number" value={newRollNo} onChange={e => setNewRollNo(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} required />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Course (Program) *</label>
+                                      <select value={newProgramId} onChange={e => setNewProgramId(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} required>
+                                        <option value="">Select Course</option>
+                                        {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                      </select>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Year of Commencement *</label>
+                                      <input type="date" min="2000-01-01" max="2100-12-31" value={newYearComm} onChange={e => setNewYearComm(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} required />
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '10px', borderTop: '1px solid var(--divider)', paddingTop: '16px' }}>
+                                <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Create User Account</button>
+                                <span style={{ fontSize: '11.5px', color: 'var(--text-faint)', maxWidth: '280px' }}>Temp password auto-generated · user must change at first login via OTP to official email</span>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Tabs: all users vs the self-signup approval queue */}
