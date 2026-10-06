@@ -328,7 +328,7 @@ const API_TO_MODULE = {
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   timetable_periods: 'timetable',
   roles: 'roles', role_permissions: 'roles',
-  designations: 'roles', user_categories: 'roles',
+  category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
@@ -339,7 +339,7 @@ const TABLE_TO_MODULE = {
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
-  designations: 'roles', user_categories: 'roles',
+  category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
@@ -489,25 +489,47 @@ async function checkTimetableConflict(candidate) {
   return null;
 }
 
-// Categories and Designations are master data whose shape Super Admin chooses:
-// a category's hierarchy_type decides whether it drills through Role → Designation
-// or Role → Course. Validated here so the invariants hold for any caller.
+// A category's shape is Super Admin's call: it declares an ordered list of
+// levels that sit below Role (e.g. Designation, then Department). Role stays
+// level 1 because permissions hang off it; `levels` is everything under it.
+const slugKey = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const validateLevels = (levels) => {
+  if (!Array.isArray(levels)) return 'Levels must be an array.';
+  if (levels.length > 4) return 'A category can have at most 4 levels below Role.';
+  const seen = new Set();
+  for (const l of levels) {
+    const key = slugKey(l?.key || l?.name);
+    if (!key) return 'Every level needs a name.';
+    if (!/^[a-z0-9_]{2,40}$/.test(key)) return 'Level keys must be lowercase letters, numbers or underscores.';
+    if (key === 'role') return '"Role" is the fixed first level — name your levels below it.';
+    if (seen.has(key)) return `Duplicate level "${key}".`;
+    seen.add(key);
+  }
+  return null;
+};
+
 const BUILT_IN_CATEGORY_KEYS = ['staff', 'student', 'administration'];
 const validateMasterMeta = async (table, body = {}) => {
   if (table === 'user_categories') {
     if (body.key !== undefined && !/^[a-z0-9_]{2,40}$/.test(String(body.key))) return 'Category key must be lowercase letters, numbers or underscores.';
     if (body.name !== undefined && !String(body.name).trim()) return 'Category name is required.';
-    if (body.hierarchy_type !== undefined && !['role_designation', 'course'].includes(body.hierarchy_type)) return 'Invalid hierarchy type.';
+    if (body.levels !== undefined) {
+      const levels = (body.levels || []).map(l => ({ key: slugKey(l?.key || l?.name), name: String(l?.name || l?.key || '').trim() }));
+      const err = validateLevels(levels);
+      if (err) return err;
+      body.levels = levels;
+    }
     if (body.key !== undefined && BUILT_IN_CATEGORY_KEYS.includes(body.key)) {
       const { data: clash } = await supabase.from('user_categories').select('id').eq('key', body.key).maybeSingle();
       if (!clash) return `"${body.key}" is a built-in category key.`;
     }
   }
-  if (table === 'designations') {
-    if (body.name !== undefined && !String(body.name).trim()) return 'Designation name is required.';
-    if (body.category_key !== undefined && body.category_key !== null && body.category_key !== '') {
+  if (table === 'category_level_values') {
+    if (body.name !== undefined && !String(body.name).trim()) return 'Value name is required.';
+    if (body.level_key !== undefined && !slugKey(body.level_key)) return 'Level is required.';
+    if (body.category_key !== undefined && !BUILT_IN_CATEGORY_KEYS.includes(body.category_key)) {
       const { data: cat } = await supabase.from('user_categories').select('key').eq('key', body.category_key).maybeSingle();
-      if (!cat) return 'Unknown category for this designation.';
+      if (!cat) return 'Unknown category. Create it in Roles & Permissions first.';
     }
   }
   if (table === 'roles' && body.category !== undefined && !BUILT_IN_CATEGORY_KEYS.includes(body.category)) {
@@ -571,7 +593,7 @@ const crud = (table, orderCol = 'created_at') => ({
       }
       // ── users: custom create with Supabase Auth + OTP ──────────────────
       if (table === 'users') {
-        const ALLOWED = ['name','email','phone','role_key','status','employee_id','roll_no','designation','designation_id','program_id','date_of_joining','year_of_commencement'];
+        const ALLOWED = ['name','email','phone','role_key','status','employee_id','roll_no','designation','level_values','program_id','date_of_joining','year_of_commencement'];
         const body = {};
         for (const k of ALLOWED) if (req.body[k] !== undefined) body[k] = req.body[k];
         if (!body.name || !body.email || !body.role_key) {
@@ -586,7 +608,8 @@ const crud = (table, orderCol = 'created_at') => ({
         else if (body.year_of_commencement !== undefined) body.year_of_commencement = Number(body.year_of_commencement) || null;
         if (body.phone === '') body.phone = null;
         if (body.designation === '') body.designation = null;
-        if (body.designation_id === '') body.designation_id = null;
+        if (body.level_values && typeof body.level_values !== 'object') body.level_values = {};
+        for (const k of Object.keys(body.level_values || {})) if (!body.level_values[k]) delete body.level_values[k];
         const { data: roleRow } = await supabase.from('roles').select('category').eq('key', body.role_key).single();
         const cat = roleRow?.category || 'staff';
         if (body.role_key === 'super_admin') {
@@ -824,7 +847,7 @@ const crud = (table, orderCol = 'created_at') => ({
       if (blocked) return res.status(403).json({ error: blocked });
       let updateData = { ...req.body };
       if (table === 'users') {
-        const ALLOWED_U = ['name','email','phone','role_key','status','employee_id','roll_no','designation','designation_id','program_id','date_of_joining','year_of_commencement','must_change_password'];
+        const ALLOWED_U = ['name','email','phone','role_key','status','employee_id','roll_no','designation','level_values','program_id','date_of_joining','year_of_commencement','must_change_password'];
         const filtered = {};
         for (const k of ALLOWED_U) if (updateData[k] !== undefined) filtered[k] = updateData[k];
         if (filtered.employee_id === '') filtered.employee_id = null;
@@ -835,7 +858,8 @@ const crud = (table, orderCol = 'created_at') => ({
         else if (filtered.year_of_commencement !== undefined) filtered.year_of_commencement = Number(filtered.year_of_commencement) || null;
         if (filtered.phone === '') filtered.phone = null;
         if (filtered.designation === '') filtered.designation = null;
-        if (filtered.designation_id === '') filtered.designation_id = null;
+        if (filtered.level_values && typeof filtered.level_values !== 'object') filtered.level_values = {};
+        for (const k of Object.keys(filtered.level_values || {})) if (!filtered.level_values[k]) delete filtered.level_values[k];
         updateData = filtered;
       }
       if (table === 'courses') {
@@ -967,9 +991,13 @@ const guard = async (table, id, body = {}) => {
         return 'The Super Admin role cannot be deleted.';
     }
   }
-  if (table === 'designations' && id) {
-    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('designation_id', id);
-    if ((count || 0) > 0) return `${count} user(s) still hold this designation. Reassign them first.`;
+  if (table === 'category_level_values' && id) {
+    const { data: v } = await supabase.from('category_level_values').select('name, level_key').eq('id', id).single();
+    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq(`level_values->>${v?.level_key || 'designation'}`, v?.name || ' ');
+    if ((count || 0) > 0) return `${count} user(s) still hold this. Reassign them first.`;
+    const { count: kids } = await supabase.from('category_level_values').select('id', { count: 'exact', head: true }).eq('parent_id', id);
+    if ((kids || 0) > 0) return `This has ${kids} value(s) below it. Delete those first.`;
+    if ((count || 0) > 0) return `${count} user(s) still hold this. Reassign them first.`;
   }
   if (table === 'user_categories' && id) {
     const { data } = await supabase.from('user_categories').select('key').eq('id', id).single();
@@ -1128,9 +1156,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', designations: 'name', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'designations', 'user_categories'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'role_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
@@ -1189,8 +1217,6 @@ app.put('/api/dashboard-widgets', authMiddleware, async (req, res) => {
 // which requires Manage on the Users module. Only descriptive, non-privileged
 // fields are exposed — role_key, status, email and program stay admin-owned.
 const SELF_EDITABLE = { name: 120, phone: 20, designation: 80, avatar_url: 500, avatar_initials: 3 };
-// `designation_id` is a UUID column, so it bypasses the length cap loop below.
-const SELF_EDITABLE_UUID = ['designation_id'];
 app.put('/api/me', authMiddleware, async (req, res) => {
   try {
     const patch = {};
@@ -1203,19 +1229,25 @@ app.put('/api/me', authMiddleware, async (req, res) => {
       if (v.length > max) return res.status(400).json({ error: `${k} too long` });
       patch[k] = v || null;
     }
-    for (const k of SELF_EDITABLE_UUID) {
-      if (req.body?.[k] === undefined) continue;
-      if (req.body[k] === null || req.body[k] === '') { patch[k] = null; continue; }
-      const { data: d } = await supabase.from('designations').select('id').eq('id', req.body[k]).maybeSingle();
-      if (!d) return res.status(400).json({ error: 'Unknown designation' });
-      patch[k] = d.id;
+    // level_values is free-form, but every key must be a level some category
+    // actually declares — otherwise users would collect junk nobody can render.
+    if (req.body?.level_values !== undefined) {
+      const lv = req.body.level_values && typeof req.body.level_values === 'object' ? req.body.level_values : {};
+      const keys = Object.keys(lv).filter(k => lv[k]);
+      if (keys.length) {
+        const { data: cats } = await supabase.from('user_categories').select('levels');
+        const known = new Set((cats || []).flatMap(c => (c.levels || []).map(l => l.key)));
+        const bad = keys.find(k => !known.has(k));
+        if (bad) return res.status(400).json({ error: `Unknown level "${bad}".` });
+      }
+      patch.level_values = lv;
     }
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
     const { data, error } = await supabase
       .from('users')
       .update(patch)
       .eq('id', req.auth.profile.id)
-      .select('id, name, email, phone, designation, designation_id, avatar_url, avatar_initials')
+      .select('id, name, email, phone, designation, level_values, avatar_url, avatar_initials')
       .single();
     if (error) throw error;
     res.json(data);
@@ -1337,7 +1369,7 @@ app.post('/api/admin/password-resets/:id/action', authMiddleware, async (req, re
 app.post('/api/admin/users/:id/approve', authMiddleware, async (req, res) => {
   try {
     if (req.auth.profile.role_key !== 'super_admin') return res.status(403).json({ error: 'Only Super Admin can approve signups' });
-    const { role_key, program_id, designation, designation_id } = req.body || {};
+    const { role_key, program_id, designation, level_values } = req.body || {};
     const { data: user } = await supabase.from('users').select('id, email, status').eq('id', req.params.id).single();
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.status !== 'pending') return res.status(409).json({ error: 'Only pending signups can be approved' });
@@ -1345,7 +1377,7 @@ app.post('/api/admin/users/:id/approve', authMiddleware, async (req, res) => {
 
     const { error: roleErr } = await supabase
       .from('users')
-      .update({ status: 'active', role_key, program_id: program_id || null, designation: designation || null, designation_id: designation_id || null })
+      .update({ status: 'active', role_key, program_id: program_id || null, designation: designation || null, level_values: (level_values && typeof level_values === 'object') ? level_values : {} })
       .eq('id', user.id);
     if (roleErr) throw roleErr;
 

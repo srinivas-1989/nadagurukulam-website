@@ -8,6 +8,32 @@ import { useImageCropper } from './ImageCropModal';
 const yearOf = (d) => (d ? Number(String(d).slice(0, 4)) || null : null);
 const dateOfYear = (y) => (y ? `${String(y).padStart(4, '0')}-01-01` : '');
 
+// One level value and everything nested under it, so any depth renders the same.
+const ValBranch = ({ parent, all, editingVal, setEditingVal, editName, setEditName, onSave, onDelete }) => (
+  <>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+      {editingVal === parent.id ? (
+        <>
+          <input value={editName} onChange={e => setEditName(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+          <button onClick={() => onSave(parent.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Save</button>
+          <button onClick={() => setEditingVal(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Cancel</button>
+        </>
+      ) : (
+        <>
+          <span style={{ fontSize: '13.5px' }}>{parent.name}</span>
+          <button onClick={() => { setEditingVal(parent.id); setEditName(parent.name); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>
+          <button onClick={() => onDelete(parent)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+        </>
+      )}
+    </div>
+    {all.filter(v => v.parent_id === parent.id).map(child => (
+      <div key={child.id} style={{ marginLeft: '18px', paddingLeft: '10px', borderLeft: '1px dashed var(--border)' }}>
+        <ValBranch parent={child} all={all} editingVal={editingVal} setEditingVal={setEditingVal} editName={editName} setEditName={setEditName} onSave={onSave} onDelete={onDelete} />
+      </div>
+    ))}
+  </>
+);
+
 const UserPersonalTab = ({ userId, dbData }) => {
   const u = dbData?.users?.find(user => user.id === userId);
   return (
@@ -16,7 +42,7 @@ const UserPersonalTab = ({ userId, dbData }) => {
         <img src={u?.profile_pic_url || '/default-avatar.png'} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg)', border: '1px solid var(--border)' }} />
         <div>
           <h4 style={{ margin: '0 0 4px' }}>{u?.name}</h4>
-          <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{u?.designation || 'N/A'} · {u?.role_key}</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{Object.values(u?.level_values || {}).join(' · ') || 'N/A'} · {u?.role_key}</div>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
@@ -70,8 +96,7 @@ const UserAdminTab = ({ userId, dbData }) => {
           <div><b>Role:</b> {user?.role_key}</div>
           <div><b>Role Level:</b> {user?.role?.level || 'N/A'}</div>
           <div><b>Status:</b> <span style={{ color: getStatusColor(user?.status), fontWeight: 600 }}>{user?.status}</span></div>
-          <div><b>Designation:</b> {user?.designation || 'N/A'}</div>
-          <div><b>Department:</b> {user?.department || 'N/A'}</div>
+          <div><b>Levels:</b> {Object.values(user?.level_values || {}).join(' · ') || 'N/A'}</div>
           <div><b>Joined:</b> {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</div>
         </div>
       </div>
@@ -228,9 +253,9 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   });
   const [roles, setRoles] = useState([]);
   const [userCategories, setUserCategories] = useState([]);
-  const [designations, setDesignations] = useState([]);
-  const [newDesignationId, setNewDesignationId] = useState('');
-  const [editUserDesignationId, setEditUserDesignationId] = useState('');
+  const [levelValues, setLevelValues] = useState([]);
+  const [newLevelValues, setNewLevelValues] = useState({});
+  const [editLevelValues, setEditLevelValues] = useState({});
   const [myProfile, setMyProfile] = useState(null);
   const [timetableBatch, setTimetableBatch] = useState(null);
   const [otpMode, setOtpMode] = useState(false);
@@ -247,7 +272,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const resolveRole = (uid) =>
     supabase.from('users').select('role_key, id, email, must_change_password, status').eq('auth_user_id', uid).single();
   const loadMyProfile = (uid) =>
-    supabase.from('users').select('id, role_key, name, email, phone, designation, program_id, avatar_url, avatar_initials').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
+    supabase.from('users').select('id, role_key, name, email, phone, level_values, program_id, avatar_url, avatar_initials').eq('auth_user_id', uid).single().then(({ data }) => { if (data) setMyProfile(data); return data; });
 
   // A user who sets initials keeps them verbatim; otherwise fall back to the
   // first two words of the display name.
@@ -295,7 +320,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (!profileOpen || !myProfile) return;
     setProfileName(myProfile.name || '');
     setProfilePhone(myProfile.phone || '');
-    setProfileDesignation(myProfile.designation || '');
+    setProfileLevels(hydrateLevels(myProfile.role_key, myProfile.level_values));
     setProfileInitials(myProfile.avatar_initials || '');
     setProfileAvatar(null);
     setProfileMsg('');
@@ -502,7 +527,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     try {
       // avatar_url is sent only when the picture actually changed — omitting it keeps
       // whatever is stored, and clearing sends an explicit null.
-      const patch = { name: nextName, phone: profilePhone.trim(), designation: profileDesignation.trim(), avatar_initials: profileInitials.trim().toUpperCase() };
+      const patch = { name: nextName, phone: profilePhone.trim(), level_values: levelNames(profileLevels), avatar_initials: profileInitials.trim().toUpperCase() };
       if (profileAvatar !== null) patch.avatar_url = profileAvatar || null;
       const res = await apiCall(`${apiUrl}/api/me`, { method: 'PUT', body: JSON.stringify(patch) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Save failed'); }
@@ -883,7 +908,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       setDbData(mapped);
       apiCall(`${apiUrl}/api/roles`).then(r => r.json()).then(d => Array.isArray(d) && setRoles(d)).catch(() => {});
       apiCall(`${apiUrl}/api/user_categories`).then(r => r.json()).then(d => Array.isArray(d) && setUserCategories(d)).catch(() => {});
-      apiCall(`${apiUrl}/api/designations`).then(r => r.json()).then(d => Array.isArray(d) && setDesignations(d)).catch(() => {});
+      apiCall(`${apiUrl}/api/category_level_values`).then(r => r.json()).then(d => Array.isArray(d) && setLevelValues(d)).catch(() => {});
     } catch (err) { console.error('Fetch error:', err); }
   };
 
@@ -928,7 +953,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [newUserRole, setNewUserRole] = useState('teacher');
   const [newEmployeeId, setNewEmployeeId] = useState('');
   const [newRollNo, setNewRollNo] = useState('');
-  const [newDesignation, setNewDesignation] = useState('');
   const [newProgramId, setNewProgramId] = useState('');
   const [newDateOfJoining, setNewDateOfJoining] = useState('');
   const [newYearComm, setNewYearComm] = useState('');
@@ -944,7 +968,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [editUserName, setEditUserName] = useState('');
   const [profileName, setProfileName] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
-  const [profileDesignation, setProfileDesignation] = useState('');
+  const [profileLevels, setProfileLevels] = useState({});
   const [profileAvatar, setProfileAvatar] = useState(null); // local preview URL before save
   const [profilePreview, setProfilePreview] = useState('');
   const [profileInitials, setProfileInitials] = useState('');
@@ -956,16 +980,14 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [editUserRoleKey, setEditUserRoleKey] = useState('');
   const [editUserEmployeeId, setEditUserEmployeeId] = useState('');
   const [editUserRollNo, setEditUserRollNo] = useState('');
-  const [editUserDesignation, setEditUserDesignation] = useState('');
   const [editUserProgramId, setEditUserProgramId] = useState('');
   const [editUserDateOfJoining, setEditUserDateOfJoining] = useState('');
   const [editUserYearComm, setEditUserYearComm] = useState('');
 
   const [usersFilterRole, setUsersFilterRole] = useState('');
-  const [usersFilterDesignation, setUsersFilterDesignation] = useState('');
+  const [usersFilterLevels, setUsersFilterLevels] = useState({});
   const [usersFilterStatus, setUsersFilterStatus] = useState('');
   const [usersFilterCategory, setUsersFilterCategory] = useState('');
-  const [usersFilterProgram, setUsersFilterProgram] = useState('');
   const [usersSearch, setUsersSearch] = useState('');
   const [viewProfileUser, setViewProfileUser] = useState(null); // user id
   const [viewProfileTab, setViewProfileTab] = useState('personal'); // 'personal' | 'kyc' | 'admin'
@@ -1000,31 +1022,77 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (res.ok) fetchUserKyc(userId);
   };
 
-  const roleCategory = (key) => {
-    const found = Array.isArray(roles) ? roles.find(r => r.key === key) : null;
-    if (found?.category) return found.category;
-    if (key === 'student' || key === 'students') return 'student';
-    if (key === 'super_admin') return 'administration';
-    if (key === 'teacher' || key === 'teaching_faculty') return 'staff';
-    return 'staff';
-  };
+  // A role's category and the ordered levels below it are both data. The only
+  // hardcoded bit is the fallback for a role whose category row hasn't loaded.
+  const roleCategory = (key) => (roles.find(r => r.key === key) || {}).category || 'staff';
+
+  // Ordered levels a category declared, e.g. [{key:'designation',name:'Designation'}].
+  const catLevels = (categoryKey) => (userCategories.find(c => c.key === categoryKey) || {}).levels || [];
 
   const newRoleCat = roleCategory(newUserRole);
   const editRoleCat = roleCategory(editUserRoleKey);
   const isStudentCat = (c) => c === 'student' || c === 'both';
   const isStaffCat = (c) => c !== 'student';
-  // A category's hierarchy is data, not code: role_designation walks Role →
-  // Designation, course walks Role → Course.
-  const catHierarchy = (key) =>
-    (userCategories.find(c => c.key === key) || {}).hierarchy_type || 'role_designation';
+  const levelNames = (valuesObj) => {
+    const res = {};
+    for (const [k, id] of Object.entries(valuesObj)) {
+      const v = levelValues.find(x => x.id === id);
+      if (v) res[k] = v.name;
+    }
+    return res;
+  };
+  // users.level_values stores names; the selects work in ids.
+  const hydrateLevels = (roleKey, saved) => {
+    const res = {};
+    for (const [k, name] of Object.entries(saved || {})) {
+      const v = levelValues.find(x => x.level_key === k && x.role_key === roleKey && x.name === name);
+      if (v) res[k] = v.id;
+    }
+    return res;
+  };
   const hasSuperAdminUser = (dbData.users || []).some(u => u.role_key === 'super_admin');
+
+  // One dropdown per configured level. Each level's options come from the value
+  // chosen above it, so any depth cascades without the UI knowing the schema.
+  const LevelSelects = ({ roleKey, values, onChange, disabled }) => {
+    const levels = catLevels(roleCategory(roleKey));
+    if (!levels.length) return null;
+    const choicesFor = (idx) => {
+      const lvl = levels[idx];
+      const parentId = idx === 0 ? null : (values[levels[idx - 1].key] || null);
+      return levelValues.filter(v =>
+        v.role_key === roleKey && v.level_key === lvl.key &&
+        (idx === 0 ? !v.parent_id : v.parent_id === parentId)
+      );
+    };
+    return levels.map((l, i) => (
+      <span key={l.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', flex: '1 1 160px', minWidth: 0 }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-soft)' }}>{l.name}</span>
+        <select
+          value={values[l.key] || ''}
+          disabled={disabled || (i > 0 && !values[levels[i - 1].key])}
+          onChange={e => {
+            const next = { ...values, [l.key]: e.target.value };
+            // Changing an earlier level invalidates everything nested under it.
+            for (let j = i + 1; j < levels.length; j++) delete next[levels[j].key];
+            onChange(next);
+          }}
+          style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
+        >
+          <option value="">Select {l.name}</option>
+          {choicesFor(i).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+      </span>
+    ));
+  };
+
   useEffect(() => {
-    if (newRoleCat === 'student') { setNewEmployeeId(''); setNewDesignation(''); setNewDesignationId(''); setNewDateOfJoining(''); }
+    if (newRoleCat === 'student') { setNewEmployeeId(''); setNewLevelValues({}); setNewDateOfJoining(''); }
     else { setNewRollNo(''); setNewProgramId(''); setNewYearComm(''); }
   }, [newRoleCat]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!editingUser) return;
-    if (editRoleCat === 'student') { setEditUserEmployeeId(''); setEditUserDesignation(''); setEditUserDesignationId(''); setEditUserDateOfJoining(''); }
+    if (editRoleCat === 'student') { setEditUserEmployeeId(''); setEditLevelValues({}); setEditUserDateOfJoining(''); }
     else { setEditUserRollNo(''); setEditUserProgramId(''); setEditUserYearComm(''); }
   }, [editRoleCat, editingUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1981,69 +2049,109 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     fetchData();
   };
 
-  // Categories & Designations — the hierarchy shape is data, chosen per category
-  // by Super Admin: role_designation walks Role → Designation, course walks Role → Course.
+  // Categories & Level Values — a category declares its own ordered levels below
+  // Role, and every value at any depth hangs off a Role in that category.
+  const slug = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const [newCatName, setNewCatName] = useState('');
-  const [newCatHierarchy, setNewCatHierarchy] = useState('role_designation');
+  const [newCatLevels, setNewCatLevels] = useState([]);
   const [editingCat, setEditingCat] = useState(null);
   const [editCatName, setEditCatName] = useState('');
-  const [editCatHierarchy, setEditCatHierarchy] = useState('role_designation');
-  const [newDesigName, setNewDesigName] = useState('');
-  const [newDesigCategory, setNewDesigCategory] = useState('');
-  const [editingDesig, setEditingDesig] = useState(null);
-  const [editDesigName, setEditDesigName] = useState('');
+  const [editCatLevels, setEditCatLevels] = useState([]);
+  const [newVal, setNewVal] = useState({ name: '', role_key: '', level_key: '', parent_id: '' });
+  const [editingVal, setEditingVal] = useState(null);
+  const [editValName, setEditValName] = useState('');
+
+  // One level row: blank name + key derived from it. Keys freeze once the level
+  // has values, because users.level_values is keyed by them.
+  const levelRows = (levels, set) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Levels below Role, in order</div>
+      {levels.map((l, i) => (
+        <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-soft)', width: '18px' }}>{i + 1}</span>
+          <input
+            placeholder="Level name (e.g. Designation)"
+            value={l.name}
+            onChange={e => set(levels.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+            style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px' }}
+          />
+          <span style={{ fontSize: '11px', color: 'var(--text-soft)', minWidth: '90px' }}>key: {slug(l.name) || '—'}</span>
+          <button type="button" disabled={i === 0} onClick={() => set(levels.map((x, j) => (j === i - 1 ? x : null)).filter(Boolean))} title="Move up">↑</button>
+          <button type="button" disabled={i === levels.length - 1} onClick={() => set(levels.map((x, j) => (j === i + 1 ? x : null)).filter(Boolean))} title="Move down">↓</button>
+          <button type="button" onClick={() => set(levels.filter((_, j) => j !== i))} title="Remove">✕</button>
+        </div>
+      ))}
+      <button type="button" disabled={levels.length >= 4} onClick={() => set([...levels, { name: '' }])}>
+        + Add level {levels.length >= 4 ? '(max 4)' : ''}
+      </button>
+    </div>
+  );
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
-    const key = newCatName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const key = slug(newCatName);
     if (!key) return;
     const res = await apiCall(`${apiUrl}/api/user_categories`, {
       method: 'POST',
-      body: JSON.stringify({ key, name: newCatName.trim(), hierarchy_type: newCatHierarchy })
+      body: JSON.stringify({
+        key,
+        name: newCatName.trim(),
+        levels: newCatLevels.filter(l => l.name.trim()).map(l => ({ key: slug(l.name), name: l.name.trim() }))
+      })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create category failed'); return; }
-    setNewCatName(''); fetchData();
+    setNewCatName(''); setNewCatLevels([]); fetchData();
   };
 
   const handleUpdateCategory = async (id) => {
     const res = await apiCall(`${apiUrl}/api/user_categories/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name: editCatName, hierarchy_type: editCatHierarchy })
+      body: JSON.stringify({
+        name: editCatName,
+        levels: editCatLevels.map(l => ({ key: slug(l.key) || slug(l.name), name: (l.name || '').trim() }))
+      })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
     setEditingCat(null); fetchData();
   };
 
   const handleDeleteCategory = async (c) => {
-    if (!confirm(`Delete category "${c.name}"? Roles in it must be reassigned first.`)) return;
+    if (!confirm(`Delete category "${c.name}"? Roles and level values in it go too.`)) return;
     const res = await apiCall(`${apiUrl}/api/user_categories/${c.id}`, { method: 'DELETE' });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
     fetchData();
   };
 
-  const handleAddDesignation = async (e) => {
+  const handleAddLevelValue = async (e) => {
     e.preventDefault();
-    if (!newDesigName.trim()) return;
-    const res = await apiCall(`${apiUrl}/api/designations`, {
+    if (!newVal.name.trim() || !newVal.role_key || !newVal.level_key) return;
+    const role = roles.find(r => r.key === newVal.role_key);
+    const res = await apiCall(`${apiUrl}/api/category_level_values`, {
       method: 'POST',
-      body: JSON.stringify({ name: newDesigName.trim(), category_key: newDesigCategory })
+      body: JSON.stringify({
+        name: newVal.name.trim(),
+        category_key: role?.category || 'staff',
+        role_key: newVal.role_key,
+        level_key: newVal.level_key,
+        parent_id: newVal.parent_id || null
+      })
     });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create designation failed'); return; }
-    setNewDesigName(''); fetchData();
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create value failed'); return; }
+    setNewVal(v => ({ ...v, name: '' })); fetchData();
   };
 
-  const handleUpdateDesignation = async (id) => {
-    const res = await apiCall(`${apiUrl}/api/designations/${id}`, {
+  const handleUpdateLevelValue = async (id) => {
+    const res = await apiCall(`${apiUrl}/api/category_level_values/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name: editDesigName })
+      body: JSON.stringify({ name: editValName })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
-    setEditingDesig(null); fetchData();
+    setEditingVal(null); fetchData();
   };
 
-  const handleDeleteDesignation = async (d) => {
-    if (!confirm(`Delete designation "${d.name}"? Users holding it must be reassigned first.`)) return;
-    const res = await apiCall(`${apiUrl}/api/designations/${d.id}`, { method: 'DELETE' });
+  const handleDeleteLevelValue = async (v) => {
+    if (!confirm(`Delete "${v.name}"? Users holding it must be reassigned first.`)) return;
+    const res = await apiCall(`${apiUrl}/api/category_level_values/${v.id}`, { method: 'DELETE' });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
     fetchData();
   };
@@ -2055,14 +2163,14 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const cat = roleCategory(newUserRole);
     const payload = { name: newName.trim(), email: newEmail.trim(), role_key: newUserRole, phone: newPhone.trim() || null,
       employee_id: newEmployeeId.trim() || null, roll_no: newRollNo.trim() || null,
-      designation: newDesignation.trim() || null, designation_id: newDesignationId || null, program_id: newProgramId || null,
+      level_values: levelNames(newLevelValues), program_id: newProgramId || null,
       date_of_joining: newDateOfJoining || null, year_of_commencement: yearOf(newYearComm) };
     if (cat === 'student' && (!payload.roll_no || !payload.program_id || !payload.year_of_commencement)) { alert('Students require Roll No, Course (Program) and Year of commencement'); return false; }
     const res = await apiCall(`${apiUrl}/api/users`, { method: 'POST', body: JSON.stringify(payload) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { alert(data.error || 'Create user failed'); return false; }
     if (data.tempPassword || data.otp) setUserNotice({ tempPassword: data.tempPassword, otp: data.otp, email: data.email || payload.email, emailSent: data.emailSent });
-    setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewDesignation(''); setNewDesignationId(''); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
+    setNewName(''); setNewEmail(''); setNewPhone(''); setNewEmployeeId(''); setNewRollNo(''); setNewLevelValues({}); setNewProgramId(''); setNewDateOfJoining(''); setNewYearComm('');
     fetchData();
     return true;
   };
@@ -2116,7 +2224,7 @@ const handleAddDiscipline = async (e) => {
   const handleUpdateUser = async (u) => {
     const payload = { name: editUserName.trim(), email: editUserEmail.trim(), role_key: editUserRoleKey,
       phone: editUserPhone.trim() || null, employee_id: editUserEmployeeId.trim() || null, roll_no: editUserRollNo.trim() || null,
-      designation: editUserDesignation.trim() || null, designation_id: editUserDesignationId || null, program_id: editUserProgramId || null,
+      level_values: levelNames(editLevelValues), program_id: editUserProgramId || null,
       date_of_joining: editUserDateOfJoining || null, year_of_commencement: yearOf(editUserYearComm) };
     if (!payload.name || !payload.email || !payload.role_key) return;
     const res = await apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -3071,8 +3179,7 @@ const handleAddDiscipline = async (e) => {
                         placeholder={initialsFor({ name: profileName })} maxLength={3} />
                       <label style={{ ...label, marginTop: '16px' }}>Phone</label>
                       <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} style={field} placeholder="Contact number" />
-                      <label style={{ ...label, marginTop: '16px' }}>Designation</label>
-                      <input value={profileDesignation} onChange={e => setProfileDesignation(e.target.value)} style={field} placeholder="e.g. Vocal Teacher" />
+                      <LevelSelects roleKey={myProfile?.role_key} values={profileLevels} onChange={setProfileLevels} />
                       <div className="ndg-profile-readonly">
                         <div><b>Email</b> {myProfile?.email || '—'}</div>
                         <div><b>Role</b> {myProfile?.role_key ? String(myProfile.role_key).replace(/_/g, ' ') : '—'}</div>
@@ -3556,18 +3663,12 @@ const handleAddDiscipline = async (e) => {
                               </div>
                               
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px' }}>
+                                <LevelSelects roleKey={newUserRole} values={newLevelValues} onChange={setNewLevelValues} />
                                 {isStaffCat(newRoleCat) && (
                                   <>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Employee ID</label>
                                       <input placeholder="ID number" value={newEmployeeId} onChange={e => setNewEmployeeId(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }} />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Designation</label>
-                                      <select value={newDesignationId} onChange={e => { setNewDesignationId(e.target.value); const d = designations.find(x => x.id === e.target.value); setNewDesignation(d ? d.name : ''); }} required style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                                         <option value="">Select Designation</option>
-                                         {designations.filter(d => d.category_key === newRoleCat).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                       </select>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <label style={{ fontSize: '12px', fontWeight: 600 }}>Date of Joining</label>
@@ -3639,13 +3740,13 @@ const handleAddDiscipline = async (e) => {
     {/* Filters */}
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
-                    <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterDesignation(''); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
+                    <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
                       <option value="">Select Category</option>
                       {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterCategory ? 0.6 : 1 }}>Filter by Role:
-                    <select disabled={!usersFilterCategory} value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterDesignation(''); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterCategory ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterCategory ? 'not-allowed' : 'pointer' }}>
+                    <select disabled={!usersFilterCategory} value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterCategory ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterCategory ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Role</option>
                       {userCategories.filter(c => !usersFilterCategory || c.key === usersFilterCategory).map(c => (
                         <optgroup key={c.key} label={c.name}>
@@ -3654,23 +3755,29 @@ const handleAddDiscipline = async (e) => {
                       ))}
                     </select>
                   </label>
-                  {catHierarchy(usersFilterCategory) === 'role_designation' ? (
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Designation:
-                    <select disabled={!usersFilterRole} value={usersFilterDesignation || ''} onChange={e => { setUsersFilterDesignation(e.target.value); setUsersFilterProgram(''); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
-                      <option value="">Select Designation</option>
-                      {designations.filter(d => d.category_key === usersFilterCategory).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </label>
-                  ) : (
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Course:
-                    <select disabled={!usersFilterRole} value={usersFilterProgram || ''} onChange={e => { setUsersFilterProgram(e.target.value); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
-                      <option value="">Select Course</option>
-                      {dbData.curriculum.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </label>
-                  )}
-                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: (!usersFilterDesignation && !usersFilterProgram) ? 0.6 : 1 }}>Filter by Status:
-                    <select disabled={!usersFilterDesignation && !usersFilterProgram} value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (!usersFilterDesignation && !usersFilterProgram) ? 'var(--surface)' : 'var(--bg)', cursor: (!usersFilterDesignation && !usersFilterProgram) ? 'not-allowed' : 'pointer' }}>
+                  {usersFilterRole && catLevels(roleCategory(usersFilterRole)).map(l => {
+                    const i = catLevels(roleCategory(usersFilterRole)).findIndex(x => x.key === l.key);
+                    const parentId = i === 0 ? null : (usersFilterLevels[catLevels(roleCategory(usersFilterRole))[i - 1].key] || null);
+                    return (
+                      <label key={l.key} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: i > 0 && !parentId ? 0.6 : 1 }}>Filter by {l.name}:
+                        <select
+                          disabled={i > 0 && !parentId}
+                          value={usersFilterLevels[l.key] || ''}
+                          onChange={e => {
+                            const next = { ...usersFilterLevels, [l.key]: e.target.value };
+                            for (let j = i + 1; j < catLevels(roleCategory(usersFilterRole)).length; j++) delete next[catLevels(roleCategory(usersFilterRole))[j].key];
+                            setUsersFilterLevels(next); setUsersFilterStatus(''); setUsersSearch('');
+                          }}
+                          style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (i > 0 && !parentId) ? 'var(--surface)' : 'var(--bg)', cursor: (i > 0 && !parentId) ? 'not-allowed' : 'pointer' }}
+                        >
+                          <option value="">Select {l.name}</option>
+                          {levelValues.filter(v => v.role_key === usersFilterRole && v.level_key === l.key && v.parent_id === parentId).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                        </select>
+                      </label>
+                    );
+                  })}
+                  <label style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: !usersFilterRole ? 0.6 : 1 }}>Filter by Status:
+                    <select disabled={!usersFilterRole} value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: !usersFilterRole ? 'var(--surface)' : 'var(--bg)', cursor: !usersFilterRole ? 'not-allowed' : 'pointer' }}>
                       <option value="">Select Status</option>
                       <option value="pending">Pending</option>
                       <option value="active">Active</option>
@@ -3684,7 +3791,7 @@ const handleAddDiscipline = async (e) => {
 
                 {/* Banner List with Hierarchy */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {(!usersFilterRole && !usersFilterCategory && !usersFilterDesignation && !usersFilterStatus && !usersFilterProgram && !usersSearch) ? (
+                  {(!usersFilterRole && !usersFilterCategory && !Object.keys(usersFilterLevels).length && !usersFilterStatus && !usersSearch) ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-soft)', background: '#fdf3e0', border: '1px dashed #e0d6c0', borderRadius: 'var(--radius-xl)' }}>
                       Please select any filter option or search above to view users in a hierarchical structure.
                     </div>
@@ -3692,9 +3799,8 @@ const handleAddDiscipline = async (e) => {
                     const filteredUsers = dbData.users
                       .filter(u => userTab !== 'pending' || u.status === 'pending')
                       .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
-                      .filter(u => !usersFilterDesignation || u.designation_id === usersFilterDesignation)
+                      .filter(u => Object.entries(usersFilterLevels).every(([k, id]) => !id || (u.level_values || {})[k] === (levelValues.find(v => v.id === id) || {}).name))
                       .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
-                      .filter(u => !usersFilterProgram || u.program_id === usersFilterProgram)
                       .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
                       .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()));
 
@@ -3706,15 +3812,14 @@ const handleAddDiscipline = async (e) => {
                       );
                     }
 
-                    const categories = ['staff', 'student', 'system'];
-                    return categories.map(cat => {
-                      const catUsers = filteredUsers.filter(u => roleCategory(u.role_key) === cat);
+                    return userCategories.map(cat => {
+                      const catUsers = filteredUsers.filter(u => roleCategory(u.role_key) === cat.key);
                       if (catUsers.length === 0) return null;
 
                       return (
-                        <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div key={cat.key} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingBottom: '6px', borderBottom: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>{cat} Category</span>
+                            <span>{cat.name} Category</span>
                             <span style={{ fontSize: '11px', background: 'var(--surface)', padding: '2px 8px', borderRadius: '12px', border: '1px solid var(--border)' }}>{catUsers.length} user{catUsers.length === 1 ? '' : 's'}</span>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingLeft: '8px' }}>
@@ -3723,7 +3828,7 @@ const handleAddDiscipline = async (e) => {
                                 <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{u.name.charAt(0)}</div>
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontWeight: 600, color: '#81171a' }}>{u.name}</div>
-                                  <div style={{ fontSize: '12px', color: '#dd9f3c' }}>{u.designation || 'No designation'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
+                                  <div style={{ fontSize: '12px', color: '#dd9f3c' }}>{Object.values(u.level_values || {}).join(' · ') || 'No levels'} · {roles.find(r => r.key === u.role_key)?.name || u.role_key}</div>
                                   <div style={{ fontSize: '11px', color: '#a09a8f' }}>ID: {u.employee_id || u.roll_no || 'N/A'}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -3735,7 +3840,7 @@ const handleAddDiscipline = async (e) => {
                                   )}
 
                                   <button onClick={() => { setViewProfileUser(u.id); fetchUserKyc(u.id); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>View Profile</button>
-                                  <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditUserDesignation(u.designation || ''); setEditUserDesignationId(u.designation_id || ''); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
+                                  <button onClick={() => { setEditingUser(u.id); setEditUserName(u.name || ''); setEditUserEmail(u.email || ''); setEditUserPhone(u.phone || ''); setEditUserRoleKey(u.role_key || roles[0]?.key || ''); setEditUserEmployeeId(u.employee_id || ''); setEditUserRollNo(u.roll_no || ''); setEditLevelValues(hydrateLevels(u.role_key, u.level_values)); setEditUserProgramId(u.program_id || ''); setEditUserDateOfJoining(u.date_of_joining || ''); setEditUserYearComm(dateOfYear(u.year_of_commencement)); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Quick Edit</button>
                                   <button onClick={() => { setEditingUser(u.id); }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit Profile</button>
                                   {(role === 'super_admin' || role === 'admin') && (
                                     <button onClick={() => { if (confirm(`Delete user ${u.name}?`)) apiCall(`${apiUrl}/api/users/${u.id}`, { method: 'DELETE' }).then(fetchData); }} style={{ background: 'none', border: '1px solid #a12a2a', color: '#a12a2a', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
@@ -3760,7 +3865,7 @@ const handleAddDiscipline = async (e) => {
                           <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid var(--border)', color: 'var(--primary)' }}>{dbData.users.find(u => u.id === viewProfileUser)?.name?.charAt(0) || '?'}</div>
                           <div>
                             <div style={{ fontWeight: 700, fontSize: '18px' }}>{dbData.users.find(u => u.id === viewProfileUser)?.name || 'User'}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{dbData.users.find(u => u.id === viewProfileUser)?.designation || ''} · {roles.find(r => r.key === dbData.users.find(u => u.id === viewProfileUser)?.role_key)?.name || dbData.users.find(u => u.id === viewProfileUser)?.role_key}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{Object.values(dbData.users.find(u => u.id === viewProfileUser)?.level_values || {}).join(' · ')} · {roles.find(r => r.key === dbData.users.find(u => u.id === viewProfileUser)?.role_key)?.name || dbData.users.find(u => u.id === viewProfileUser)?.role_key}</div>
                           </div>
                         </div>
                         <button onClick={() => { setViewProfileUser(null); setViewProfileTab('personal'); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Close</button>
@@ -5991,68 +6096,81 @@ const handleAddDiscipline = async (e) => {
 
                 {/* Categories decide what the hierarchy below a role looks like */}
                 <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '0 0 10px' }}>Categories</h4>
-                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="Category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                  <select value={newCatHierarchy} onChange={e => setNewCatHierarchy(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Below each role in this category">
-                    <option value="role_designation">Role → Designation</option>
-                    <option value="course">Role → Course</option>
-                  </select>
+                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input placeholder="Category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} />
+                    {levelRows(newCatLevels, setNewCatLevels)}
+                  </div>
                   <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
                 </form>
                 {userCategories.map(c => (
-                  <div key={c.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div key={c.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                     {editingCat === c.id ? (
-                      <>
-                        <input value={editCatName} onChange={e => setEditCatName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
-                        <select value={editCatHierarchy} onChange={e => setEditCatHierarchy(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                          <option value="role_designation">Role → Designation</option>
-                          <option value="course">Role → Course</option>
-                        </select>
-                        <button onClick={() => handleUpdateCategory(c.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
-                        <button onClick={() => setEditingCat(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                      </>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <input value={editCatName} onChange={e => setEditCatName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', maxWidth: '260px' }} />
+                        {levelRows(editCatLevels, setEditCatLevels)}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => handleUpdateCategory(c.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
+                          <button onClick={() => setEditingCat(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <b style={{ color: 'var(--primary)', fontSize: '14px' }}>{c.name}</b>
                         <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{c.key}</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-soft)', flex: 1 }}>{c.hierarchy_type === 'course' ? 'Role → Course' : 'Role → Designation'}</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{roles.filter(r => r.category === c.key).length} role(s) · {designations.filter(d => d.category_key === c.key).length} designation(s)</span>
-                        <button onClick={() => { setEditingCat(c.id); setEditCatName(c.name); setEditCatHierarchy(c.hierarchy_type || 'role_designation'); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
+                        <span style={{ fontSize: '12px', color: 'var(--text-soft)', flex: 1 }}>
+                          Role → {(c.levels || []).map(l => l.name).join(' → ') || 'Role only'}
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{roles.filter(r => r.category === c.key).length} role(s)</span>
+                        <button onClick={() => { setEditingCat(c.id); setEditCatName(c.name); setEditCatLevels((c.levels || []).map(l => ({ key: l.key, name: l.name }))); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
                         <button onClick={() => handleDeleteCategory(c)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>
                       </>
                     )}
                   </div>
                 ))}
 
-                {/* Designations hang off a category, and only apply under a role in that category */}
-                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Designations</h4>
-                <form onSubmit={handleAddDesignation} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="Designation name (e.g. Head of Dept)" value={newDesigName} onChange={e => setNewDesigName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                  <select value={newDesigCategory} onChange={e => setNewDesigCategory(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
-                    <option value="">Select Category</option>
-                    {userCategories.filter(c => (c.hierarchy_type || 'role_designation') === 'role_designation').map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
+                {/* Every value below Role lives under the role it belongs to */}
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Level Values by Role</h4>
+                <form onSubmit={handleAddLevelValue} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input placeholder="Value name (e.g. Head of Dept)" value={newVal.name} onChange={e => setNewVal(v => ({ ...v, name: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                  <select value={newVal.role_key} onChange={e => { const r = roles.find(x => x.key === e.target.value); setNewVal(v => ({ ...v, role_key: e.target.value, level_key: (catLevels(r?.category)[0] || {}).key || '', parent_id: '' })); }} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Role">
+                    <option value="">Select Role</option>
+                    {roles.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                   </select>
-                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Designation</button>
+                  {newVal.role_key && (
+                    <select value={newVal.level_key} onChange={e => setNewVal(v => ({ ...v, level_key: e.target.value, parent_id: '' }))} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Level">
+                      {catLevels(roleCategory(newVal.role_key)).map(l => <option key={l.key} value={l.key}>{l.name}</option>)}
+                    </select>
+                  )}
+                  {newVal.role_key && newVal.level_key !== (catLevels(roleCategory(newVal.role_key))[0] || {}).key && (
+                    <select value={newVal.parent_id} onChange={e => setNewVal(v => ({ ...v, parent_id: e.target.value }))} style={{ padding: '8px', border: '1px solid var(--border)' }} title="Under which value">
+                      <option value="">Top level (no parent)</option>
+                      {levelValues.filter(v => v.role_key === newVal.role_key && v.level_key !== newVal.level_key).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  )}
+                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Value</button>
                 </form>
-                {designations.map(d => (
-                  <div key={d.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    {editingDesig === d.id ? (
-                      <>
-                        <input value={editDesigName} onChange={e => setEditDesigName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                        <button onClick={() => handleUpdateDesignation(d.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
-                        <button onClick={() => setEditingDesig(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                      </>
-                    ) : (
-                      <>
-                        <b style={{ fontSize: '14px' }}>{d.name}</b>
-                        <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{(userCategories.find(c => c.key === d.category_key) || {}).name || d.category_key}</span>
-                        <span style={{ flex: 1 }} />
-                        <button onClick={() => { setEditingDesig(d.id); setEditDesigName(d.name); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>
-                        <button onClick={() => handleDeleteDesignation(d)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>
-                      </>
-                    )}
-                  </div>
-                ))}
+                {roles.map(r => {
+                  const mine = levelValues.filter(v => v.role_key === r.key);
+                  if (!mine.length) return null;
+                  return (
+                    <div key={r.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px' }}>
+                      <b style={{ fontSize: '14px', color: 'var(--primary)' }}>{r.name}</b>
+                      {catLevels(r.category).map(l => {
+                        const parents = mine.filter(v => v.level_key === l.key && !v.parent_id);
+                        if (!parents.length) return null;
+                        return (
+                          <div key={l.key} style={{ marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid var(--border)' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{l.name}</div>
+                            {parents.map(p => (
+                              <ValBranch key={p.id} parent={p} all={mine} editingVal={editingVal} setEditingVal={setEditingVal} editName={editValName} setEditName={setEditValName} onSave={handleUpdateLevelValue} onDelete={handleDeleteLevelValue} />
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
 
                 <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Roles</h4>
                 <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>

@@ -1,18 +1,35 @@
--- 1. User Categories master table (Staff, Student, Administration Category, + custom categories)
+-- Fully configurable category hierarchies.
+--
+-- A category declares its own ordered levels, e.g.
+--   [{"key":"designation","name":"Designation"},{"key":"department","name":"Department"}]
+-- Level 1 is always Role (public.roles) because permissions hang off it; the
+-- declared levels are everything below it.
+--
+-- Every level below Role shares one table, so adding a new level to a category
+-- is data, not a migration.
+
+-- 1. Categories carry their ordered levels
 create table if not exists public.user_categories (
   id uuid default uuid_generate_v4() primary key,
   key text unique not null,
   name text not null,
-  hierarchy_type text not null default 'role_designation' check (hierarchy_type in ('role_designation', 'course')),
+  levels jsonb not null default '[]'::jsonb,
   sort_order int default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-insert into public.user_categories (key, name, hierarchy_type, sort_order) values
-  ('staff', 'Staff', 'role_designation', 10),
-  ('student', 'Student', 'course', 20),
-  ('administration', 'Administration', 'role_designation', 30)
-on conflict (key) do update set name = EXCLUDED.name, hierarchy_type = EXCLUDED.hierarchy_type;
+-- Older installs may still have hierarchy_type from the first cut.
+alter table public.user_categories add column if not exists levels jsonb not null default '[]'::jsonb;
+alter table public.user_categories drop column if exists hierarchy_type;
+
+insert into public.user_categories (key, name, levels, sort_order) values
+  ('staff', 'Staff',
+     '[{"key":"designation","name":"Designation"}]'::jsonb, 10),
+  ('student', 'Student',
+     '[{"key":"course","name":"Course"}]'::jsonb, 20),
+  ('administration', 'Administration',
+     '[{"key":"designation","name":"Designation"}]'::jsonb, 30)
+on conflict (key) do update set name = EXCLUDED.name, levels = EXCLUDED.levels;
 
 alter table public.user_categories enable row level security;
 
@@ -32,24 +49,36 @@ create policy "Super admin manage user_categories"
     )
   );
 
--- 2. Designations master table, scoped to the category that owns it
-create table if not exists public.designations (
+-- 2. One table holds every value below Role, at any depth.
+--    parent_id walks deeper levels; role_key anchors a value under a role.
+create table if not exists public.category_level_values (
   id uuid default uuid_generate_v4() primary key,
-  name text unique not null,
-  category_key text references public.user_categories(key) on update cascade on delete restrict default 'staff',
+  category_key text not null references public.user_categories(key) on update cascade on delete cascade,
+  level_key text not null,
+  role_key text references public.roles(key) on update cascade on delete cascade,
+  parent_id uuid references public.category_level_values(id) on delete cascade,
+  name text not null,
+  sort_order int default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-alter table public.designations enable row level security;
+create index if not exists clv_category_level_idx on public.category_level_values(category_key, level_key);
+create index if not exists clv_parent_idx on public.category_level_values(parent_id) where parent_id is not null;
 
-drop policy if exists "Authenticated users read designations" on public.designations;
-create policy "Authenticated users read designations"
-  on public.designations for select to authenticated
+-- Same value name may repeat across levels/parents, but not twice in one place.
+create unique index if not exists clv_unique_per_parent
+  on public.category_level_values (category_key, level_key, coalesce(role_key, ''), coalesce(parent_id::text, ''), lower(name));
+
+alter table public.category_level_values enable row level security;
+
+drop policy if exists "Authenticated users read category_level_values" on public.category_level_values;
+create policy "Authenticated users read category_level_values"
+  on public.category_level_values for select to authenticated
   using (true);
 
-drop policy if exists "Admin manage designations" on public.designations;
-create policy "Admin manage designations"
-  on public.designations for all to authenticated
+drop policy if exists "Super admin manage category_level_values" on public.category_level_values;
+create policy "Super admin manage category_level_values"
+  on public.category_level_values for all to authenticated
   using (
     exists (
       select 1 from public.users
@@ -58,9 +87,26 @@ create policy "Admin manage designations"
     )
   );
 
--- 3. Add designation_id FK to users
-alter table public.users add column if not exists designation_id uuid references public.designations(id) on delete set null;
-create index if not exists users_designation_id_idx on public.users(designation_id) where designation_id is not null;
+-- 3. Carry the existing designations across, then drop the old table.
+alter table public.users add column if not exists level_values jsonb not null default '{}'::jsonb;
+
+do $$
+begin
+  if to_regclass('public.designations') is not null then
+    insert into public.category_level_values (category_key, level_key, name)
+    select d.category_key, 'designation', d.name from public.designations d
+    on conflict do nothing;
+
+    update public.users u
+    set level_values = u.level_values || jsonb_build_object('designation', d.name)
+    from public.designations d
+    where d.id = u.designation_id;
+  end if;
+end $$;
+
+alter table public.users drop constraint if exists users_designation_id_fkey;
+alter table public.users drop column if exists designation_id;
+drop table if exists public.designations;
 
 -- 4. Rename the 'system' category to 'administration', then relax the
 --    roles.category check so custom categories can hold roles.
