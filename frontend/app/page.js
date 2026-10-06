@@ -3741,24 +3741,28 @@ const handleAddDiscipline = async (e) => {
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
                     <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
-                      <option value="">All Categories</option>
+                      <option value="">Select Category</option>
+                      <option value="ALL">All Categories</option>
                       {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                     </select>
                   </label>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Role:
                     <select value={usersFilterRole || ''} onChange={e => { setUsersFilterRole(e.target.value); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', cursor: 'pointer' }}>
-                      <option value="">All Roles</option>
-                      {userCategories.filter(c => !usersFilterCategory || c.key === usersFilterCategory).map(c => (
+                      <option value="">Select Role</option>
+                      <option value="ALL">All Roles</option>
+                      {userCategories.filter(c => !usersFilterCategory || usersFilterCategory === 'ALL' || c.key === usersFilterCategory).map(c => (
                         <optgroup key={c.key} label={c.name}>
                           {roles.filter(r => r.category === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                         </optgroup>
                       ))}
                     </select>
                   </label>
-                  {(usersFilterRole ? catLevels(roleCategory(usersFilterRole)) : catLevels(usersFilterCategory)).map((l, i, levels) => {
+                  {((usersFilterRole && usersFilterRole !== 'ALL') ? catLevels(roleCategory(usersFilterRole)) : ((usersFilterCategory && usersFilterCategory !== 'ALL') ? catLevels(usersFilterCategory) : [])).map((l, i, levels) => {
                     // Category-wide: the same name can exist under several roles, so
                     // match the parent by name instead of by the one id we kept.
-                    const inScope = (v) => usersFilterRole ? v.role_key === usersFilterRole : v.category_key === usersFilterCategory;
+                    const roleScoped = !!(usersFilterRole && usersFilterRole !== 'ALL');
+                    const catScoped = !!(usersFilterCategory && usersFilterCategory !== 'ALL');
+                    const inScope = (v) => roleScoped ? v.role_key === usersFilterRole : catScoped ? v.category_key === usersFilterCategory : false;
                     const parentName = i === 0 ? null : (levelValues.find(v => v.id === (usersFilterLevels[levels[i - 1].key] || '')) || {}).name || null;
                     return (
                       <label key={l.key} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: i > 0 && !parentName ? 0.6 : 1 }}>Filter by {l.name}:
@@ -3772,7 +3776,8 @@ const handleAddDiscipline = async (e) => {
                           }}
                           style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: (i > 0 && !parentName) ? 'var(--surface)' : 'var(--bg)', cursor: (i > 0 && !parentName) ? 'not-allowed' : 'pointer' }}
                         >
-                          <option value="">All {l.name}s</option>
+                          <option value="">Select {l.name}</option>
+                          <option value="ALL">All {l.name}s</option>
                           {levelValues.filter(v => inScope(v) && v.level_key === l.key
                               && (i === 0 ? !v.parent_id : ((levelValues.find(p => p.id === v.parent_id) || {}).name || null) === parentName))
                             .filter((v, _i, arr) => arr.findIndex(x => x.name === v.name) === _i)
@@ -3783,7 +3788,8 @@ const handleAddDiscipline = async (e) => {
                   })}
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Status:
                     <select value={usersFilterStatus || ''} onChange={e => { setUsersFilterStatus(e.target.value); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', cursor: 'pointer' }}>
-                      <option value="">All Statuses</option>
+                      <option value="">Select Status</option>
+                      <option value="ALL">All Statuses</option>
                       <option value="pending">Pending</option>
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -3801,12 +3807,18 @@ const handleAddDiscipline = async (e) => {
                       Please select any filter option or search above to view users in a hierarchical structure.
                     </div>
                   ) : (() => {
+                    // 'ALL' means "no restriction on this level", same as leaving it blank.
+                    const catOn = usersFilterCategory && usersFilterCategory !== 'ALL';
+                    const roleOn = usersFilterRole && usersFilterRole !== 'ALL';
+                    const statusOn = usersFilterStatus && usersFilterStatus !== 'ALL';
+                    const levelSel = Object.entries(usersFilterLevels).filter(([, id]) => id && id !== 'ALL');
+
                     const filteredUsers = dbData.users
                       .filter(u => userTab !== 'pending' || u.status === 'pending')
-                      .filter(u => !usersFilterRole || u.role_key === usersFilterRole)
-                      .filter(u => Object.entries(usersFilterLevels).every(([k, id]) => !id || (u.level_values || {})[k] === (levelValues.find(v => v.id === id) || {}).name))
-                      .filter(u => !usersFilterStatus || u.status === usersFilterStatus)
-                      .filter(u => !usersFilterCategory || roleCategory(u.role_key) === usersFilterCategory)
+                      .filter(u => !roleOn || u.role_key === usersFilterRole)
+                      .filter(u => levelSel.every(([k, id]) => (u.level_values || {})[k] === (levelValues.find(v => v.id === id) || {}).name))
+                      .filter(u => !statusOn || u.status === usersFilterStatus)
+                      .filter(u => !catOn || roleCategory(u.role_key) === usersFilterCategory)
                       .filter(u => !usersSearch || u.name.toLowerCase().includes(usersSearch.toLowerCase()) || u.email.toLowerCase().includes(usersSearch.toLowerCase()) || (u.employee_id || '').toLowerCase().includes(usersSearch.toLowerCase()) || (u.roll_no || '').toLowerCase().includes(usersSearch.toLowerCase()));
 
                     if (filteredUsers.length === 0) {
