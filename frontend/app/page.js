@@ -843,6 +843,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [signupMode, setSignupMode] = useState(false);
   const [signupMsg, setSignupMsg] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
+  const [signupStep, setSignupStep] = useState(1);
   const [signupForm, setSignupForm] = useState({ name: '', email: '', phone: '', password: '', role_key: 'student', roll_no: '', designation: '', year_of_commencement: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
@@ -2320,7 +2321,7 @@ const handleAddDiscipline = async (e) => {
               </>
             ) : (
               <>
-                <button onClick={() => { setSignupMode(true); setSignupMsg(''); setView('login'); }} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
+                <button onClick={() => { setSignupMode(true); setSignupStep(1); setSignupMsg(''); setView('login'); }} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: '#fff', padding: '9px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '14.5px' }}>
                   Sign Up
                 </button>
                 <button onClick={() => { setSignupMode(false); setView('login'); }} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: '4px', fontWeight: 600, cursor: 'pointer', fontSize: '14.5px' }}>
@@ -2487,205 +2488,133 @@ const handleAddDiscipline = async (e) => {
           </p>
           {signupMode ? (
             <div className="ndg-signup-card">
+              <div className="ndg-wizard-steps" aria-hidden="true">
+                {[1, 2, 3].map(n => (
+                  <span key={n} className={`ndg-wizard-step ${n < signupStep ? 'done' : n === signupStep ? 'active' : ''}`} />
+                ))}
+              </div>
+              <p className="ndg-wizard-count">Step {signupStep} of 3</p>
+
               {signupMsg && (
-                <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '12px 16px', borderRadius: 'var(--radius)', fontSize: '13.5px', color: 'var(--primary-deep)', fontWeight: 500 }}>
+                <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: '13.5px', color: 'var(--primary-deep)' }}>
                   {signupMsg}
                 </div>
               )}
 
-              {/* Block 1: Personal Details */}
-              <div className="ndg-signup-block">
-                <div className="ndg-signup-sidehead">
-                  <span className="ndg-signup-badge">Block 1</span>
-                  <h3 className="ndg-signup-side-title">Personal Details</h3>
-                  <p className="ndg-signup-side-desc">
-                    What to fill: Your official full name, primary email address for portal access, and active phone number.
-                  </p>
-                </div>
-                <div className="ndg-signup-fields">
-                  <div className="ndg-signup-field">
-                    <label className="ndg-signup-label">
-                      <span>Full Name <span className="ndg-signup-req">*</span></span>
-                    </label>
-                    <input
-                      className="ndg-signup-input"
-                      placeholder="e.g. Gayatri Sharma"
-                      value={signupForm.name}
-                      onChange={e => setSignupForm({ ...signupForm, name: e.target.value })}
-                      required
-                    />
-                    <p className="ndg-signup-hint">Your official name as per certificates or ID proof.</p>
-                  </div>
-
-                  <div className="ndg-signup-field">
-                    <label className="ndg-signup-label">
-                      <span>Email Address <span className="ndg-signup-req">*</span></span>
-                    </label>
-                    <input
-                      type="email"
-                      className="ndg-signup-input"
-                      placeholder="e.g. gayatri@example.com"
-                      value={signupForm.email}
-                      onChange={e => setSignupForm({ ...signupForm, email: e.target.value })}
-                      required
-                    />
-                    <p className="ndg-signup-hint">Used for sign in and receiving official approval notifications.</p>
-                  </div>
-
-                  <div className="ndg-signup-field">
-                    <label className="ndg-signup-label">
-                      <span>Phone / Mobile Number</span>
-                      <span className="ndg-signup-opt">Optional</span>
-                    </label>
-                    <input
-                      type="tel"
-                      className="ndg-signup-input"
-                      placeholder="e.g. +91 98765 43210"
-                      value={signupForm.phone}
-                      onChange={e => setSignupForm({ ...signupForm, phone: e.target.value })}
-                    />
-                    <p className="ndg-signup-hint">Primary contact number for SMS and urgent academy updates.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Block 2: Academy Role */}
-              <div className="ndg-signup-block">
-                <div className="ndg-signup-sidehead">
-                  <span className="ndg-signup-badge">Block 2</span>
-                  <h3 className="ndg-signup-side-title">Academy Role</h3>
-                  <p className="ndg-signup-side-desc">
-                    What to fill: Select whether you are applying as a student learner or faculty/staff member.
-                  </p>
-                </div>
-                <div className="ndg-signup-fields">
-                  <div className="ndg-signup-field">
-                    <label className="ndg-signup-label">
-                      <span>Applying As <span className="ndg-signup-req">*</span></span>
-                    </label>
-                    <select
-                      className="ndg-signup-select"
-                      value={signupForm.role_key}
-                      onChange={e => setSignupForm({ ...signupForm, role_key: e.target.value })}
-                    >
-                      <option value="student">Student (Learner enrolled in courses)</option>
-                      <option value="faculty">Faculty / Staff (Teacher, Acharya, or Administrator)</option>
-                    </select>
-                    <p className="ndg-signup-hint">Determines the portal access level and modules configured for your account.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Block 3: Academic / Professional Details */}
-              <div className="ndg-signup-block">
-                <div className="ndg-signup-sidehead">
-                  <span className="ndg-signup-badge">Block 3</span>
-                  <h3 className="ndg-signup-side-title">
-                    {signupForm.role_key === 'student' ? 'Academic Details' : 'Professional Details'}
-                  </h3>
-                  <p className="ndg-signup-side-desc">
-                    {signupForm.role_key === 'student'
-                      ? 'What to fill: Your student roll number (if issued) and the date your course commenced.'
-                      : 'What to fill: Your academic designation, department, or teaching discipline.'}
-                  </p>
-                </div>
-                <div className="ndg-signup-fields">
-                  {signupForm.role_key === 'student' ? (
-                    <>
-                      <div className="ndg-signup-field">
-                        <label className="ndg-signup-label">
-                          <span>Roll Number / Student ID</span>
-                          <span className="ndg-signup-opt">Optional</span>
-                        </label>
-                        <input
-                          className="ndg-signup-input"
-                          placeholder="e.g. NG-2026-001"
-                          value={signupForm.roll_no}
-                          onChange={e => setSignupForm({ ...signupForm, roll_no: e.target.value })}
-                        />
-                        <p className="ndg-signup-hint">Leave blank if roll number has not been allocated yet.</p>
-                      </div>
-
-                      <div className="ndg-signup-field">
-                        <label className="ndg-signup-label">
-                          <span>Date of Commencement</span>
-                          <span className="ndg-signup-opt">Optional</span>
-                        </label>
-                        <input
-                          type="date"
-                          min="2000-01-01"
-                          max="2100-12-31"
-                          className="ndg-signup-input"
-                          value={signupForm.year_of_commencement}
-                          onChange={e => setSignupForm({ ...signupForm, year_of_commencement: e.target.value })}
-                        />
-                        <p className="ndg-signup-hint">Select the start date of your course. The commencement year is recorded.</p>
-                      </div>
-                    </>
-                  ) : (
+              {signupStep === 1 && (
+                <>
+                  <h3 className="ndg-signup-title">Personal details</h3>
+                  <div className="ndg-signup-fields">
                     <div className="ndg-signup-field">
-                      <label className="ndg-signup-label">
-                        <span>Designation / Department</span>
-                        <span className="ndg-signup-opt">Optional</span>
-                      </label>
-                      <input
-                        className="ndg-signup-input"
-                        placeholder="e.g. Senior Vocal Guru / Sanskrit Acharya"
-                        value={signupForm.designation}
-                        onChange={e => setSignupForm({ ...signupForm, designation: e.target.value })}
-                      />
-                      <p className="ndg-signup-hint">Your official title or primary teaching subject.</p>
+                      <label className="ndg-signup-label" htmlFor="su-name">Full name <span className="ndg-signup-req">*</span></label>
+                      <input id="su-name" className="ndg-signup-input" value={signupForm.name} onChange={e => setSignupForm({ ...signupForm, name: e.target.value })} />
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Block 4: Account Security */}
-              <div className="ndg-signup-block">
-                <div className="ndg-signup-sidehead">
-                  <span className="ndg-signup-badge">Block 4</span>
-                  <h3 className="ndg-signup-side-title">Account Security</h3>
-                  <p className="ndg-signup-side-desc">
-                    What to fill: Create a confidential password with at least 8 characters to log in once approved.
-                  </p>
-                </div>
-                <div className="ndg-signup-fields">
-                  <div className="ndg-signup-field">
-                    <label className="ndg-signup-label">
-                      <span>Password <span className="ndg-signup-req">*</span></span>
-                    </label>
-                    <input
-                      type="password"
-                      className="ndg-signup-input"
-                      placeholder="Minimum 8 characters"
-                      value={signupForm.password}
-                      onChange={e => setSignupForm({ ...signupForm, password: e.target.value })}
-                      required
-                    />
-                    <p className="ndg-signup-hint">Choose a strong password with at least 8 characters.</p>
+                    <div className="ndg-signup-field">
+                      <label className="ndg-signup-label" htmlFor="su-email">Email address <span className="ndg-signup-req">*</span></label>
+                      <input id="su-email" type="email" className="ndg-signup-input" value={signupForm.email} onChange={e => setSignupForm({ ...signupForm, email: e.target.value })} />
+                    </div>
+                    <div className="ndg-signup-field">
+                      <label className="ndg-signup-label" htmlFor="su-phone">Phone <span className="ndg-signup-opt">optional</span></label>
+                      <input id="su-phone" type="tel" className="ndg-signup-input" value={signupForm.phone} onChange={e => setSignupForm({ ...signupForm, phone: e.target.value })} />
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
 
-              {/* Action Buttons */}
+              {signupStep === 2 && (
+                <>
+                  <h3 className="ndg-signup-title">{signupForm.role_key === 'student' ? 'Academic details' : 'Professional details'}</h3>
+                  <div className="ndg-signup-fields">
+                    <div className="ndg-signup-field">
+                      <label className="ndg-signup-label" htmlFor="su-role">Applying as <span className="ndg-signup-req">*</span></label>
+                      <select id="su-role" className="ndg-signup-select" value={signupForm.role_key} onChange={e => setSignupForm({ ...signupForm, role_key: e.target.value })}>
+                        <option value="student">Student</option>
+                        <option value="faculty">Faculty / Staff</option>
+                      </select>
+                    </div>
+
+                    {signupForm.role_key === 'student' ? (
+                      <>
+                        <div className="ndg-signup-field">
+                          <label className="ndg-signup-label" htmlFor="su-roll">Roll number <span className="ndg-signup-opt">optional</span></label>
+                          <input id="su-roll" className="ndg-signup-input" value={signupForm.roll_no} onChange={e => setSignupForm({ ...signupForm, roll_no: e.target.value })} />
+                        </div>
+                        <div className="ndg-signup-field">
+                          <label className="ndg-signup-label" htmlFor="su-commence">Date of commencement <span className="ndg-signup-opt">optional</span></label>
+                          <input id="su-commence" type="date" min="2000-01-01" max="2100-12-31" className="ndg-signup-input" value={signupForm.year_of_commencement} onChange={e => setSignupForm({ ...signupForm, year_of_commencement: e.target.value })} />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="ndg-signup-field">
+                        <label className="ndg-signup-label" htmlFor="su-desig">Designation <span className="ndg-signup-opt">optional</span></label>
+                        <input id="su-desig" className="ndg-signup-input" value={signupForm.designation} onChange={e => setSignupForm({ ...signupForm, designation: e.target.value })} />
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {signupStep === 3 && (
+                <>
+                  <h3 className="ndg-signup-title">Password</h3>
+                  <div className="ndg-signup-fields">
+                    <div className="ndg-signup-field">
+                      <label className="ndg-signup-label" htmlFor="su-pass">Password <span className="ndg-signup-req">*</span></label>
+                      <input id="su-pass" type="password" className="ndg-signup-input" value={signupForm.password} onChange={e => setSignupForm({ ...signupForm, password: e.target.value })} />
+                      <p className="ndg-signup-hint">At least 8 characters.</p>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="ndg-signup-actions">
                 <button
                   type="button"
-                  disabled={signupLoading}
-                  onClick={async () => {
-                    const f = signupForm;
-                    if (!f.name || !f.email || !f.password) { setSignupMsg('Name, email and password are required'); return; }
-                    if (f.password.length < 8) { setSignupMsg('Password must be at least 8 characters'); return; }
-                    setSignupLoading(true); setSignupMsg('');
-                    try {
-                      const r = await fetch(`${apiUrl}/api/public/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-                        name: f.name, email: f.email, phone: f.phone, password: f.password,
-                        role_key: f.role_key, roll_no: f.roll_no, designation: f.designation,
-                        year_of_commencement: yearOf(f.year_of_commencement),
-                      })});
-                      const j = await r.json().catch(() => ({}));
-                      if (!r.ok) { setSignupMsg(j.error || 'Signup failed'); return; }
+                  onClick={() => {
+                    setSignupMsg('');
+                    // Step 1 has nothing behind it, so it exits signup entirely.
+                    if (signupStep === 1) { setSignupStep(1); setSignupMode(false); return; }
+                    setSignupStep(s => s - 1);
+                  }}
+                  style={{ background: 'none', border: 'none', padding: '10px 0', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: 'var(--text-soft)' }}
+                >
+                  {signupStep === 1 ? 'Back to sign in' : 'Back'}
+                </button>
+
+                {signupStep < 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignupMsg('');
+                      if (signupStep === 1 && (!signupForm.name.trim() || !signupForm.email.trim())) {
+                        setSignupMsg('Name and email are required');
+                        return;
+                      }
+                      setSignupStep(s => s + 1);
+                    }}
+                    style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '11px 22px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={signupLoading}
+                    onClick={async () => {
+                      const f = signupForm;
+                      if (!f.name || !f.email || !f.password) { setSignupMsg('Name, email and password are required'); return; }
+                      if (f.password.length < 8) { setSignupMsg('Password must be at least 8 characters'); return; }
+                      setSignupLoading(true); setSignupMsg('');
+                      try {
+                        const r = await fetch(`${apiUrl}/api/public/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                          name: f.name, email: f.email, phone: f.phone, password: f.password,
+                          role_key: f.role_key, roll_no: f.roll_no, designation: f.designation,
+                          year_of_commencement: yearOf(f.year_of_commencement),
+                        })});
+                        const j = await r.json().catch(() => ({}));
+                        if (!r.ok) { setSignupMsg(j.error || 'Signup failed'); return; }
                       setSignupMsg('Request received. An administrator will review it and email you an OTP once approved.');
+                      setSignupStep(1);
                       setSignupForm({ name: '', email: '', phone: '', password: '', role_key: 'student', roll_no: '', designation: '', year_of_commencement: '' });
                     } catch (err) { setSignupMsg('Signup failed — please try again'); } finally { setSignupLoading(false); }
                   }}
@@ -2701,23 +2630,9 @@ const handleAddDiscipline = async (e) => {
                     transition: 'background 0.15s ease',
                   }}
                 >
-                  {signupLoading ? 'Submitting Request…' : 'Submit Access Request'}
+                  {signupLoading ? 'Submitting…' : 'Submit request'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setSignupMode(false); setSignupMsg(''); }}
-                  style={{
-                    background: 'none',
-                    border: '1px solid var(--border)',
-                    padding: '11px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '13.5px',
-                    color: 'var(--text-soft)',
-                  }}
-                >
-                  Back to Sign In
-                </button>
+                )}
               </div>
             </div>
           ) : otpMode ? (
@@ -2771,7 +2686,7 @@ const handleAddDiscipline = async (e) => {
               </form>
               <div style={{ display: 'flex', gap: '18px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => setOtpMode(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>First login? Set password with OTP</button>
-                <button type="button" onClick={() => { setSignupMode(true); setSignupMsg(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>New here? Request access</button>
+                <button type="button" onClick={() => { setSignupMode(true); setSignupStep(1); setSignupMsg(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13.5px', textDecoration: 'underline' }}>New here? Request access</button>
               </div>
             </>
           )}
