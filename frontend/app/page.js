@@ -6241,7 +6241,7 @@ const handleAddDiscipline = async (e) => {
                   Super Admin is the one fixed role. Create every other role here, and set exactly what each one can do in each module — no row means the module is hidden for that role.
                 </p>
 
-                {/* Categories decide what the hierarchy below a role looks like */}
+                {/* Categories manage categories list */}
                 <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '0 0 10px' }}>Categories</h4>
                 <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <input placeholder="Category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
@@ -6267,9 +6267,7 @@ const handleAddDiscipline = async (e) => {
                   </div>
                 ))}
 
-                {/* The tree is the schema: a role is its own root node and every
-                    bucket hangs off a parent, so depth is just however deep you edit it. */}
-                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Category Tree</h4>
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Full Tree View (Categories → Roles → Hierarchy)</h4>
                 <form onSubmit={handleAddLevelValue} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <input placeholder="Bucket name (e.g. Carnatic Music)" value={newVal.name} onChange={e => setNewVal(v => ({ ...v, name: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
                   <select value={newVal.parent_id} onChange={e => setNewVal(v => ({ ...v, parent_id: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 260px' }} title="Under which node">
@@ -6281,73 +6279,93 @@ const handleAddDiscipline = async (e) => {
                   </select>
                   <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Bucket</button>
                 </form>
-                {userCategories.map(c => {
-                  const roots = levelValues.filter(v => !v.parent_id && v.category_key === c.key);
-                  if (!roots.length) return null;
-                  return (
-                    <div key={c.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '10px 16px', marginBottom: '8px' }}>
-                      <b style={{ fontSize: '14px', color: 'var(--primary)' }}>{c.name}</b>
-                      {roots.map(p => (
-                        <ValBranch key={p.id} parent={p} all={levelValues.filter(v => v.category_key === c.key)} editingVal={editingVal} setEditingVal={setEditingVal} editName={editValName} setEditName={setEditValName} onSave={handleUpdateLevelValue} onDelete={handleDeleteLevelValue} />
-                      ))}
-                    </div>
-                  );
-                })}
 
-                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Roles</h4>
-                <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="Role name (e.g. Examiner)" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                  <input placeholder="Description" value={newRoleDesc} onChange={e => setNewRoleDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
-                  <select value={newRoleCategory} onChange={e => setNewRoleCategory(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
-                    <option value="">Select Category</option>
-                    {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
-                  </select>
-                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Role</button>
-                </form>
-                {roles.map(r => {
-                  const granted = Object.keys(permsMap[r.key] || {}).length;
-                  const fixed = r.key === 'super_admin';
+                <div style={{ marginBottom: '14px' }}>
+                  <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input placeholder="Role name (e.g. Examiner)" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                    <input placeholder="Description" value={newRoleDesc} onChange={e => setNewRoleDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
+                    <select value={newRoleCategory} onChange={e => setNewRoleCategory(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
+                      <option value="">Select Category</option>
+                      {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
+                    </select>
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Role</button>
+                  </form>
+                </div>
+
+                {userCategories.map(cat => {
+                  const catRoles = roles.filter(r => r.category === cat.key);
+                  const catNodes = levelValues.filter(v => v.category_key === cat.key);
+                  const roots = catNodes.filter(v => !v.parent_id);
+
                   return (
-                    <div key={r.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginBottom: '14px', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', flexWrap: 'wrap' }}>
-                        {editingRole === r.id ? (
-                          <>
-                            <input value={editRoleName} onChange={e => setEditRoleName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
-                            <input value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                            <select value={editRoleCategory} onChange={e => setEditRoleCategory(e.target.value)} disabled={fixed} required style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                              <option value="">Select Category</option>
-                              {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
-                            </select>
-                            <button onClick={() => handleUpdateRole(r.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
-                            <button onClick={() => setEditingRole(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                          </>
+                    <div key={cat.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+                        <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>{cat.name}</h3>
+                        <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{cat.key}</span>
+                      </div>
+
+                      {/* Roles */}
+                      <div style={{ marginBottom: '12px', paddingLeft: '8px' }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Roles ({catRoles.length})</div>
+                        {catRoles.map(r => {
+                          const granted = Object.keys(permsMap[r.key] || {}).length;
+                          const fixed = r.key === 'super_admin';
+                          return (
+                            <div key={r.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginBottom: '8px', overflow: 'hidden' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', flexWrap: 'wrap' }}>
+                                {editingRole === r.id ? (
+                                  <>
+                                    <input value={editRoleName} onChange={e => setEditRoleName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
+                                    <input value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
+                                    <select value={editRoleCategory} onChange={e => setEditRoleCategory(e.target.value)} disabled={fixed} required style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                                      <option value="">Select Category</option>
+                                      {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
+                                    </select>
+                                    <button onClick={() => handleUpdateRole(r.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
+                                    <button onClick={() => setEditingRole(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <b style={{ color: 'var(--primary)', fontSize: '14px' }}>{r.name}</b>
+                                    {fixed && <span style={{ fontSize: '11px', background: 'var(--surface-muted)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-soft)' }}>fixed</span>}
+                                    <span style={{ color: 'var(--text-soft)', fontSize: '12.5px', flex: '1 1 160px' }}>{r.description}</span>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{granted} module{granted === 1 ? '' : 's'}</span>
+                                    <button onClick={() => setOpenRole(openRole === r.key ? null : r.key)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Permissions</button>
+                                    {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); setEditRoleCategory(r.category || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                                    {!fixed && <button onClick={() => handleDeleteRole(r)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                                  </>
+                                )}
+                              </div>
+                              {openRole === r.key && (
+                                <div style={{ borderTop: '1px solid var(--border)', padding: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', background: 'var(--surface-muted)' }}>
+                                  {MODULES.map(m => (
+                                    <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                                      <span style={{ flex: 1 }}>{m.name}</span>
+                                      <select value={permsMap[r.key]?.[m.key]?.level || '—'} disabled={fixed} onChange={e => handlePermChange(r.key, m.key, e.target.value)} style={{ padding: '4px 6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12.5px', background: 'var(--surface)' }}>
+                                        <option value="—">—</option>
+                                        {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                                      </select>
+                                    </label>
+                                  ))}
+                                  {fixed && <p style={{ fontSize: '12px', color: 'var(--text-faint)', gridColumn: '1 / -1', margin: 0 }}>Super Admin always has Full access everywhere — this cannot be changed.</p>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Hierarchy Tree Nodes */}
+                      <div style={{ paddingLeft: '8px' }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Category Hierarchy Tree</div>
+                        {roots.length === 0 ? (
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic' }}>No tree nodes defined yet.</div>
                         ) : (
-                          <>
-                            <b style={{ color: 'var(--primary)', fontSize: '15px' }}>{r.name}</b>
-                            {fixed && <span style={{ fontSize: '11px', background: 'var(--surface-muted)', padding: '2px 10px', borderRadius: '99px', color: 'var(--text-soft)' }}>fixed</span>}
-                            <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{(userCategories.find(c => c.key === r.category) || {}).name || r.category}</span>
-                            <span style={{ color: 'var(--text-soft)', fontSize: '13px', flex: '1 1 160px' }}>{r.description}</span>
-                            <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{granted} module{granted === 1 ? '' : 's'}</span>
-                            <button onClick={() => setOpenRole(openRole === r.key ? null : r.key)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Permissions</button>
-                            {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); setEditRoleCategory(r.category || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Edit</button>}
-                            {!fixed && <button onClick={() => handleDeleteRole(r)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Delete</button>}
-                          </>
+                          roots.map(p => (
+                            <ValBranch key={p.id} parent={p} all={catNodes} editingVal={editingVal} setEditingVal={setEditingVal} editName={editValName} setEditName={setEditValName} onSave={handleUpdateLevelValue} onDelete={handleDeleteLevelValue} />
+                          ))
                         )}
                       </div>
-                      {openRole === r.key && (
-                        <div style={{ borderTop: '1px solid var(--border)', padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', background: 'var(--surface-muted)' }}>
-                          {MODULES.map(m => (
-                            <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                              <span style={{ flex: 1 }}>{m.name}</span>
-                              <select value={permsMap[r.key]?.[m.key]?.level || '—'} disabled={fixed} onChange={e => handlePermChange(r.key, m.key, e.target.value)} style={{ padding: '4px 6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12.5px', background: 'var(--surface)' }}>
-                                <option value="—">—</option>
-                                {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                              </select>
-                            </label>
-                          ))}
-                          {fixed && <p style={{ fontSize: '12px', color: 'var(--text-faint)', gridColumn: '1 / -1', margin: 0 }}>Super Admin always has Full access everywhere — this cannot be changed.</p>}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
