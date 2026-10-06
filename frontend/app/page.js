@@ -2063,6 +2063,11 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
 
   // One level row: blank name + key derived from it. Keys freeze once the level
   // has values, because users.level_values is keyed by them.
+  const swapLevels = (levels, i, j) => {
+    const next = [...levels];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  };
   const levelRows = (levels, set) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div style={{ fontSize: '11px', color: 'var(--text-soft)' }}>Levels below Role, in order</div>
@@ -2075,9 +2080,9 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
             onChange={e => set(levels.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
             style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '4px' }}
           />
-          <span style={{ fontSize: '11px', color: 'var(--text-soft)', minWidth: '90px' }}>key: {slug(l.name) || '—'}</span>
-          <button type="button" disabled={i === 0} onClick={() => set(levels.map((x, j) => (j === i - 1 ? x : null)).filter(Boolean))} title="Move up">↑</button>
-          <button type="button" disabled={i === levels.length - 1} onClick={() => set(levels.map((x, j) => (j === i + 1 ? x : null)).filter(Boolean))} title="Move down">↓</button>
+          <span style={{ fontSize: '11px', color: 'var(--text-soft)', minWidth: '90px' }}>key: {slug(l.key || l.name) || '—'}</span>
+          <button type="button" disabled={i === 0} onClick={() => set(swapLevels(levels, i, i - 1))} title="Move up">↑</button>
+          <button type="button" disabled={i === levels.length - 1} onClick={() => set(swapLevels(levels, i, i + 1))} title="Move down">↓</button>
           <button type="button" onClick={() => set(levels.filter((_, j) => j !== i))} title="Remove">✕</button>
         </div>
       ))}
