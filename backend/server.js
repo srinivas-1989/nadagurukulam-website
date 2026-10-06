@@ -983,13 +983,26 @@ const guard = async (table, id, body = {}, req = null) => {
     }
   }
   if (table === 'category_level_values' && id) {
-    // level_values is keyed by node id, so a user holds a node when that key is
-    // present. PostgREST can't test jsonb key existence, so read and filter here.
-    const { data: holders } = await supabase.from('users').select('level_values').not('level_values', 'is', null);
-    const held = (holders || []).filter(lv => Object.prototype.hasOwnProperty.call(lv.level_values || {}, id)).length;
-    if (held > 0) return `${held} user(s) still hold this. Reassign them first.`;
-    const { count: kids } = await supabase.from('category_level_values').select('id', { count: 'exact', head: true }).eq('parent_id', id);
-    if ((kids || 0) > 0) return `This has ${kids} bucket(s) below it. Delete those first.`;
+    if (body && body.parent_id) {
+      // Re-parenting under one's own descendant would detach the subtree into a cycle.
+      let cur = body.parent_id;
+      while (cur) {
+        if (cur === id) return 'A bucket cannot move inside itself.';
+        const { data: p } = await supabase.from('category_level_values').select('parent_id').eq('id', cur).maybeSingle();
+        cur = p?.parent_id || null;
+      }
+    }
+    // Only a delete is blocked by holders and children; renaming, moving and
+    // reordering carry the same rows with them and must stay allowed.
+    if (!body || Object.keys(body).length === 0) {
+      // level_values is keyed by node id, so a user holds a node when that key is
+      // present. PostgREST can't test jsonb key existence, so read and filter here.
+      const { data: holders } = await supabase.from('users').select('level_values').not('level_values', 'is', null);
+      const held = (holders || []).filter(lv => Object.prototype.hasOwnProperty.call(lv.level_values || {}, id)).length;
+      if (held > 0) return `${held} user(s) still hold this. Reassign them first.`;
+      const { count: kids } = await supabase.from('category_level_values').select('id', { count: 'exact', head: true }).eq('parent_id', id);
+      if ((kids || 0) > 0) return `This has ${kids} bucket(s) below it. Delete those first.`;
+    }
   }
   if (table === 'user_categories' && id) {
     const { data } = await supabase.from('user_categories').select('key').eq('id', id).single();

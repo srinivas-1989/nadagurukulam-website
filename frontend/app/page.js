@@ -8,31 +8,114 @@ import { useImageCropper } from './ImageCropModal';
 const yearOf = (d) => (d ? Number(String(d).slice(0, 4)) || null : null);
 const dateOfYear = (y) => (y ? `${String(y).padStart(4, '0')}-01-01` : '');
 
-// One level value and everything nested under it, so any depth renders the same.
-const ValBranch = ({ parent, all, editingVal, setEditingVal, editName, setEditName, onSave, onDelete }) => (
-  <>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-      {editingVal === parent.id ? (
-        <>
-          <input value={editName} onChange={e => setEditName(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
-          <button onClick={() => onSave(parent.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Save</button>
-          <button onClick={() => setEditingVal(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12.5px' }}>Cancel</button>
-        </>
-      ) : (
-        <>
-          <span style={{ fontSize: '13.5px' }}>{parent.name}</span>
-          <button onClick={() => { setEditingVal(parent.id); setEditName(parent.name); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>
-          <button onClick={() => onDelete(parent)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
-        </>
-      )}
-    </div>
-    {all.filter(v => v.parent_id === parent.id).map(child => (
-      <div key={child.id} style={{ marginLeft: '18px', paddingLeft: '10px', borderLeft: '1px dashed var(--border)' }}>
-        <ValBranch parent={child} all={all} editingVal={editingVal} setEditingVal={setEditingVal} editName={editName} setEditName={setEditName} onSave={onSave} onDelete={onDelete} />
+const treeBtn = { background: 'none', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' };
+const treeBtnPrimary = { ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' };
+
+// Every node under this one, so a move can never drop a node inside itself.
+const subtreeIds = (rootId, all) => {
+  const ids = new Set([rootId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    all.forEach(v => {
+      if (v.parent_id && ids.has(v.parent_id) && !ids.has(v.id)) { ids.add(v.id); grew = true; }
+    });
+  }
+  return ids;
+};
+
+// Sibling order is sort_order first, then insertion time, so a seeded tree still
+// reads in the order it was authored even when orders tie.
+const bySort = (a, b) => (a.sort_order || 0) - (b.sort_order || 0) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
+
+const nodeDepth = (node, all) => {
+  let d = 0;
+  let cur = node;
+  while (cur.parent_id) {
+    cur = all.find(x => x.id === cur.parent_id);
+    if (!cur) break;
+    d++;
+  }
+  return d;
+};
+
+// One tree node and everything below it. Add, rename, move and reorder all act on
+// this node, so the shape is edited where it's read rather than in a side form.
+const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) => {
+  const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveTo, setMoveTo] = useState(node.parent_id || '');
+  const [draft, setDraft] = useState('');
+  const kids = all.filter(v => v.parent_id === node.id).sort(bySort);
+  const held = holders[node.id] || 0;
+  const banned = subtreeIds(node.id, all);
+
+  const submitAdd = () => {
+    if (!draft.trim()) return;
+    onAdd(node.id, draft.trim());
+    setDraft('');
+    setAdding(false);
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', flexWrap: 'wrap' }}>
+        {renaming ? (
+          <>
+            <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+            <button onClick={() => { onSave(node.id, { name: draft.trim() }); setRenaming(false); }} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Save</button>
+            <button onClick={() => setRenaming(false)} style={treeBtn}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: '13.5px', fontWeight: 500 }}>{node.name}</span>
+            <span style={{ fontSize: '10px', letterSpacing: '0.05em', background: 'var(--bg)', padding: '1px 7px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+              {node.role_key ? 'ROLE' : 'BUCKET'}
+            </span>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>
+              {kids.length} below{held ? ` · ${held} user${held === 1 ? '' : 's'}` : ''}
+            </span>
+            <span style={{ flex: 1 }} />
+            <button onClick={() => { setAdding(!adding); setRenaming(false); setMoving(false); setDraft(''); }} style={treeBtnPrimary}>+ Add</button>
+            <button onClick={() => { setRenaming(true); setAdding(false); setMoving(false); setDraft(node.name); }} style={treeBtn}>Rename</button>
+            <button onClick={() => { setMoving(!moving); setAdding(false); setRenaming(false); setMoveTo(node.parent_id || ''); }} style={treeBtn}>Move</button>
+            <button onClick={() => onReorder(node, -1)} style={treeBtn} title="Move up">↑</button>
+            <button onClick={() => onReorder(node, 1)} style={treeBtn} title="Move down">↓</button>
+            <button onClick={() => onDelete(node)} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }} title="Delete">✕</button>
+          </>
+        )}
       </div>
-    ))}
-  </>
-);
+
+      {adding && (
+        <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center' }}>
+          <input autoFocus placeholder={`Bucket under ${node.name}`} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
+          <button onClick={submitAdd} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Add</button>
+          <button onClick={() => { setAdding(false); setDraft(''); }} style={treeBtn}>Cancel</button>
+        </div>
+      )}
+
+      {moving && (
+        <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center' }}>
+          <select value={moveTo} onChange={e => setMoveTo(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 220px' }} title="New parent">
+            <option value="">— top level —</option>
+            {all.filter(v => !banned.has(v.id)).map(v => (
+              <option key={v.id} value={v.id}>{'— '.repeat(nodeDepth(v, all))}{v.name}</option>
+            ))}
+          </select>
+          <button onClick={() => { onSave(node.id, { parent_id: moveTo || null }); setMoving(false); }} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Move here</button>
+          <button onClick={() => setMoving(false)} style={treeBtn}>Cancel</button>
+        </div>
+      )}
+
+      {kids.map(child => (
+        <div key={child.id} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '1px dashed var(--border)' }}>
+          <TreeNode node={child} all={all} holders={holders} onSave={onSave} onAdd={onAdd} onReorder={onReorder} onDelete={onDelete} />
+        </div>
+      ))}
+    </>
+  );
+};
 
 const UserPersonalTab = ({ userId, dbData }) => {
   const u = dbData?.users?.find(user => user.id === userId);
@@ -2146,8 +2229,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [editCatName, setEditCatName] = useState('');
   const [editCatLevels, setEditCatLevels] = useState([]);
   const [newVal, setNewVal] = useState({ name: '', parent_id: '' });
-  const [editingVal, setEditingVal] = useState(null);
-  const [editValName, setEditValName] = useState('');
 
   // One level row: blank name + key derived from it. Keys freeze once the level
   // has values, because users.level_values is keyed by them.
@@ -2229,13 +2310,39 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     setNewVal(v => ({ ...v, name: '' })); fetchData();
   };
 
-  const handleUpdateLevelValue = async (id) => {
-    const res = await apiCall(`${apiUrl}/api/category_level_values/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name: editValName })
+  // Tree rows add in place; the sidebar form stays for seeding a top-level bucket.
+  const handleAddLevelUnder = async (parentId, name) => {
+    const res = await apiCall(`${apiUrl}/api/category_level_values`, {
+      method: 'POST',
+      body: JSON.stringify({ name, parent_id: parentId })
     });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
-    setEditingVal(null); fetchData();
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create bucket failed'); return false; }
+    fetchData();
+    return true;
+  };
+
+  // How many users hold each node, so the tree shows what a delete would break.
+  const valHolders = (dbData.users || []).reduce((acc, u) => {
+    Object.entries(u.level_values || {}).forEach(([k, on]) => { if (on) acc[k] = (acc[k] || 0) + 1; });
+    return acc;
+  }, {});
+
+  const patchLevelValue = async (id, patch) => {
+    const res = await apiCall(`${apiUrl}/api/category_level_values/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return false; }
+    fetchData();
+    return true;
+  };
+
+  // Two-way swap: renumbering every sibling is what keeps sort_order meaningful
+  // when rows were seeded out of step.
+  const handleReorderLevelValue = async (v, dir) => {
+    const sibs = levelValues.filter(x => (x.parent_id || null) === (v.parent_id || null)).sort(bySort);
+    const i = sibs.findIndex(x => x.id === v.id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= sibs.length) return;
+    await patchLevelValue(sibs[i].id, { sort_order: sibs[j].sort_order || j });
+    await patchLevelValue(sibs[j].id, { sort_order: sibs[i].sort_order || i });
   };
 
   const handleDeleteLevelValue = async (v) => {
@@ -6361,8 +6468,8 @@ const handleAddDiscipline = async (e) => {
                         {roots.length === 0 ? (
                           <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic' }}>No tree nodes defined yet.</div>
                         ) : (
-                          roots.map(p => (
-                            <ValBranch key={p.id} parent={p} all={catNodes} editingVal={editingVal} setEditingVal={setEditingVal} editName={editValName} setEditName={setEditValName} onSave={handleUpdateLevelValue} onDelete={handleDeleteLevelValue} />
+                          roots.slice().sort(bySort).map(p => (
+                            <TreeNode key={p.id} node={p} all={catNodes} holders={valHolders} onSave={patchLevelValue} onAdd={handleAddLevelUnder} onReorder={handleReorderLevelValue} onDelete={handleDeleteLevelValue} />
                           ))
                         )}
                       </div>
