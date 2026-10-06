@@ -39,23 +39,28 @@ const nodeDepth = (node, all) => {
   return d;
 };
 
-// One tree node and everything below it. Add, rename, move and reorder all act on
-// this node, so the shape is edited where it's read rather than in a side form.
-const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) => {
+// Every node here is the same kind of thing: a bucket. A role is a bucket that
+// happens to carry a role_key, so the tree shows one list and a node that needs
+// permissions offers them rather than living in a separate section.
+const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete, roles, mods, levels, perms, onPerm, onDeleteRole }) => {
   const [adding, setAdding] = useState(false);
+  const [asRole, setAsRole] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveTo, setMoveTo] = useState(node.parent_id || '');
   const [draft, setDraft] = useState('');
+  const [permsOpen, setPermsOpen] = useState(false);
   const kids = all.filter(v => v.parent_id === node.id).sort(bySort);
   const held = holders[node.id] || 0;
   const banned = subtreeIds(node.id, all);
+  const role = node.role_key ? roles.find(r => r.key === node.role_key) : null;
 
-  const submitAdd = () => {
+  const submitAdd = (makeRole) => {
     if (!draft.trim()) return;
-    onAdd(node.id, draft.trim());
+    onAdd(node.id, draft.trim(), makeRole);
     setDraft('');
     setAdding(false);
+    setAsRole(false);
   };
 
   return (
@@ -69,17 +74,22 @@ const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) =>
           </>
         ) : (
           <>
-            <span style={{ fontSize: '13.5px', fontWeight: 500 }}>{node.name}</span>
-            <span style={{ fontSize: '10px', letterSpacing: '0.05em', background: 'var(--bg)', padding: '1px 7px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-              {node.role_key ? 'ROLE' : 'BUCKET'}
-            </span>
+            <span style={{ fontSize: '13.5px', fontWeight: role ? 700 : 500 }}>{node.name}</span>
+            {role && (
+              <span style={{ fontSize: '10px', letterSpacing: '0.05em', background: 'var(--surface-muted)', padding: '1px 7px', borderRadius: '99px', color: 'var(--primary)', border: '1px solid var(--primary)' }}>ROLE</span>
+            )}
             <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>
-              {kids.length} below{held ? ` · ${held} user${held === 1 ? '' : 's'}` : ''}
+              {kids.length ? `${kids.length} below · ` : ''}{held ? `${held} user${held === 1 ? '' : 's'}` : 'unused'}
             </span>
             <span style={{ flex: 1 }} />
-            <button onClick={() => { setAdding(!adding); setRenaming(false); setMoving(false); setDraft(''); }} style={treeBtnPrimary}>+ Add</button>
+            <button onClick={() => { setAdding(!adding); setRenaming(false); setMoving(false); setDraft(''); setAsRole(false); }} style={treeBtnPrimary}>+ Add</button>
             <button onClick={() => { setRenaming(true); setAdding(false); setMoving(false); setDraft(node.name); }} style={treeBtn}>Rename</button>
             <button onClick={() => { setMoving(!moving); setAdding(false); setRenaming(false); setMoveTo(node.parent_id || ''); }} style={treeBtn}>Move</button>
+            {role && (
+              <button onClick={() => setPermsOpen(o => !o)} style={permsOpen ? { ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : treeBtn} title="Permissions">
+                Permissions
+              </button>
+            )}
             <button onClick={() => onReorder(node, -1)} style={treeBtn} title="Move up">↑</button>
             <button onClick={() => onReorder(node, 1)} style={treeBtn} title="Move down">↓</button>
             <button onClick={() => onDelete(node)} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }} title="Delete">✕</button>
@@ -88,10 +98,14 @@ const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) =>
       </div>
 
       {adding && (
-        <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center' }}>
-          <input autoFocus placeholder={`Bucket under ${node.name}`} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
-          <button onClick={submitAdd} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Add</button>
-          <button onClick={() => { setAdding(false); setDraft(''); }} style={treeBtn}>Cancel</button>
+        <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input autoFocus placeholder={`Name for the new bucket under ${node.name}`} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(asRole); } }} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--text-soft)' }}>
+            <input type="checkbox" checked={asRole} onChange={e => setAsRole(e.target.checked)} />
+            Make it a role
+          </label>
+          <button onClick={() => submitAdd(asRole)} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Add</button>
+          <button onClick={() => { setAdding(false); setDraft(''); setAsRole(false); }} style={treeBtn}>Cancel</button>
         </div>
       )}
 
@@ -108,9 +122,30 @@ const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) =>
         </div>
       )}
 
+      {role && permsOpen && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '12px', margin: '6px 0', background: 'var(--surface-muted)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '8px' }}>
+          {mods.map(m => (
+            <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+              <span style={{ flex: 1 }}>{m.name}</span>
+              <select value={perms?.[role.key]?.[m.key]?.level || '—'} onChange={e => onPerm(role.key, m.key, e.target.value)} style={{ padding: '3px 6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', background: 'var(--surface)' }}>
+                <option value="—">—</option>
+                {levels.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </label>
+          ))}
+          {role.key === 'super_admin' && <p style={{ fontSize: '12px', color: 'var(--text-faint)', gridColumn: '1 / -1', margin: 0 }}>Super Admin always has Full access everywhere — this cannot be changed.</p>}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px' }}>
+            <button onClick={() => setPermsOpen(false)} style={treeBtn}>Close</button>
+            {role.key !== 'super_admin' && (
+              <button onClick={() => { onDeleteRole(role); setPermsOpen(false); }} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }}>Delete role</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {kids.map(child => (
         <div key={child.id} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '1px dashed var(--border)' }}>
-          <TreeNode node={child} all={all} holders={holders} onSave={onSave} onAdd={onAdd} onReorder={onReorder} onDelete={onDelete} />
+          <TreeNode node={child} all={all} holders={holders} onSave={onSave} onAdd={onAdd} onReorder={onReorder} onDelete={onDelete} roles={roles} mods={mods} levels={levels} perms={perms} onPerm={onPerm} onDeleteRole={onDeleteRole} />
         </div>
       ))}
     </>
@@ -2154,34 +2189,25 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   };
 
   // Roles & Permissions — Super Admin is the one fixed role; everything else is data.
-  const [newRoleName, setNewRoleName] = useState('');
-  const [newRoleDesc, setNewRoleDesc] = useState('');
-  const [openRole, setOpenRole] = useState(null);
-  const [editingRole, setEditingRole] = useState(null);
-  const [editRoleName, setEditRoleName] = useState('');
-  const [editRoleDesc, setEditRoleDesc] = useState('');
-
-  const [newRoleCategory, setNewRoleCategory] = useState('');
-  const [editRoleCategory, setEditRoleCategory] = useState('');
-  const handleAddRole = async (e) => {
+  const handleAddRootBucket = async (e) => {
     e.preventDefault();
-    const key = newRoleName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    if (!key || !newRoleCategory) return;
-    const res = await apiCall(`${apiUrl}/api/roles`, {
-      method: 'POST',
-      body: JSON.stringify({ key, name: newRoleName, description: newRoleDesc, category: newRoleCategory })
-    });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return; }
-    setNewRoleName(''); setNewRoleDesc(''); setNewRoleCategory(''); fetchData();
-  };
-
-  const handleUpdateRole = async (id) => {
-    const res = await apiCall(`${apiUrl}/api/roles/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name: editRoleName, description: editRoleDesc, category: editRoleCategory })
-    });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return; }
-    setEditingRole(null); fetchData();
+    if (!newVal.name.trim() || !newVal.category_key) return;
+    if (newVal.role) {
+      const key = newVal.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const res = await apiCall(`${apiUrl}/api/roles`, {
+        method: 'POST',
+        body: JSON.stringify({ key, name: newVal.name.trim(), category: newVal.category_key })
+      });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return; }
+    } else {
+      const res = await apiCall(`${apiUrl}/api/category_level_values`, {
+        method: 'POST',
+        body: JSON.stringify({ name: newVal.name.trim(), category_key: newVal.category_key })
+      });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create bucket failed'); return; }
+    }
+    setNewVal({ name: '', category_key: '', role: false });
+    fetchData();
   };
 
   const handleDeleteRole = async (r) => {
@@ -2228,7 +2254,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [editingCat, setEditingCat] = useState(null);
   const [editCatName, setEditCatName] = useState('');
   const [editCatLevels, setEditCatLevels] = useState([]);
-  const [newVal, setNewVal] = useState({ name: '', parent_id: '' });
+  const [newVal, setNewVal] = useState({ name: '', category_key: '', role: false });
 
   // One level row: blank name + key derived from it. Keys freeze once the level
   // has values, because users.level_values is keyed by them.
@@ -2294,24 +2320,20 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     fetchData();
   };
 
-  const handleAddLevelValue = async (e) => {
-    e.preventDefault();
-    if (!newVal.name.trim() || !newVal.parent_id) return;
-    // category_key is inherited from the parent node server-side, so only the
-    // parent and the name travel.
-    const res = await apiCall(`${apiUrl}/api/category_level_values`, {
-      method: 'POST',
-      body: JSON.stringify({
-        name: newVal.name.trim(),
-        parent_id: newVal.parent_id
-      })
-    });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create value failed'); return; }
-    setNewVal(v => ({ ...v, name: '' })); fetchData();
-  };
-
-  // Tree rows add in place; the sidebar form stays for seeding a top-level bucket.
-  const handleAddLevelUnder = async (parentId, name) => {
+  // Adding below an existing node needs no category: it is inherited from the
+  // parent server-side, so only the parent and the name travel.
+  const handleAddLevelUnder = async (parentId, name, makeRole) => {
+    if (makeRole) {
+      const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (!key) return false;
+      const res = await apiCall(`${apiUrl}/api/roles`, {
+        method: 'POST',
+        body: JSON.stringify({ key, name: name.trim(), parent_id: parentId })
+      });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return false; }
+      fetchData();
+      return true;
+    }
     const res = await apiCall(`${apiUrl}/api/category_level_values`, {
       method: 'POST',
       body: JSON.stringify({ name, parent_id: parentId })
@@ -6374,33 +6396,26 @@ const handleAddDiscipline = async (e) => {
                   </div>
                 ))}
 
-                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Full Tree View (Categories → Roles → Hierarchy)</h4>
-                <form onSubmit={handleAddLevelValue} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="Bucket name (e.g. Carnatic Music)" value={newVal.name} onChange={e => setNewVal(v => ({ ...v, name: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                  <select value={newVal.parent_id} onChange={e => setNewVal(v => ({ ...v, parent_id: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 260px' }} title="Under which node">
-                    <option value="">Select parent node</option>
-                    {levelValues.map(v => {
-                      const depth = (() => { let d = 0, cur = v; while (cur && cur.parent_id) { d++; cur = levelValues.find(x => x.id === cur.parent_id); } return d; })();
-                      return <option key={v.id} value={v.id}>{'— '.repeat(depth)}{v.name}</option>;
-                    })}
+                <h4 style={{ fontSize: '15px', color: 'var(--primary)', margin: '24px 0 10px' }}>Buckets</h4>
+                <p style={{ color: 'var(--text-soft)', margin: '0 0 14px', maxWidth: '720px' }}>
+                  Every node in this tree is a bucket. A role is a bucket that also carries permissions, so tick
+                  “Make it a role” when adding one — designations, departments and program categories are plain buckets.
+                  Everything nests as deep as you need, and each node is edited where it sits.
+                </p>
+                <form onSubmit={handleAddRootBucket} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input placeholder="Top-level bucket name (e.g. Carnatic Music)" value={newVal.name} onChange={e => setNewVal(v => ({ ...v, name: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} />
+                  <select value={newVal.category_key} onChange={e => setNewVal(v => ({ ...v, category_key: e.target.value }))} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '0 1 200px' }} title="Category">
+                    <option value="">Select category</option>
+                    {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                   </select>
-                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Bucket</button>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', color: 'var(--text-soft)' }}>
+                    <input type="checkbox" checked={!!newVal.role} onChange={e => setNewVal(v => ({ ...v, role: e.target.checked }))} />
+                    Make it a role
+                  </label>
+                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add</button>
                 </form>
 
-                <div style={{ marginBottom: '14px' }}>
-                  <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <input placeholder="Role name (e.g. Examiner)" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                    <input placeholder="Description" value={newRoleDesc} onChange={e => setNewRoleDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 200px' }} />
-                    <select value={newRoleCategory} onChange={e => setNewRoleCategory(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} title="Category">
-                      <option value="">Select Category</option>
-                      {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
-                    </select>
-                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Role</button>
-                  </form>
-                </div>
-
                 {userCategories.map(cat => {
-                  const catRoles = roles.filter(r => r.category === cat.key);
                   const catNodes = levelValues.filter(v => v.category_key === cat.key);
                   const roots = catNodes.filter(v => !v.parent_id);
 
@@ -6409,67 +6424,28 @@ const handleAddDiscipline = async (e) => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                         <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>{cat.name}</h3>
                         <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{cat.key}</span>
+                        <span style={{ flex: 1 }} />
+                        <button onClick={() => handleDeleteCategory(cat)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete Category</button>
                       </div>
 
-                      {/* Roles */}
-                      <div style={{ marginBottom: '12px', paddingLeft: '8px' }}>
-                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Roles ({catRoles.length})</div>
-                        {catRoles.map(r => {
-                          const granted = Object.keys(permsMap[r.key] || {}).length;
-                          const fixed = r.key === 'super_admin';
-                          return (
-                            <div key={r.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginBottom: '8px', overflow: 'hidden' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', flexWrap: 'wrap' }}>
-                                {editingRole === r.id ? (
-                                  <>
-                                    <input value={editRoleName} onChange={e => setEditRoleName(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 140px' }} />
-                                    <input value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} style={{ padding: '6px', border: '1px solid var(--border)', flex: '1 1 180px' }} />
-                                    <select value={editRoleCategory} onChange={e => setEditRoleCategory(e.target.value)} disabled={fixed} required style={{ padding: '6px', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                                      <option value="">Select Category</option>
-                                      {userCategories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
-                                    </select>
-                                    <button onClick={() => handleUpdateRole(r.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
-                                    <button onClick={() => setEditingRole(null)} style={{ background: 'none', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <b style={{ color: 'var(--primary)', fontSize: '14px' }}>{r.name}</b>
-                                    {fixed && <span style={{ fontSize: '11px', background: 'var(--surface-muted)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-soft)' }}>fixed</span>}
-                                    <span style={{ color: 'var(--text-soft)', fontSize: '12.5px', flex: '1 1 160px' }}>{r.description}</span>
-                                    <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{granted} module{granted === 1 ? '' : 's'}</span>
-                                    <button onClick={() => setOpenRole(openRole === r.key ? null : r.key)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Permissions</button>
-                                    {!fixed && <button onClick={() => { setEditingRole(r.id); setEditRoleName(r.name); setEditRoleDesc(r.description || ''); setEditRoleCategory(r.category || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
-                                    {!fixed && <button onClick={() => handleDeleteRole(r)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
-                                  </>
-                                )}
-                              </div>
-                              {openRole === r.key && (
-                                <div style={{ borderTop: '1px solid var(--border)', padding: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', background: 'var(--surface-muted)' }}>
-                                  {MODULES.map(m => (
-                                    <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                                      <span style={{ flex: 1 }}>{m.name}</span>
-                                      <select value={permsMap[r.key]?.[m.key]?.level || '—'} disabled={fixed} onChange={e => handlePermChange(r.key, m.key, e.target.value)} style={{ padding: '4px 6px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12.5px', background: 'var(--surface)' }}>
-                                        <option value="—">—</option>
-                                        {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                                      </select>
-                                    </label>
-                                  ))}
-                                  {fixed && <p style={{ fontSize: '12px', color: 'var(--text-faint)', gridColumn: '1 / -1', margin: 0 }}>Super Admin always has Full access everywhere — this cannot be changed.</p>}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {/* Unified Tree View with inline "+ Add" */}
+                      <div style={{ paddingLeft: '4px' }}>
+                        <div style={{ marginBottom: '10px' }}>
+                          <form onSubmit={(e) => { e.preventDefault(); const name = newVal.names?.[cat.key] || ''; if (!name.trim()) return; handleAddRootBucketDirect(cat.key, name.trim(), !!newVal.roles?.[cat.key]); }} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input placeholder={`Add top-level bucket under ${cat.name}`} value={newVal.names?.[cat.key] || ''} onChange={e => { const val = e.target.value; setNewVal(v => ({ ...v, names: { ...(v.names || {}), [cat.key]: val } })); }} required style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px', fontSize: '13px' }} />
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--text-soft)' }}>
+                              <input type="checkbox" checked={!!newVal.roles?.[cat.key]} onChange={e => { const val = e.target.checked; setNewVal(v => ({ ...v, roles: { ...(v.roles || {}), [cat.key]: val } })); }} />
+                              Make role
+                            </label>
+                            <button type="submit" style={{ ...treeBtnPrimary, padding: '6px 14px' }}>+ Add Root Bucket</button>
+                          </form>
+                        </div>
 
-                      {/* Hierarchy Tree Nodes */}
-                      <div style={{ paddingLeft: '8px' }}>
-                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Category Hierarchy Tree</div>
                         {roots.length === 0 ? (
-                          <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic' }}>No tree nodes defined yet.</div>
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic', padding: '6px 0' }}>No branches defined yet under {cat.name}.</div>
                         ) : (
                           roots.slice().sort(bySort).map(p => (
-                            <TreeNode key={p.id} node={p} all={catNodes} holders={valHolders} onSave={patchLevelValue} onAdd={handleAddLevelUnder} onReorder={handleReorderLevelValue} onDelete={handleDeleteLevelValue} />
+                            <TreeNode key={p.id} node={p} all={catNodes} holders={valHolders} onSave={patchLevelValue} onAdd={handleAddLevelUnder} onReorder={handleReorderLevelValue} onDelete={handleDeleteLevelValue} roles={roles} mods={MODULES} levels={LEVELS} perms={permsMap} onPerm={handlePermChange} onDeleteRole={handleDeleteRole} />
                           ))
                         )}
                       </div>

@@ -1134,9 +1134,17 @@ const rolesCreate = async (req, res) => {
     if (catErr) return res.status(400).json({ error: catErr });
     const { data, error } = await supabase.from('roles').insert([body]).select();
     if (error) throw error;
-    // A role is just a tree node that carries role_key, so give it a root node
-    // in its category — otherwise it exists in the picker but nowhere assignable.
-    await supabase.from('category_level_values').insert([{ category_key: body.category, role_key: body.key, name: body.name }]);
+    // A role is just a tree node that carries role_key, so place it in the tree
+    // under the bucket the caller chose — otherwise it exists in the picker but
+    // nowhere assignable. No parent_id means a root node in its category.
+    const parentId = req.body.parent_id || null;
+    if (parentId) {
+      const { data: parent } = await supabase.from('category_level_values').select('id, category_key').eq('id', parentId).maybeSingle();
+      if (!parent) return res.status(400).json({ error: 'Unknown parent node.' });
+      body.category = parent.category_key;
+      await supabase.from('roles').update({ category: body.category }).eq('key', body.key);
+    }
+    await supabase.from('category_level_values').insert([{ category_key: body.category, parent_id: parentId, role_key: body.key, name: body.name }]);
     res.status(201).json(data[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 };
@@ -1169,8 +1177,18 @@ const rolesDelete = async (req, res) => {
     if (!level || !canAccess(level, 'delete')) return res.status(403).json({ error: 'You do not have Full access for this module.' });
     const blocked = await guard('roles', req.params.id, req.body);
     if (blocked) return res.status(403).json({ error: blocked });
+    const { data: gone } = await supabase.from('roles').select('key').eq('id', req.params.id).single();
     const { error } = await supabase.from('roles').delete().eq('id', req.params.id);
     if (error) throw error;
+    // The role's bucket would otherwise linger as an unnamed placeholder, but its
+    // FK cascades, so only remove it once nothing sits below it.
+    if (gone?.key) {
+      const { data: node } = await supabase.from('category_level_values').select('id').eq('role_key', gone.key).maybeSingle();
+      if (node) {
+        const { count: kids } = await supabase.from('category_level_values').select('id', { count: 'exact', head: true }).eq('parent_id', node.id);
+        if ((kids || 0) === 0) await supabase.from('category_level_values').delete().eq('id', node.id);
+      }
+    }
     res.status(204).send();
   } catch (err) { res.status(500).json({ error: err.message }); }
 };
