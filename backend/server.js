@@ -1987,7 +1987,79 @@ app.put('/api/curriculum-content/:key', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Every editable public-site section is a cms_blocks document: one doc per block.
+
+
+// Organisation endpoints
+const UNIT_TYPES = ['School', 'Faculty', 'Department', 'Centre', 'Unit', 'Office'];
+
+// Least privilege: the backend gates every route, not just the UI.
+const requireLevel = async (req, res, moduleKey, action) => {
+  const level = await getAccessLevel(req.auth.profile, moduleKey);
+  if (!level || !canAccess(level, action)) {
+    res.status(403).json({ error: `You do not have ${action === 'list' ? 'View' : action === 'create' ? 'Create' : action === 'update' ? 'Edit' : 'Delete'} access for ${moduleKey}.` });
+    return null;
+  }
+  return level;
+};
+
+app.get('/api/organisation/units', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'organisation', 'list');
+    if (!level) return;
+    const { data, error } = await supabase.from('organisational_units').select('*').order('name');
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/organisation/units', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'organisation', 'create');
+    if (!level) return;
+    const { campus_id, parent_unit_id, name, type } = req.body;
+    if (!String(name || '').trim()) return res.status(400).json({ error: 'name is required' });
+    if (!UNIT_TYPES.includes(type)) return res.status(400).json({ error: `type must be one of: ${UNIT_TYPES.join(', ')}` });
+    const { data, error } = await supabase.from('organisational_units').insert([{
+      campus_id: campus_id || null, parent_unit_id: parent_unit_id || null,
+      name: String(name).trim().slice(0, 160), type,
+    }]).select();
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admissions endpoints
+const APPLICATION_STATUSES = ['submitted', 'screening', 'audition', 'selected', 'admitted', 'rejected'];
+
+app.get('/api/admissions/applications', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'admissions', 'list');
+    if (!level) return;
+    let query = supabase.from('admissions_applications').select('*').order('submitted_at', { ascending: false });
+    if (req.query.status) query = query.eq('status', req.query.status);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admissions/applications', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'admissions', 'create');
+    if (!level) return;
+    const { applicant_id, programme_id, status } = req.body;
+    if (!applicant_id) return res.status(400).json({ error: 'applicant_id is required' });
+    if (status !== undefined && !APPLICATION_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `status must be one of: ${APPLICATION_STATUSES.join(', ')}` });
+    }
+    const { data, error } = await supabase.from('admissions_applications')
+      .insert([{ applicant_id, programme_id: programme_id || null, ...(status ? { status } : {}) }]).select();
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 app.get('/api/cms', async (req, res) => {
   try {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });

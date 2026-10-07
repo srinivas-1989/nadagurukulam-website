@@ -37,3 +37,6 @@ backend/test-*.js
 backend/auth-system.js
 backend/test-super-admin-endpoints-simple.js
 backend/test-super-admin-endpoints.js
+
+# Local revert checkpoints - not part of the project
+.checkpoints/

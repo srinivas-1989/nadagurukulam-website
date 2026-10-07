@@ -580,6 +580,89 @@ create policy "Projects deletable by owner or manager"
   using (student_id = public.my_user_id() or batch_id = any(public.my_batch_ids()) or public.has_permission('projects', array['Manage','Full']));
 
 -- ============================================================================
+-- ORGANISATION & ADMISSIONS
+-- Backend-only domains: applicants and admission decisions are confidential,
+-- so these stay locked to the backend service_role unless a role is granted
+-- View+ on the matching module.
+-- ============================================================================
+drop policy if exists "Organisation units readable with organisation access" on public.organisational_units;
+create policy "Organisation units readable with organisation access"
+  on public.organisational_units for select
+  to authenticated
+  using (public.has_permission('organisation', array['View','Self','Submits','Own','Manage','Full']));
+
+drop policy if exists "Organisation managers can manage units" on public.organisational_units;
+create policy "Organisation managers can manage units"
+  on public.organisational_units for all
+  to authenticated
+  using (public.has_permission('organisation', array['Manage','Full']))
+  with check (public.has_permission('organisation', array['Manage','Full']));
+
+drop policy if exists "Institutions readable with organisation access" on public.institutions;
+create policy "Institutions readable with organisation access"
+  on public.institutions for select
+  to authenticated
+  using (public.has_permission('organisation', array['View','Self','Submits','Own','Manage','Full']));
+
+drop policy if exists "Campuses readable with organisation access" on public.campuses;
+create policy "Campuses readable with organisation access"
+  on public.campuses for select
+  to authenticated
+  using (public.has_permission('organisation', array['View','Self','Submits','Own','Manage','Full']));
+
+drop policy if exists "Admissions applications readable with admissions access" on public.admissions_applications;
+create policy "Admissions applications readable with admissions access"
+  on public.admissions_applications for select
+  to authenticated
+  using (public.has_permission('admissions', array['View','Self','Submits','Own','Manage','Full']));
+
+drop policy if exists "Admissions managers can manage applications" on public.admissions_applications;
+create policy "Admissions managers can manage applications"
+  on public.admissions_applications for all
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']))
+  with check (public.has_permission('admissions', array['Manage','Full']));
+
+-- Applicant identities are confidential: admissions staff only, never the whole portal.
+drop policy if exists "Applicants readable by admissions staff" on public.applicants;
+create policy "Applicants readable by admissions staff"
+  on public.applicants for select
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']));
+
+drop policy if exists "Admissions staff can manage applicants" on public.applicants;
+create policy "Admissions staff can manage applicants"
+  on public.applicants for all
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']))
+  with check (public.has_permission('admissions', array['Manage','Full']));
+
+drop policy if exists "Screening records readable by admissions staff" on public.screening_records;
+create policy "Screening records readable by admissions staff"
+  on public.screening_records for select
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']));
+
+drop policy if exists "Admissions staff can manage screening records" on public.screening_records;
+create policy "Admissions staff can manage screening records"
+  on public.screening_records for all
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']))
+  with check (public.has_permission('admissions', array['Manage','Full']));
+
+drop policy if exists "Auditions readable by admissions staff" on public.auditions;
+create policy "Auditions readable by admissions staff"
+  on public.auditions for select
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']));
+
+drop policy if exists "Admissions staff can manage auditions" on public.auditions;
+create policy "Admissions staff can manage auditions" on public.auditions for all
+  to authenticated
+  using (public.has_permission('admissions', array['Manage','Full']))
+  with check (public.has_permission('admissions', array['Manage','Full']));
+
+-- ============================================================================
 -- CERTIFICATES — per-student (certificates module)
 -- ============================================================================
 drop policy if exists "Certificates readable by owner or manager" on public.certificates;
