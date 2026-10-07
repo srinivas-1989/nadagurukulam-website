@@ -4064,7 +4064,7 @@ const handleAddDiscipline = async (e) => {
                 {/* Tabs: all users vs the self-signup approval queue */}
                 {role === 'super_admin' && (
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--divider)' }}>
-                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`], ['resets', `Password Resets (${passwordResets.filter(r => r.status === 'pending').length})`]].map(([key, label]) => (
+                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`], ['resets', `Password Resets (${passwordResets.filter(r => r.status === 'pending').length})`], ['roles', 'Roles & Permissions']].map(([key, label]) => (
                       <button key={key} onClick={() => { setUserTab(key); if (key === 'resets') loadPasswordResets(); }} style={{ background: 'none', border: 'none', borderBottom: userTab === key ? '2px solid var(--primary)' : '2px solid transparent', padding: '9px 16px', cursor: 'pointer', fontSize: '13.5px', fontWeight: userTab === key ? 700 : 500, color: userTab === key ? 'var(--primary-deep)' : 'var(--text-soft)' }}>{label}</button>
                     ))}
                   </div>
