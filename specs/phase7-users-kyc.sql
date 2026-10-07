@@ -24,6 +24,7 @@ create table if not exists public.user_kyc_docs (
 -- RLS policies for user_kyc_docs
 alter table public.user_kyc_docs enable row level security;
 
+drop policy if exists "Users can view their own KYC docs or admins can view all" on public.user_kyc_docs;
 create policy "Users can view their own KYC docs or admins can view all"
   on public.user_kyc_docs for select
   using (
@@ -35,6 +36,7 @@ create policy "Users can view their own KYC docs or admins can view all"
     )
   );
 
+drop policy if exists "Users or admins can insert KYC docs" on public.user_kyc_docs;
 create policy "Users or admins can insert KYC docs"
   on public.user_kyc_docs for insert
   with check (
@@ -46,6 +48,7 @@ create policy "Users or admins can insert KYC docs"
     )
   );
 
+drop policy if exists "Admins can delete KYC docs" on public.user_kyc_docs;
 create policy "Admins can delete KYC docs"
   on public.user_kyc_docs for delete
   using (

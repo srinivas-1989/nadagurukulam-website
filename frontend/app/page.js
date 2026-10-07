@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useImageCropper } from './ImageCropModal';
+import OrganisationPage from './organisation/page';
+import AdmissionsPage from './admissions/page';
 
 // The column holds a year, but a date picker is far easier to hit than a
 // number box, so the UI collects a date and these take its year.
@@ -576,7 +578,9 @@ export default function Home() {
     { key: 'projects', name: 'Projects', desc: 'Student portfolio — works beyond curriculum.' },
     { key: 'certificates', name: 'Certificates', desc: 'Institutional + external achievements.' },
     { key: 'roles', name: 'Roles', desc: 'Create roles and set what each can do in every module.' },
-    { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' }
+    { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' },
+    { key: 'organisation', name: 'Organisation', desc: 'Institution, campuses, and reporting structure.' },
+    { key: 'admissions', name: 'Admissions', desc: 'Applications, screening, auditions, and admission decisions.' }
   ];
 
   const MODULE_ICONS = {
@@ -6595,9 +6599,12 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
 
+            {activeModule === 'organisation' && <OrganisationPage />}
+            {activeModule === 'admissions' && <AdmissionsPage />}
+
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles', 'organisation', 'admissions'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module

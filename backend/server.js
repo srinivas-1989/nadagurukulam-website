@@ -220,6 +220,11 @@ app.post('/api/public/signup', async (req, res) => {
       throw userErr;
     }
 
+    await recordAudit(req, {
+      action: 'create', entityType: 'users', entityId: userData[0].id,
+      summary: `Created account ${emailLower} with role ${role_key}`,
+      newValue: { name, email: emailLower, role_key, status: 'pending' },
+    });
     res.status(201).json(userData[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -322,6 +327,29 @@ async function getAccessLevel(profile, moduleKey) {
 function canAccess(level, action) {
   const thresholds = { list: 1, create: 3, update: 4, delete: 6 };
   return LEVEL_ORDER[level] >= (thresholds[action] ?? 0);
+}
+
+// Audit trail — who did what, where, when, and the values before/after.
+// Never throws: a failed audit write must not roll back the action it describes.
+async function recordAudit(req, { action, entityType, entityId, summary, previousValue, newValue }) {
+  try {
+    const profile = req.auth?.profile;
+    await supabase.from('audit_log').insert([{
+      actor_id: profile?.id || null,
+      actor_name: profile?.name || null,
+      actor_role: profile?.role_key || null,
+      action,
+      entity_type: entityType,
+      entity_id: entityId ? String(entityId) : null,
+      summary: summary || null,
+      previous_value: previousValue ?? null,
+      new_value: newValue ?? null,
+      ip_address: req.ip || null,
+      user_agent: req.get?.('user-agent') || null,
+    }]);
+  } catch (err) {
+    console.error('audit write failed', err.message);
+  }
 }
 
 // API key → module_key for permission lookup (api key is the URL segment, e.g. /api/curriculum)
@@ -2024,6 +2052,10 @@ app.post('/api/organisation/units', authMiddleware, async (req, res) => {
       name: String(name).trim().slice(0, 160), type,
     }]).select();
     if (error) throw error;
+    await recordAudit(req, {
+      action: 'create', entityType: 'organisational_units', entityId: data[0].id,
+      summary: `Created ${type} "${data[0].name}"`, newValue: data[0],
+    });
     res.status(201).json(data[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2055,6 +2087,11 @@ app.post('/api/admissions/applications', authMiddleware, async (req, res) => {
     const { data, error } = await supabase.from('admissions_applications')
       .insert([{ applicant_id, programme_id: programme_id || null, ...(status ? { status } : {}) }]).select();
     if (error) throw error;
+    await recordAudit(req, {
+      action: 'create', entityType: 'admissions_applications', entityId: data[0].id,
+      summary: `Created admissions application for applicant ${applicant_id}`,
+      newValue: { applicant_id, programme_id: programme_id || null, status: data[0].status },
+    });
     res.status(201).json(data[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
