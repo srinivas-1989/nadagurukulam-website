@@ -145,11 +145,9 @@ const RoleCard = ({ role, root, all, holders, onAdd, onSave, onDelete, mods, lev
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState(role.name);
-  const [branchName, setBranchName] = useState('');
+  const [editingBranch, setEditingBranch] = useState(false);
+  const [branchName, setBranchName] = useState(root?.tag || root?.name || '');
   const kids = root ? all.filter(v => v.parent_id === root.id).sort(bySort) : [];
-  // The role's own node is the branch this list hangs off, so its tag doubles as
-  // the branch name an admin types here.
-  const branch = fieldLabel(root) || 'Branch';
 
   const addField = () => {
     if (!draft.trim()) return;
@@ -179,12 +177,30 @@ const RoleCard = ({ role, root, all, holders, onAdd, onSave, onDelete, mods, lev
           Module Access
         </button>
         {role.key !== 'super_admin' && (
-          <button onClick={() => { setRenaming(true); setPermOpen(false); }} style={treeBtn}>Rename</button>
+          <button onClick={() => { setRenaming(true); setPermOpen(false); }} style={treeBtn}>Rename Role</button>
         )}
         {role.key !== 'super_admin' && (
           <button onClick={() => onDeleteRole(role)} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }}>Delete Role</button>
         )}
       </div>
+
+      {root && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          {editingBranch ? (
+            <>
+              <input autoFocus value={branchName} onChange={e => setBranchName(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+              <button onClick={() => { onSave(root.id, { tag: branchName.trim() || null }); setEditingBranch(false); }} style={treeBtnPrimary}>Save</button>
+              <button onClick={() => { setBranchName(root.tag || root.name); setEditingBranch(false); }} style={treeBtn}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <strong style={{ fontSize: '14px', color: 'var(--text-soft)' }}>Branch: {fieldLabel(root)}</strong>
+              <button onClick={() => setEditingBranch(true)} style={treeBtn}>Rename</button>
+            </>
+          )}
+        </div>
+      )}
+
 
       {permOpen && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '8px', padding: '12px', marginBottom: '12px', background: 'var(--bg)', borderRadius: 'var(--radius-xl)' }}>
@@ -1477,7 +1493,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
               style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)', width: '100%' }}
             >
               <option value="">Select {s.label}</option>
-              {s.options.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              {s.options.map(v => <option key={v.id} value={v.id}>{fieldLabel(v)}</option>)}
             </select>
           </span>
         ))}
@@ -4226,7 +4242,7 @@ const handleAddDiscipline = async (e) => {
                           >
                             <option value="">Select {levelName}</option>
                             {parentIds.length > 1 && <option value="ALL">All {levelName}s</option>}
-                            {options.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                            {options.map(v => <option key={v.id} value={v.id}>{fieldLabel(v)}</option>)}
                           </select>
                         </label>
                       );
