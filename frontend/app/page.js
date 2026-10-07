@@ -621,7 +621,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [forgotLoading, setForgotLoading] = useState(false);
   const [passwordResets, setPasswordResets] = useState([]);
   const [showAddUser, setShowAddUser] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [uploadingKey, setUploadingKey] = useState(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 
@@ -1306,7 +1305,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       method: 'PUT',
       body: JSON.stringify(payload)
     });
-    setEditing(null);
     fetchData();
   };
 
@@ -1519,8 +1517,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [newDiscStructure, setNewDiscStructure] = useState('semester');
   const [newDiscYearCount, setNewDiscYearCount] = useState(2);
   const [newDiscSemPerYear, setNewDiscSemPerYear] = useState(2);
-  const [newDiscTotalSems, setNewDiscTotalSems] = useState(4);
-  const [newDiscMonthCount, setNewDiscMonthCount] = useState(12);
   const [newDiscCat, setNewDiscCat] = useState('');
   const [newDiscPeriodMins, setNewDiscPeriodMins] = useState(45);
   const [newDiscEffFrom, setNewDiscEffFrom] = useState('');
@@ -1531,7 +1527,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [discEditStructure, setDiscEditStructure] = useState('semester');
   const [discEditYearCount, setDiscEditYearCount] = useState(2);
   const [discEditSemPerYear, setDiscEditSemPerYear] = useState(2);
-  const [discEditTotalSems, setDiscEditTotalSems] = useState(4);
   const [discEditMonthCount, setDiscEditMonthCount] = useState(12);
   const [discEditCat, setDiscEditCat] = useState('');
   const [discEditPeriodMins, setDiscEditPeriodMins] = useState(45);
@@ -1573,7 +1568,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [syllabusParsing, setSyllabusParsing] = useState(false);
   const [syllabusParsed, setSyllabusParsed] = useState(null); // {filename,size,parsed,papers,rawPreview}
   const [syllabusParseErr, setSyllabusParseErr] = useState('');
-  const [syllabusSaving, setSyllabusSaving] = useState(false);
   const [syllabusTargetDisc, setSyllabusTargetDisc] = useState('');
   const [syllabusDrafts, setSyllabusDrafts] = useState([]); // editable copies of papers [{...parsed,_include,_verified,_expanded}]
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -1591,7 +1585,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [modCoDetail, setModCoDetail] = useState('');
   const [modRbt, setModRbt] = useState('Remember'); // legacy single
   const [modMethod, setModMethod] = useState(''); // legacy single textarea
-  const [editingModId, setEditingModId] = useState(null);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const academicYearFor = (d=new Date()) => { const y=d.getFullYear(), m=d.getMonth()+1; const s=m>=4?y:y-1; return `${s}-${String(s+1).slice(2)}`; };
   const [syllModAcademicYear, setSyllModAcademicYear] = useState(academicYearFor());
@@ -1816,8 +1809,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [newSessionBatch, setNewSessionBatch] = useState('');
   const [newSessionTitle, setNewSessionTitle] = useState('');
   const [newSessionDate, setNewSessionDate] = useState('');
-  const [newSessionTime, setNewSessionTime] = useState('');
-
+  
   const handleAddLiveSession = async (e) => {
     e.preventDefault();
     if (!newSessionBatch || !newSessionTitle || !newSessionDate) return;
@@ -1827,7 +1819,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       method: 'POST',
       body: JSON.stringify({ batch_id: newSessionBatch, title: newSessionTitle, room_name: roomName, room_link: roomLink, session_date: newSessionDate, status: 'scheduled' })
     });
-    setNewSessionBatch(''); setNewSessionTitle(''); setNewSessionDate(''); setNewSessionTime(''); fetchData();
+    setNewSessionBatch(''); setNewSessionTitle(''); setNewSessionDate(''); fetchData();
   };
 
   const handleJoinSession = (roomLink) => {
@@ -2802,40 +2794,37 @@ const handleAddDiscipline = async (e) => {
       year_number: p.yearLabel ? (ROMAN.indexOf(String(p.yearLabel).replace('Year ','').trim())+1 || null) : null,
     };
     if (mode==='yearly' && !coursePayload.year_label) { alert('Choose a Year for this program.'); return; }
-    setSyllabusSaving(true);
-    try {
-      const res = await apiCall(`${apiUrl}/api/courses`, { method:'POST', body: JSON.stringify(coursePayload) });
+    const res = await apiCall(`${apiUrl}/api/courses`, { method:'POST', body: JSON.stringify(coursePayload) });
       if (!res.ok) { const e=await res.json().catch(()=>({})); alert(e.error||'Create course failed'); return; }
-      const created = await res.json().catch(()=>null);
-      const courseId = created?.id;
-      const mods = syllabusParsed._pendingModules || p.modules || [];
-      let singleSyllId = null;
-      if (courseId && mods.length) {
-        const existingSyll2 = (dbData.course_syllabi||[]).filter(s=>s.course_id===courseId).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
-        if (existingSyll2) singleSyllId = existingSyll2.id;
-        else {
-          const ay2 = syllModAcademicYear || `${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(2)}`;
-          const rr2 = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: courseId, academic_year: ay2, status: 'draft' }) });
-          if (rr2.ok) { const j2=await rr2.json().catch(()=>null); if (j2?.id) singleSyllId=j2.id; }
+    const created = await res.json().catch(()=>null);
+    const courseId = created?.id;
+    const mods = syllabusParsed._pendingModules || p.modules || [];
+    let singleSyllId = null;
+    if (courseId && mods.length) {
+      const existingSyll2 = (dbData.course_syllabi||[]).filter(s=>s.course_id===courseId).sort((a,b)=> (b.version_number||0)-(a.version_number||0))[0];
+      if (existingSyll2) singleSyllId = existingSyll2.id;
+      else {
+        const ay2 = syllModAcademicYear || `${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(2)}`;
+        const rr2 = await apiCall(`${apiUrl}/api/course_syllabi`, { method:'POST', body: JSON.stringify({ course_id: courseId, academic_year: ay2, status: 'draft' }) });
+        if (rr2.ok) { const j2=await rr2.json().catch(()=>null); if (j2?.id) singleSyllId=j2.id; }
+      }
+    }
+    if (courseId && mods.length) {
+      for (const mm of mods) {
+        const rr = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: courseId, syllabus_id: singleSyllId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
+        const mc = await rr.json().catch(()=>null);
+        const modId = mc?.id;
+        if (modId && mm.topics?.length) {
+          for (let i=0;i<mm.topics.length;i++) await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: mm.topics[i], sort_order: i }) });
         }
       }
-      if (courseId && mods.length) {
-        for (const mm of mods) {
-          const rr = await apiCall(`${apiUrl}/api/course_modules`, { method:'POST', body: JSON.stringify({ course_id: courseId, syllabus_id: singleSyllId, module_number: mm.module_number, title: mm.title, hours: mm.hours ?? null, rbt_level: mm.rbt_level || null, methodology: mm.methodology || null, co_mapping: mm.co_mapping || null }) });
-          const mc = await rr.json().catch(()=>null);
-          const modId = mc?.id;
-          if (modId && mm.topics?.length) {
-            for (let i=0;i<mm.topics.length;i++) await apiCall(`${apiUrl}/api/course_module_topics`, { method:'POST', body: JSON.stringify({ module_id: modId, topic: mm.topics[i], sort_order: i }) });
-          }
-        }
-      }
-      // also save structured syllabus to Mongo for detail view
-      if (courseId && (objectives.length || outcomes.length || mods.length)) {
-        await apiCall(`${apiUrl}/api/curriculum-content/course_${courseId}`, { method:'PUT', body: JSON.stringify({ objectives, outcomes: outcomes.map(o=>o.text), pedagogy: pedagogy ? pedagogy.split('\n').filter(Boolean) : [], modules: mods.map(m=>({ title:m.title, hours:m.hours, rbt_level:m.rbt_level, methodology:m.methodology, co_mapping:m.co_mapping, topics:m.topics, description:'' })), assessments: '' }) }).catch(()=>{});
-      }
-      alert('Course + modules saved from file.');
-      setSyllabusParsed(null); setSyllabusFile(null); setSyllabusTargetDisc(''); fetchData();
-    } finally { setSyllabusSaving(false); }
+    }
+    // also save structured syllabus to Mongo for detail view
+    if (courseId && (objectives.length || outcomes.length || mods.length)) {
+      await apiCall(`${apiUrl}/api/curriculum-content/course_${courseId}`, { method:'PUT', body: JSON.stringify({ objectives, outcomes: outcomes.map(o=>o.text), pedagogy: pedagogy ? pedagogy.split('\n').filter(Boolean) : [], modules: mods.map(m=>({ title:m.title, hours:m.hours, rbt_level:m.rbt_level, methodology:m.methodology, co_mapping:m.co_mapping, topics:m.topics, description:'' })), assessments: '' }) }).catch(()=>{});
+    }
+    alert('Course + modules saved from file.');
+    setSyllabusParsed(null); setSyllabusFile(null); setSyllabusTargetDisc(''); fetchData();
   };
   const downloadTemplate = async () => {
     try {
@@ -4547,7 +4536,7 @@ const handleAddDiscipline = async (e) => {
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)', fontSize: '12.5px' }}>{d.period_minutes ? `${d.period_minutes} min` : '45 min'}{d.period_effective_from ? <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}><br />from {d.period_effective_from}</span> : ''}</td>
                             <td style={{ padding: '10px 12px', color: 'var(--text-soft)' }}>{d.description || '—'}</td>
                             <td style={{ padding: '10px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); const yc=d.year_count||2, sp=d.semesters_per_year||2; setDiscEditYearCount(yc); setDiscEditSemPerYear(sp); setDiscEditTotalSems(String(yc*sp)); setDiscEditMonthCount(d.month_count||12); setDiscEditCat(d.category_id || ''); setDiscEditPeriodMins(d.period_minutes || 45); setDiscEditEffFrom(d.period_effective_from || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
+                              {canAdmin('curriculum') && <button onClick={() => { setEditingDisc(d.id); setDiscEditName(d.name || ''); setDiscEditLevels(d.levels || ''); setDiscEditDesc(d.description || ''); setDiscEditStructure(d.structure_mode || 'semester'); const yc=d.year_count||2, sp=d.semesters_per_year||2; setDiscEditYearCount(yc); setDiscEditSemPerYear(sp); setDiscEditMonthCount(d.month_count||12); setDiscEditCat(d.category_id || ''); setDiscEditPeriodMins(d.period_minutes || 45); setDiscEditEffFrom(d.period_effective_from || ''); }} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>}
                               {isFull('curriculum') && <button onClick={() => handleDelete('curriculum', d.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                             </td>
                           </tr>
