@@ -629,7 +629,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
-    class_entries: [], class_confirmations: []
+    class_entries: [], class_confirmations: [], academic_years: [], terms: []
   });
   const [roles, setRoles] = useState([]);
   const [userCategories, setUserCategories] = useState([]);
@@ -1285,7 +1285,8 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['examination_types', 'examination_types'], ['program_categories', 'program_categories'], ['course_syllabi', 'course_syllabi'], ['liveclasses', 'live_sessions'],
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
-        ['role_permissions', 'role_permissions'], ['user_permissions', 'user_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions']
+        ['role_permissions', 'role_permissions'], ['user_permissions', 'user_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions'],
+        ['academic_years', 'academic_years'], ['terms', 'terms']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
         apiCall(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])
