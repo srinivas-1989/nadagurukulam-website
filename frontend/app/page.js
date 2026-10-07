@@ -145,7 +145,11 @@ const RoleCard = ({ role, root, all, holders, onAdd, onSave, onDelete, mods, lev
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState(role.name);
+  const [branchName, setBranchName] = useState('');
   const kids = root ? all.filter(v => v.parent_id === root.id).sort(bySort) : [];
+  // The role's own node is the branch this list hangs off, so its tag doubles as
+  // the branch name an admin types here.
+  const branch = fieldLabel(root) || 'Branch';
 
   const addField = () => {
     if (!draft.trim()) return;
@@ -555,7 +559,7 @@ export default function Home() {
     { key: 'activities', name: 'Activities', desc: 'Competitions, performances, achievements.' },
     { key: 'projects', name: 'Projects', desc: 'Student portfolio — works beyond curriculum.' },
     { key: 'certificates', name: 'Certificates', desc: 'Institutional + external achievements.' },
-    { key: 'roles', name: 'Roles & Permissions', desc: 'Create roles and set what each can do in every module.' },
+    { key: 'roles', name: 'Roles', desc: 'Create roles and set what each can do in every module.' },
     { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' }
   ];
 
@@ -4064,7 +4068,7 @@ const handleAddDiscipline = async (e) => {
                 {/* Tabs: all users vs the self-signup approval queue */}
                 {role === 'super_admin' && (
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--divider)' }}>
-                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`], ['resets', `Password Resets (${passwordResets.filter(r => r.status === 'pending').length})`], ['roles', 'Roles & Permissions']].map(([key, label]) => (
+                    {[['all', 'All Users'], ['pending', `Pending Approvals (${dbData.users.filter(u => u.status === 'pending').length})`], ['resets', `Password Resets (${passwordResets.filter(r => r.status === 'pending').length})`], ['roles', 'Roles']].map(([key, label]) => (
                       <button key={key} onClick={() => { setUserTab(key); if (key === 'resets') loadPasswordResets(); }} style={{ background: 'none', border: 'none', borderBottom: userTab === key ? '2px solid var(--primary)' : '2px solid transparent', padding: '9px 16px', cursor: 'pointer', fontSize: '13.5px', fontWeight: userTab === key ? 700 : 500, color: userTab === key ? 'var(--primary-deep)' : 'var(--text-soft)' }}>{label}</button>
                     ))}
                   </div>
@@ -4186,32 +4190,42 @@ const handleAddDiscipline = async (e) => {
                       depth++;
                     }
                     return slots.map((slot, i) => {
-                      // The first level sits under the role/category, so it never
-                      // needs its own gate; deeper ones do.
-                      const gateOk = i === 0 || slot.parentIds.some(pid => usersFilterLevels[pid] || usersFilterLevels[pid] === 'ALL');
-                      const options = i === 0
-                        ? roots.filter((r, ix) => roots.findIndex(x => x.name === r.name) === ix)
-                        : slot.kids.filter((v, ix, arr) => arr.findIndex(x => x.name === v.name) === ix);
-                      const chosen = slot.parentIds.find(pid => usersFilterLevels[pid]);
-                      const chosenName = (levelValues.find(v => v.id === chosen) || {}).name || '';
+                      // Dropdown i lists the children of whatever dropdown i-1 settled
+                      // on. 'ALL' there means no restriction, so offer every node on
+                      // that level and the union of their children.
+                      const picked = i === 0
+                        ? roots.map(r => r.id)
+                        : slots[i - 1].parentIds.filter(pid => usersFilterLevels[pid]);
+                      const scoped = i > 0 && picked.length && picked.every(pid => usersFilterLevels[pid] !== 'ALL');
+                      const parentIds = i === 0
+                        ? roots.map(r => r.id)
+                        : scoped ? picked : slots[i - 1].parentIds;
+                      const gateOk = parentIds.length > 0 && (i === 0 || picked.length > 0);
+                      const options = slot.kids
+                        .filter(v => parentIds.includes(v.parent_id))
+                        .filter((v, ix, arr) => arr.findIndex(x => x.name === v.name) === ix);
+                      const parentNode = levelValues.find(v => v.id === parentIds[0]);
+                      const levelName = fieldLabel(parentNode) || (i === 0 ? 'Field' : 'Sub-field');
+                      const chosen = parentIds.find(pid => usersFilterLevels[pid]) || '';
                       return (
-                        <label key={i} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: gateOk ? 1 : 0.6 }}>Filter by {chosenName || (i === 0 ? 'Field' : 'Sub-field')}:
+                        <label key={i} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: gateOk ? 1 : 0.6 }}>Filter by {levelName}:
                           <select
                             disabled={!gateOk}
-                            value={chosen || ''}
+                            value={chosen}
                             onChange={e => {
-                              // Keep every parent chain above this level, drop the rest.
+                              // Each pick hangs off the one node above it, so the
+                              // branch below this level is always knowable.
                               const next = {};
                               for (let j = 0; j < i; j++) {
                                 for (const pid of slots[j].parentIds) if (usersFilterLevels[pid]) next[pid] = usersFilterLevels[pid];
                               }
-                              if (e.target.value) for (const pid of slot.parentIds) next[pid] = e.target.value;
+                              if (e.target.value) next[chosen || parentIds[0]] = e.target.value;
                               setUsersFilterLevels(next); setUsersFilterStatus(''); setUsersSearch('');
                             }}
                             style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: gateOk ? 'var(--bg)' : 'var(--surface)', cursor: gateOk ? 'pointer' : 'not-allowed' }}
                           >
-                            <option value="">Select {chosenName || (i === 0 ? 'Field' : 'Sub-field')}</option>
-                            <option value="ALL">All {chosenName || 'this level'}s</option>
+                            <option value="">Select {levelName}</option>
+                            {parentIds.length > 1 && <option value="ALL">All {levelName}s</option>}
                             {options.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                           </select>
                         </label>
