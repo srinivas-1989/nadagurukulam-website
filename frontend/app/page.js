@@ -24,9 +24,12 @@ const subtreeIds = (rootId, all) => {
   return ids;
 };
 
-// Sibling order is sort_order first, then insertion time, so a seeded tree still
-// reads in the order it was authored even when orders tie.
-const bySort = (a, b) => (a.sort_order || 0) - (b.sort_order || 0) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
+// Fields read alphabetically so the tree is scannable without hand-ordering it.
+const bySort = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+
+// A field's tag is the short heading other screens point at it with; without one
+// the full name is the heading.
+const fieldLabel = (v) => (v && String(v.tag || '').trim()) || (v && v.name) || '';
 
 const nodeDepth = (node, all) => {
   let d = 0;
@@ -39,47 +42,64 @@ const nodeDepth = (node, all) => {
   return d;
 };
 
-// Every node here is the same kind of thing: a bucket. A role is a bucket that
-// happens to carry a role_key, so the tree shows one list and a node that needs
-// permissions offers them rather than living in a separate section.
-const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) => {
+// Every node here is a field. A role is a field that happens to carry a
+// role_key, so the tree shows one list and a node that needs permissions
+// offers them rather than living in a separate section. Fields start folded
+// and each one folds its own children, so depth never costs screen height.
+const TreeNode = ({ node, all, holders, onSave, onAdd, onDelete }) => {
+  const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [tagging, setTagging] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveTo, setMoveTo] = useState(node.parent_id || '');
   const [draft, setDraft] = useState('');
+  const [draftTag, setDraftTag] = useState('');
   const kids = all.filter(v => v.parent_id === node.id).sort(bySort);
   const held = holders[node.id] || 0;
   const banned = subtreeIds(node.id, all);
 
   const submitAdd = () => {
     if (!draft.trim()) return;
-    onAdd(node.id, draft.trim());
+    onAdd(node.id, draft.trim(), draftTag.trim());
     setDraft('');
+    setDraftTag('');
     setAdding(false);
   };
+
+  const closeForms = () => { setAdding(false); setRenaming(false); setTagging(false); setMoving(false); };
 
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', flexWrap: 'wrap' }}>
+        <button onClick={() => setOpen(o => !o)} title={open ? 'Collapse' : 'Expand'} disabled={!kids.length} style={{ background: 'none', border: 'none', cursor: kids.length ? 'pointer' : 'default', color: 'var(--primary)', fontSize: '12px', padding: '0 2px', opacity: kids.length ? 1 : 0.25 }}>
+          {open ? '▼' : '▶'}
+        </button>
+
         {renaming ? (
           <>
             <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
             <button onClick={() => { onSave(node.id, { name: draft.trim() }); setRenaming(false); }} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Save</button>
             <button onClick={() => setRenaming(false)} style={treeBtn}>Cancel</button>
           </>
+        ) : tagging ? (
+          <>
+            <input autoFocus placeholder="Tag (e.g. Dept)" value={draftTag} onChange={e => setDraftTag(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+            <button onClick={() => { onSave(node.id, { tag: draftTag.trim() || null }); setTagging(false); }} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Save</button>
+            <button onClick={() => setTagging(false)} style={treeBtn}>Cancel</button>
+          </>
         ) : (
           <>
-            <span style={{ fontSize: '13.5px', fontWeight: 500 }}>{node.name}</span>
+            <span style={{ fontSize: '13.5px', fontWeight: 500 }}>{fieldLabel(node)}</span>
+            {node.tag ? <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '1px 7px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }} title={node.name}>{node.name}</span> : null}
             <span style={{ fontSize: '11.5px', color: 'var(--text-faint)' }}>
               {kids.length ? `${kids.length} below · ` : ''}{held ? `${held} user${held === 1 ? '' : 's'}` : 'unused'}
             </span>
             <span style={{ flex: 1 }} />
-            <button onClick={() => { setAdding(!adding); setRenaming(false); setMoving(false); setDraft(''); }} style={treeBtnPrimary}>+ Add</button>
-            <button onClick={() => { setRenaming(true); setAdding(false); setMoving(false); setDraft(node.name); }} style={treeBtn}>Rename</button>
-            <button onClick={() => { setMoving(!moving); setAdding(false); setRenaming(false); setMoveTo(node.parent_id || ''); }} style={treeBtn}>Move</button>
-            <button onClick={() => onReorder(node, -1)} style={treeBtn} title="Move up">↑</button>
-            <button onClick={() => onReorder(node, 1)} style={treeBtn} title="Move down">↓</button>
+            <button onClick={() => { setAdding(a => !a); setRenaming(false); setTagging(false); setMoving(false); setDraft(''); setDraftTag(''); }} style={treeBtnPrimary}>+ Add Field</button>
+            <button onClick={() => { setRenaming(true); setAdding(false); setTagging(false); setMoving(false); setDraft(node.name); }} style={treeBtn}>Rename</button>
+            <button onClick={() => { setTagging(true); setAdding(false); setRenaming(false); setMoving(false); setDraftTag(node.tag || ''); }} style={treeBtn}>Tag</button>
+            <button onClick={() => { setMoving(!moving); setAdding(false); setRenaming(false); setTagging(false); setMoveTo(node.parent_id || ''); }} style={treeBtn}>Move</button>
             <button onClick={() => onDelete(node)} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }} title="Delete">✕</button>
           </>
         )}
@@ -87,18 +107,19 @@ const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) =>
 
       {adding && (
         <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input autoFocus placeholder={`Name for the new bucket under ${node.name}`} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
+          <input autoFocus placeholder={`Name for the new field under ${node.name}`} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 180px' }} />
+          <input placeholder="Tag (optional)" value={draftTag} onChange={e => setDraftTag(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '0 1 150px' }} />
           <button onClick={() => submitAdd()} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Add</button>
-          <button onClick={() => { setAdding(false); setDraft(''); }} style={treeBtn}>Cancel</button>
+          <button onClick={() => { setAdding(false); setDraft(''); setDraftTag(''); }} style={treeBtn}>Cancel</button>
         </div>
       )}
 
       {moving && (
-        <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={moveTo} onChange={e => setMoveTo(e.target.value)} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 220px' }} title="New parent">
             <option value="">— top level —</option>
-            {all.filter(v => !banned.has(v.id)).map(v => (
-              <option key={v.id} value={v.id}>{'— '.repeat(nodeDepth(v, all))}{v.name}</option>
+            {all.filter(v => !banned.has(v.id)).sort(bySort).map(v => (
+              <option key={v.id} value={v.id}>{'— '.repeat(nodeDepth(v, all))}{fieldLabel(v)}</option>
             ))}
           </select>
           <button onClick={() => { onSave(node.id, { parent_id: moveTo || null }); setMoving(false); }} style={{ ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' }}>Move here</button>
@@ -106,38 +127,56 @@ const TreeNode = ({ node, all, holders, onSave, onAdd, onReorder, onDelete }) =>
         </div>
       )}
 
-      {kids.map(child => (
+      {open && kids.map(child => (
         <div key={child.id} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '1px dashed var(--border)' }}>
-          <TreeNode node={child} all={all} holders={holders} onSave={onSave} onAdd={onAdd} onReorder={onReorder} onDelete={onDelete} />
+          <TreeNode node={child} all={all} holders={holders} onSave={onSave} onAdd={onAdd} onDelete={onDelete} />
         </div>
       ))}
     </>
   );
 };
 
-// One role, read as a top-level category: its module access, then every bucket
+// One role, read as a top-level category: its module access, then every field
 // that hangs beneath it. Nodes come from the tree the backend plants.
-const RoleCard = ({ role, root, all, holders, onAdd, onSave, onReorder, onDelete, mods, levels, perms, onPerm, onDeleteRole }) => {
+const RoleCard = ({ role, root, all, holders, onAdd, onSave, onDelete, mods, levels, perms, onPerm, onDeleteRole, onRenameRole }) => {
   const [draft, setDraft] = useState('');
+  const [draftTag, setDraftTag] = useState('');
   const [permOpen, setPermOpen] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [editName, setEditName] = useState(role.name);
   const kids = root ? all.filter(v => v.parent_id === root.id).sort(bySort) : [];
 
-  const addBucket = () => {
+  const addField = () => {
     if (!draft.trim()) return;
-    onAdd(root.id, draft.trim());
+    onAdd(root.id, draft.trim(), draftTag.trim());
     setDraft('');
+    setDraftTag('');
   };
 
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>{role.name}</h3>
-        <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{role.key}</span>
-        <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{kids.length} bucket{kids.length === 1 ? '' : 's'}</span>
+        {renaming ? (
+          <>
+            <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onRenameRole(role, editName); setRenaming(false); } }} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '15px' }} />
+            <button onClick={() => { onRenameRole(role, editName); setRenaming(false); }} style={treeBtnPrimary}>Save</button>
+            <button onClick={() => { setEditName(role.name); setRenaming(false); }} style={treeBtn}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>{role.name}</h3>
+            <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{role.key}</span>
+          </>
+        )}
+        <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{kids.length} field{kids.length === 1 ? '' : 's'}</span>
         <span style={{ flex: 1 }} />
         <button onClick={() => setPermOpen(o => !o)} style={permOpen ? { ...treeBtn, background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : treeBtnPrimary}>
           Module Access
         </button>
+        {role.key !== 'super_admin' && (
+          <button onClick={() => { setRenaming(true); setPermOpen(false); }} style={treeBtn}>Rename</button>
+        )}
         {role.key !== 'super_admin' && (
           <button onClick={() => onDeleteRole(role)} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }}>Delete Role</button>
         )}
@@ -171,34 +210,50 @@ const RoleCard = ({ role, root, all, holders, onAdd, onSave, onReorder, onDelete
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '6px' }}>
-            <input
-              placeholder={`Add a bucket under ${role.name} (e.g. Department)`}
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBucket(); } }}
-              style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 220px', fontSize: '13px' }}
-            />
-            <button onClick={addBucket} style={{ ...treeBtnPrimary, padding: '6px 14px' }}>+ Add Bucket</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <button onClick={() => setFieldsOpen(o => !o)} title={fieldsOpen ? 'Collapse' : 'Expand'} style={{ background: 'none', border: 'none', cursor: kids.length ? 'pointer' : 'default', color: 'var(--primary)', fontSize: '13px', padding: '0 2px', opacity: kids.length ? 1 : 0.25 }}>
+              {fieldsOpen ? '▼' : '▶'}
+            </button>
+            <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Fields under this role ({kids.length})</span>
           </div>
 
-          {kids.length === 0 ? (
-            <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic', padding: '4px 0' }}>
-              No buckets yet under {role.name}.
-            </div>
-          ) : (
-            kids.map(k => (
-              <TreeNode
-                key={k.id}
-                node={k}
-                all={all}
-                holders={holders}
-                onSave={onSave}
-                onAdd={onAdd}
-                onReorder={onReorder}
-                onDelete={onDelete}
-              />
-            ))
+          {fieldsOpen && (
+            <>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
+                <input
+                  placeholder={`Add a field under ${role.name} (e.g. Department)`}
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addField(); } }}
+                  style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 200px', fontSize: '13px' }}
+                />
+                <input
+                  placeholder="Tag (optional)"
+                  value={draftTag}
+                  onChange={e => setDraftTag(e.target.value)}
+                  style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', flex: '0 1 140px', fontSize: '13px' }}
+                />
+                <button onClick={addField} style={{ ...treeBtnPrimary, padding: '6px 14px' }}>+ Add Field</button>
+              </div>
+
+              {kids.length === 0 ? (
+                <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic', padding: '4px 0' }}>
+                  No fields yet under {role.name}.
+                </div>
+              ) : (
+                kids.map(k => (
+                  <TreeNode
+                    key={k.id}
+                    node={k}
+                    all={all}
+                    holders={holders}
+                    onSave={onSave}
+                    onAdd={onAdd}
+                    onDelete={onDelete}
+                  />
+                ))
+              )}
+            </>
           )}
         </>
       )}
@@ -207,9 +262,9 @@ const RoleCard = ({ role, root, all, holders, onAdd, onSave, onReorder, onDelete
 };
 
 // A category block: it owns its roles, and every role carries its own module
-// access plus the bucket tree that splits its people further. Categories hold
+// access plus the field tree that splits its people further. Categories hold
 // nothing else, so the block stays readable folded.
-const CategoryCard = ({ cat, roles, levelValues, holders, open, onToggle, onAddRole, onAddBucket, onPatchBucket, onReorder, onDeleteBucket, onDeleteCat, onRenameCat, mods, levels, perms, onPerm, onDeleteRole }) => {
+const CategoryCard = ({ cat, roles, levelValues, holders, open, onToggle, onAddRole, onAddBucket, onPatchBucket, onDeleteBucket, onDeleteCat, onRenameCat, mods, levels, perms, onPerm, onDeleteRole, onRenameRole }) => {
   const [draft, setDraft] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState(cat.name);
@@ -283,13 +338,13 @@ const CategoryCard = ({ cat, roles, levelValues, holders, open, onToggle, onAddR
                   holders={holders}
                   onAdd={onAddBucket}
                   onSave={onPatchBucket}
-                  onReorder={onReorder}
                   onDelete={onDeleteBucket}
                   mods={mods}
                   levels={levels}
                   perms={perms}
                   onPerm={onPerm}
                   onDeleteRole={onDeleteRole}
+                  onRenameRole={onRenameRole}
                 />
               );
             })
@@ -1399,7 +1454,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     for (let i = 1; i < roleDepth(roleKey); i++) {
       const parentId = chain[i - 1] || null;
       const kids = parentId ? childrenOf(parentId) : [];
-      slots.push({ id: chain[i] || '', label: kids[0]?.name || 'Bucket', options: kids });
+      slots.push({ id: chain[i] || '', label: fieldLabel(kids[0]) || 'Field', options: kids });
     }
     return (
       <>
@@ -2337,7 +2392,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   };
 
   // Categories are the top level; roles live inside one and the backend plants a
-  // root tree node per role so sub-buckets can hang off it to any depth.
+  // root tree node per role so sub-fields can hang off it to any depth.
   const handleAddCategory = async (e) => {
     e.preventDefault();
     const key = slug(newCatName);
@@ -2361,7 +2416,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   };
 
   const handleDeleteCategory = async (cat) => {
-    if (!confirm(`Delete category "${cat.name}"? Roles and buckets in it go too.`)) return;
+    if (!confirm(`Delete category "${cat.name}"? Roles and fields in it go too.`)) return;
     const res = await apiCall(`${apiUrl}/api/user_categories/${cat.id}`, { method: 'DELETE' });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
     fetchData();
@@ -2377,6 +2432,18 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       body: JSON.stringify({ key, name: name.trim(), category: categoryKey })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return; }
+    fetchData();
+  };
+
+  // Display name only — the role key stays fixed so every permission row and
+  // user assignment already pointing at it keeps working.
+  const handleUpdateRole = async (role, name) => {
+    if (!name.trim() || name.trim() === role.name) return;
+    const res = await apiCall(`${apiUrl}/api/roles/${role.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: name.trim() })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); }
     fetchData();
   };
 
@@ -2421,12 +2488,12 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [newCatName, setNewCatName] = useState('');
   const [openCats, setOpenCats] = useState({});
 
-  const handleAddLevelUnder = async (parentId, name) => {
+  const handleAddLevelUnder = async (parentId, name, tag) => {
     const res = await apiCall(`${apiUrl}/api/category_level_values`, {
       method: 'POST',
-      body: JSON.stringify({ name, parent_id: parentId })
+      body: JSON.stringify({ name, tag, parent_id: parentId })
     });
-    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create bucket failed'); return false; }
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create field failed'); return false; }
     fetchData();
     return true;
   };
@@ -2442,17 +2509,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); return false; }
     fetchData();
     return true;
-  };
-
-  // Two-way swap: renumbering every sibling is what keeps sort_order meaningful
-  // when rows were seeded out of step.
-  const handleReorderLevelValue = async (v, dir) => {
-    const sibs = levelValues.filter(x => (x.parent_id || null) === (v.parent_id || null)).sort(bySort);
-    const i = sibs.findIndex(x => x.id === v.id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= sibs.length) return;
-    await patchLevelValue(sibs[i].id, { sort_order: sibs[j].sort_order || j });
-    await patchLevelValue(sibs[j].id, { sort_order: sibs[i].sort_order || i });
   };
 
   const handleDeleteLevelValue = async (v) => {
@@ -4094,7 +4150,7 @@ const handleAddDiscipline = async (e) => {
                       const chosen = slot.parentIds.find(pid => usersFilterLevels[pid]);
                       const chosenName = (levelValues.find(v => v.id === chosen) || {}).name || '';
                       return (
-                        <label key={i} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: gateOk ? 1 : 0.6 }}>Filter by {chosenName || (i === 0 ? 'Bucket' : 'Sub-bucket')}:
+                        <label key={i} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: gateOk ? 1 : 0.6 }}>Filter by {chosenName || (i === 0 ? 'Field' : 'Sub-field')}:
                           <select
                             disabled={!gateOk}
                             value={chosen || ''}
@@ -4109,7 +4165,7 @@ const handleAddDiscipline = async (e) => {
                             }}
                             style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: gateOk ? 'var(--bg)' : 'var(--surface)', cursor: gateOk ? 'pointer' : 'not-allowed' }}
                           >
-                            <option value="">Select {chosenName || (i === 0 ? 'Bucket' : 'Sub-bucket')}</option>
+                            <option value="">Select {chosenName || (i === 0 ? 'Field' : 'Sub-field')}</option>
                             <option value="ALL">All {chosenName || 'this level'}s</option>
                             {options.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                           </select>
@@ -6452,12 +6508,12 @@ const handleAddDiscipline = async (e) => {
             )}
 
             {/* ROLES & PERMISSIONS — a category is the top level; each role inside it
-                owns its module access, and any bucket beneath it narrows that further. */}
+                owns its module access, and any field beneath it narrows that further. */}
             {activeModule === 'roles' && (
               <div>
                 <p style={{ color: 'var(--text-soft)', marginBottom: '20px', maxWidth: '760px' }}>
                   Categories are the top level. Open one to create roles inside it and set exactly what each
-                  role can reach in every module — no access set means the module stays hidden. Buckets hung
+                  role can reach in every module — no access set means the module stays hidden. Fields hung
                   under a role split its people further, as deep as you need.
                 </p>
 
@@ -6491,7 +6547,6 @@ const handleAddDiscipline = async (e) => {
                       onAddRole={handleAddRoleInCategory}
                       onAddBucket={handleAddLevelUnder}
                       onPatchBucket={patchLevelValue}
-                      onReorder={handleReorderLevelValue}
                       onDeleteBucket={handleDeleteLevelValue}
                       onDeleteCat={() => handleDeleteCategory(cat)}
                       onRenameCat={(c, name) => handleUpdateCategory(c, name)}
@@ -6500,6 +6555,7 @@ const handleAddDiscipline = async (e) => {
                       perms={permsMap}
                       onPerm={handlePermChange}
                       onDeleteRole={handleDeleteRole}
+                      onRenameRole={handleUpdateRole}
                     />
                   ))}
               </div>
