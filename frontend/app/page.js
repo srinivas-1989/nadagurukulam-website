@@ -1321,7 +1321,9 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [newDateOfJoining, setNewDateOfJoining] = useState('');
   const [newYearComm, setNewYearComm] = useState('');
   const [userNotice, setUserNotice] = useState(null); // { tempPassword, otp, email }
-  const [userTab, setUserTab] = useState('all'); // all | pending | resets
+  const [userTab, setUserTab] = useState('all'); // all | pending | resets | roles
+  // 'roles' is no longer its own module, so any leftover navigation lands on its Users tab.
+  const goModule = (k) => { if (k === 'roles') { setActiveModule('users'); setUserTab('roles'); } else setActiveModule(k); };
   const [signupMode, setSignupMode] = useState(false);
   const [signupMsg, setSignupMsg] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
@@ -2920,7 +2922,8 @@ const handleAddDiscipline = async (e) => {
     const ped=String(c.pedagogy||''); setEditPedagogy(ped); setEditPedagogyList(ped?ped.split('\n').map(s=>s.trim()).filter(Boolean):[]);
   };
 
-  const currentModules = role ? MODULES.filter(m => perm(m.key)) : [];
+  // 'roles' has no sidebar entry of its own; it lives as a tab inside Users.
+  const currentModules = role ? MODULES.filter(m => m.key !== 'roles' && perm(m.key)) : [];
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
@@ -3627,7 +3630,7 @@ const handleAddDiscipline = async (e) => {
               };
               const week = weekCounts();
               const wkMax = Math.max(...week.map(d => d.count), 1);
-              const qa = MODULES.filter(m => canCreate(m.key) && m.key !== 'overview').slice(0, 6);
+              const qa = MODULES.filter(m => canCreate(m.key) && m.key !== 'overview' && m.key !== 'roles').slice(0, 6);
               const live = dbData.live_sessions.filter(s =>
                 (s.status === 'live' || s.status === 'scheduled') && perm('liveclasses')
               );
@@ -3923,7 +3926,7 @@ const handleAddDiscipline = async (e) => {
                           key={k}
                           className={`ndg-widget ${widthClass}${dragOver === k ? ' drag-over' : ''}${dragging === k ? ' dragging' : ''}`}
                           style={{ cursor: 'pointer' }}
-                          onClick={() => setActiveModule(k)}
+                          onClick={() => goModule(k)}
                           {...dragProps}
                         >
                           {renderCtl()}
@@ -4099,7 +4102,62 @@ const handleAddDiscipline = async (e) => {
                     ))}
                   </div>
                 )}
-    {/* Filters */}
+            {/* ROLES & PERMISSIONS — a category is the top level; each role inside it
+                owns its module access, and any field beneath it narrows that further. */}
+            {userTab === 'roles' && (
+                <div>
+                  <p style={{ color: 'var(--text-soft)', marginBottom: '20px', maxWidth: '760px' }}>
+                    Categories are the top level. Open one to create roles inside it and set exactly what each
+                    role can reach in every module — no access set means the module stays hidden. Fields hung
+                    under a role split its people further, as deep as you need.
+                  </p>
+
+                  <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input placeholder="New category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
+                  </form>
+
+                  {role === 'super_admin' && (
+                    <div style={{ background: 'var(--surface)', border: '2px solid var(--primary)', borderRadius: 'var(--radius-xl)', marginBottom: '20px', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>Super Admin</h3>
+                        <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>super_admin</span>
+                        <span style={{ fontSize: '12.5px', color: 'var(--text-soft)' }}>Full access everywhere. Only one account may hold this role.</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {userCategories
+                    .slice()
+                    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                    .map(cat => (
+                      <CategoryCard
+                        key={cat.id}
+                        cat={cat}
+                        roles={roles.filter(r => r.key !== 'super_admin' && (r.category || 'staff') === cat.key)}
+                        levelValues={levelValues}
+                        holders={valHolders}
+                        open={!!openCats[cat.id]}
+                        onToggle={() => setOpenCats(o => ({ ...o, [cat.id]: !o[cat.id] }))}
+                        onAddRole={handleAddRoleInCategory}
+                        onAddBucket={handleAddLevelUnder}
+                        onPatchBucket={patchLevelValue}
+                        onDeleteBucket={handleDeleteLevelValue}
+                        onDeleteCat={() => handleDeleteCategory(cat)}
+                        onRenameCat={(c, name) => handleUpdateCategory(c, name)}
+                        mods={MODULES}
+                        levels={LEVELS}
+                        perms={permsMap}
+                        onPerm={handlePermChange}
+                        onDeleteRole={handleDeleteRole}
+                        onRenameRole={handleUpdateRole}
+                      />
+                    ))}
+                </div>
+            )}
+
+                {userTab !== 'roles' && (
+                  <>
                 <div style={{ background: '#fdf3e0', border: '1px solid #e0d6c0', borderRadius: 'var(--radius-xl)', padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-soft)' }}>Filter by Category:
                     <select value={usersFilterCategory || ''} onChange={e => { setUsersFilterCategory(e.target.value); setUsersFilterRole(''); setUsersFilterLevels({}); setUsersFilterStatus(''); setUsersSearch(''); }} style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)' }}>
@@ -4274,6 +4332,8 @@ const handleAddDiscipline = async (e) => {
                     });
                   })()}
                 </div>
+                  </>
+                )}
 
                 {/* View Profile Modal */}
                 {viewProfileUser && (
@@ -6507,59 +6567,6 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
 
-            {/* ROLES & PERMISSIONS — a category is the top level; each role inside it
-                owns its module access, and any field beneath it narrows that further. */}
-            {activeModule === 'roles' && (
-              <div>
-                <p style={{ color: 'var(--text-soft)', marginBottom: '20px', maxWidth: '760px' }}>
-                  Categories are the top level. Open one to create roles inside it and set exactly what each
-                  role can reach in every module — no access set means the module stays hidden. Fields hung
-                  under a role split its people further, as deep as you need.
-                </p>
-
-                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="New category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
-                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
-                </form>
-
-                {role === 'super_admin' && (
-                  <div style={{ background: 'var(--surface)', border: '2px solid var(--primary)', borderRadius: 'var(--radius-xl)', marginBottom: '20px', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', flexWrap: 'wrap' }}>
-                      <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>Super Admin</h3>
-                      <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>super_admin</span>
-                      <span style={{ fontSize: '12.5px', color: 'var(--text-soft)' }}>Full access everywhere. Only one account may hold this role.</span>
-                    </div>
-                  </div>
-                )}
-
-                {userCategories
-                  .slice()
-                  .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-                  .map(cat => (
-                    <CategoryCard
-                      key={cat.id}
-                      cat={cat}
-                      roles={roles.filter(r => r.key !== 'super_admin' && (r.category || 'staff') === cat.key)}
-                      levelValues={levelValues}
-                      holders={valHolders}
-                      open={!!openCats[cat.id]}
-                      onToggle={() => setOpenCats(o => ({ ...o, [cat.id]: !o[cat.id] }))}
-                      onAddRole={handleAddRoleInCategory}
-                      onAddBucket={handleAddLevelUnder}
-                      onPatchBucket={patchLevelValue}
-                      onDeleteBucket={handleDeleteLevelValue}
-                      onDeleteCat={() => handleDeleteCategory(cat)}
-                      onRenameCat={(c, name) => handleUpdateCategory(c, name)}
-                      mods={MODULES}
-                      levels={LEVELS}
-                      perms={permsMap}
-                      onPerm={handlePermChange}
-                      onDeleteRole={handleDeleteRole}
-                      onRenameRole={handleUpdateRole}
-                    />
-                  ))}
-              </div>
-            )}
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
             {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles'].includes(activeModule) && (
