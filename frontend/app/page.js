@@ -1440,8 +1440,6 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     for (const id of heldChain(roleKey, held)) res[id] = true;
     return res;
   };
-  const hasSuperAdminUser = (dbData.users || []).some(u => u.role_key === 'super_admin');
-
   // One dropdown per depth of the role's own subtree. Each depth's options are
   // the children of the node chosen above it, so the UI never needs to know the
   // schema — adding a row in the tree manager adds a field here by itself.
@@ -4022,7 +4020,7 @@ const handleAddDiscipline = async (e) => {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Role *</label>
                                   <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                                    {roles.filter(r => !(r.key === 'super_admin' && hasSuperAdminUser)).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                                    {roles.filter(r => r.key !== 'super_admin').map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                                   </select>
                                 </div>
                               </div>
@@ -4172,7 +4170,7 @@ const handleAddDiscipline = async (e) => {
                       <option value="ALL">All Roles</option>
                       {userCategories.filter(c => !usersFilterCategory || usersFilterCategory === 'ALL' || c.key === usersFilterCategory).map(c => (
                         <optgroup key={c.key} label={c.name}>
-                          {roles.filter(r => (role === 'super_admin' || r.key !== 'super_admin') && r.category === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                          {roles.filter(r => r.key !== 'super_admin' && (r.category || 'staff') === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                         </optgroup>
                       ))}
                     </select>
