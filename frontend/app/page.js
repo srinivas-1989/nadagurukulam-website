@@ -1466,12 +1466,10 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const root = roleKey ? roleRoot(roleKey) : null;
     if (!root) return null;
     const chain = heldChain(roleKey, held);
-    // Slot 0 is the role's own node (already fixed by the role picker); each
-    // slot after it offers the children of whatever the slot above holds.
-    const slots = [{ id: chain[0] || root.id, label: 'Role', options: [root], fixed: true }];
+    const slots = [{ id: chain[0] || root.id, label: fieldLabel(root) || 'Role', options: [root], fixed: true }];
     for (let i = 1; i < roleDepth(roleKey); i++) {
-      const parentId = chain[i - 1] || null;
-      const kids = parentId ? childrenOf(parentId) : [];
+      const parentId = chain[i - 1] || root.id;
+      const kids = childrenOf(parentId);
       slots.push({ id: chain[i] || '', label: fieldLabel(kids[0]) || 'Field', options: kids });
     }
     return (
@@ -4211,37 +4209,35 @@ const handleAddDiscipline = async (e) => {
                       // that level and the union of their children.
                       const picked = i === 0
                         ? roots.map(r => r.id)
-                        : slots[i - 1].parentIds.filter(pid => usersFilterLevels[pid]);
-                      const scoped = i > 0 && picked.length && picked.every(pid => usersFilterLevels[pid] !== 'ALL');
-                      const parentIds = i === 0
-                        ? roots.map(r => r.id)
-                        : scoped ? picked : slots[i - 1].parentIds;
-                      const gateOk = parentIds.length > 0 && (i === 0 || picked.length > 0);
-                      const options = slot.kids
-                        .filter(v => parentIds.includes(v.parent_id))
-                        .filter((v, ix, arr) => arr.findIndex(x => x.name === v.name) === ix);
-                      const parentNode = levelValues.find(v => v.id === parentIds[0]);
-                      const levelName = fieldLabel(parentNode) || (i === 0 ? 'Field' : 'Sub-field');
-                      const chosen = parentIds.find(pid => usersFilterLevels[pid]) || '';
+                        : slots[i - 1].kids.map(k => k.id).filter(kid => usersFilterLevels[kid] && usersFilterLevels[kid] !== 'ALL');
+                      const gateOk = slot.kids.length > 0;
+                      const options = picked.length
+                        ? slot.kids.filter(v => picked.includes(v.parent_id))
+                        : slot.kids;
+                      // Name the branch this level descends from: the root for the first
+                      // dropdown, otherwise whatever level sits above it.
+                      const branchNode = i === 0 ? roots[0] : slots[i - 1].kids[0];
+                      const levelName = fieldLabel(branchNode) || (i === 0 ? 'Field' : 'Sub-field');
+                      const chosen = picked.find(pid => usersFilterLevels[pid]) || '';
                       return (
                         <label key={i} style={{ fontSize: '12px', color: 'var(--text-soft)', opacity: gateOk ? 1 : 0.6 }}>Filter by {levelName}:
                           <select
                             disabled={!gateOk}
                             value={chosen}
                             onChange={e => {
-                              // Each pick hangs off the one node above it, so the
-                              // branch below this level is always knowable.
+                              // Each pick hangs off the node above it, so the branch
+                              // below this level is always knowable.
                               const next = {};
                               for (let j = 0; j < i; j++) {
-                                for (const pid of slots[j].parentIds) if (usersFilterLevels[pid]) next[pid] = usersFilterLevels[pid];
+                                for (const kid of slots[j].kids) if (usersFilterLevels[keyFor(kid)]) next[keyFor(kid)] = usersFilterLevels[keyFor(kid)];
                               }
-                              if (e.target.value) next[chosen || parentIds[0]] = e.target.value;
+                              if (e.target.value) next[chosen || slots[i - 1].kids[0].id] = e.target.value;
                               setUsersFilterLevels(next); setUsersFilterStatus(''); setUsersSearch('');
                             }}
                             style={{ marginLeft: '8px', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', background: gateOk ? 'var(--bg)' : 'var(--surface)', cursor: gateOk ? 'pointer' : 'not-allowed' }}
                           >
                             <option value="">Select {levelName}</option>
-                            {parentIds.length > 1 && <option value="ALL">All {levelName}s</option>}
+                            {slots[i - 1] && slots[i - 1].kids.length > 1 && <option value="ALL">All {levelName}s</option>}
                             {options.map(v => <option key={v.id} value={v.id}>{fieldLabel(v)}</option>)}
                           </select>
                         </label>
