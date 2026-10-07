@@ -206,6 +206,100 @@ const RoleCard = ({ role, root, all, holders, onAdd, onSave, onReorder, onDelete
   );
 };
 
+// A category block: it owns its roles, and every role carries its own module
+// access plus the bucket tree that splits its people further. Categories hold
+// nothing else, so the block stays readable folded.
+const CategoryCard = ({ cat, roles, levelValues, holders, open, onToggle, onAddRole, onAddBucket, onPatchBucket, onReorder, onDeleteBucket, onDeleteCat, onRenameCat, mods, levels, perms, onPerm, onDeleteRole }) => {
+  const [draft, setDraft] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [editName, setEditName] = useState(cat.name);
+
+  const addRole = () => {
+    if (!draft.trim()) return;
+    onAddRole(cat.key, draft.trim());
+    setDraft('');
+  };
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', marginBottom: '12px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', flexWrap: 'wrap' }}>
+        <button onClick={onToggle} title={open ? 'Collapse' : 'Expand'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: '13px', padding: '0 2px' }}>
+          {open ? '\u25bc' : '\u25b6'}
+        </button>
+
+        {renaming ? (
+          <>
+            <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onRenameCat(cat, editName); setRenaming(false); } }} style={{ padding: '5px 9px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '14px' }} />
+            <button onClick={() => { onRenameCat(cat, editName); setRenaming(false); }} style={treeBtnPrimary}>Save</button>
+            <button onClick={() => { setRenaming(false); setEditName(cat.name); }} style={treeBtn}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <b style={{ color: 'var(--primary)', fontSize: '15px' }}>{cat.name}</b>
+            <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>{cat.key}</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{roles.length} role{roles.length === 1 ? '' : 's'}</span>
+          </>
+        )}
+
+        <span style={{ flex: 1 }} />
+        <button onClick={() => { setRenaming(true); setEditName(cat.name); }} style={treeBtn}>Rename</button>
+        <button onClick={onDeleteCat} style={{ ...treeBtn, borderColor: 'var(--primary)', color: 'var(--primary)' }}>Delete</button>
+      </div>
+
+      {open && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+            <input
+              placeholder={`New role in ${cat.name} (e.g. Guest Faculty)`}
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRole(); } }}
+              style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '4px', flex: '1 1 220px', fontSize: '13px' }}
+            />
+            <button onClick={addRole} style={{ ...treeBtnPrimary, padding: '6px 14px' }}>+ Add Role</button>
+          </div>
+
+          {roles.length === 0 ? (
+            <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', fontStyle: 'italic', padding: '4px 0' }}>
+              No roles in {cat.name} yet.
+            </div>
+          ) : (
+            roles.map(r => {
+              const root = levelValues.find(v => v.role_key === r.key && !v.parent_id) || null;
+              const ids = new Set(root ? [root.id] : []);
+              let grew = true;
+              while (grew) {
+                grew = false;
+                levelValues.forEach(v => { if (v.parent_id && ids.has(v.parent_id) && !ids.has(v.id)) { ids.add(v.id); grew = true; } });
+              }
+              const subtree = levelValues.filter(v => ids.has(v.id));
+
+              return (
+                <RoleCard
+                  key={r.key}
+                  role={r}
+                  root={root}
+                  all={subtree}
+                  holders={holders}
+                  onAdd={onAddBucket}
+                  onSave={onPatchBucket}
+                  onReorder={onReorder}
+                  onDelete={onDeleteBucket}
+                  mods={mods}
+                  levels={levels}
+                  perms={perms}
+                  onPerm={onPerm}
+                  onDeleteRole={onDeleteRole}
+                />
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UserPersonalTab = ({ userId, dbData }) => {
   const u = dbData?.users?.find(user => user.id === userId);
   return (
@@ -2242,19 +2336,48 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     setNewEnqName(''); setNewEnqContact(''); setNewEnqMessage(''); fetchData();
   };
 
-  // Roles & Permissions — every role is a top-level category. It carries its own
-  // module access, and the backend plants a root tree node for it so sub-buckets
-  // can hang off it to any depth.
-  const handleAddRole = async (e) => {
+  // Categories are the top level; roles live inside one and the backend plants a
+  // root tree node per role so sub-buckets can hang off it to any depth.
+  const handleAddCategory = async (e) => {
     e.preventDefault();
-    const key = slug(newRoleName);
+    const key = slug(newCatName);
+    if (!key) return;
+    const res = await apiCall(`${apiUrl}/api/user_categories`, {
+      method: 'POST',
+      body: JSON.stringify({ key, name: newCatName.trim() })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create category failed'); return; }
+    setNewCatName(''); fetchData();
+  };
+
+  const handleUpdateCategory = async (cat, name) => {
+    if (!name.trim() || name.trim() === cat.name) return;
+    const res = await apiCall(`${apiUrl}/api/user_categories/${cat.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: name.trim() })
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Update failed'); }
+    fetchData();
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!confirm(`Delete category "${cat.name}"? Roles and buckets in it go too.`)) return;
+    const res = await apiCall(`${apiUrl}/api/user_categories/${cat.id}`, { method: 'DELETE' });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Delete failed'); }
+    fetchData();
+  };
+
+  // The category travels on create, so a new role lands in the block it was
+  // typed into instead of silently defaulting to staff.
+  const handleAddRoleInCategory = async (categoryKey, name) => {
+    const key = slug(name);
     if (!key) return;
     const res = await apiCall(`${apiUrl}/api/roles`, {
       method: 'POST',
-      body: JSON.stringify({ key, name: newRoleName.trim() })
+      body: JSON.stringify({ key, name: name.trim(), category: categoryKey })
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || 'Create role failed'); return; }
-    setNewRoleName(''); fetchData();
+    fetchData();
   };
 
   const handleDeleteRole = async (r) => {
@@ -2293,10 +2416,10 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     fetchData();
   };
 
-  // Roles are the top-level categories. Each one carries its own module access,
-  // and its tree of sub-buckets hangs off the root node the backend plants.
+  // Categories are the top level and every role hangs off exactly one.
   const slug = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const [newRoleName, setNewRoleName] = useState('');
+  const [newCatName, setNewCatName] = useState('');
+  const [openCats, setOpenCats] = useState({});
 
   const handleAddLevelUnder = async (parentId, name) => {
     const res = await apiCall(`${apiUrl}/api/category_level_values`, {
@@ -6328,50 +6451,47 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
 
-            {/* ROLES & PERMISSIONS — every role is a top-level category: it owns its
-                module access, and any bucket hung beneath it narrows that further. */}
+            {/* ROLES & PERMISSIONS — a category is the top level; each role inside it
+                owns its module access, and any bucket beneath it narrows that further. */}
             {activeModule === 'roles' && (
               <div>
                 <p style={{ color: 'var(--text-soft)', marginBottom: '20px', maxWidth: '760px' }}>
-                  Each role is a category of its own. It decides what that role can reach in every module —
-                  no access set means the module stays hidden — and any bucket you hang beneath it splits
-                  the people holding it further, as deep as you need.
+                  Categories are the top level. Open one to create roles inside it and set exactly what each
+                  role can reach in every module — no access set means the module stays hidden. Buckets hung
+                  under a role split its people further, as deep as you need.
                 </p>
 
-                <form onSubmit={handleAddRole} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input placeholder="New role name (e.g. Guest Faculty)" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
-                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Role</button>
+                <form onSubmit={handleAddCategory} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input placeholder="New category name (e.g. Volunteers)" value={newCatName} onChange={e => setNewCatName(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 240px' }} />
+                  <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
                 </form>
 
-                {roles.map(r => {
-                  const root = levelValues.find(v => v.role_key === r.key && !v.parent_id) || null;
-                  const ids = new Set(root ? [root.id] : []);
-                  let grew = true;
-                  while (grew) {
-                    grew = false;
-                    levelValues.forEach(v => { if (v.parent_id && ids.has(v.parent_id) && !ids.has(v.id)) { ids.add(v.id); grew = true; } });
-                  }
-                  const subtree = levelValues.filter(v => ids.has(v.id));
-
-                  return (
-                    <RoleCard
-                      key={r.key}
-                      role={r}
-                      root={root}
-                      all={subtree}
+                {userCategories
+                  .slice()
+                  .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                  .map(cat => (
+                    <CategoryCard
+                      key={cat.id}
+                      cat={cat}
+                      roles={roles.filter(r => (r.category || 'staff') === cat.key)}
+                      levelValues={levelValues}
                       holders={valHolders}
-                      onAdd={handleAddLevelUnder}
-                      onSave={patchLevelValue}
+                      open={!!openCats[cat.id]}
+                      onToggle={() => setOpenCats(o => ({ ...o, [cat.id]: !o[cat.id] }))}
+                      onAddRole={handleAddRoleInCategory}
+                      onAddBucket={handleAddLevelUnder}
+                      onPatchBucket={patchLevelValue}
                       onReorder={handleReorderLevelValue}
-                      onDelete={handleDeleteLevelValue}
+                      onDeleteBucket={handleDeleteLevelValue}
+                      onDeleteCat={() => handleDeleteCategory(cat)}
+                      onRenameCat={(c, name) => handleUpdateCategory(c, name)}
                       mods={MODULES}
                       levels={LEVELS}
                       perms={permsMap}
                       onPerm={handlePermChange}
                       onDeleteRole={handleDeleteRole}
                     />
-                  );
-                })}
+                  ))}
               </div>
             )}
 
