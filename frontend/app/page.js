@@ -4058,7 +4058,7 @@ const handleAddDiscipline = async (e) => {
                       <option value="ALL">All Roles</option>
                       {userCategories.filter(c => !usersFilterCategory || usersFilterCategory === 'ALL' || c.key === usersFilterCategory).map(c => (
                         <optgroup key={c.key} label={c.name}>
-                          {roles.filter(r => r.category === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+                          {roles.filter(r => (role === 'super_admin' || r.key !== 'super_admin') && r.category === c.key).map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
                         </optgroup>
                       ))}
                     </select>
@@ -6466,6 +6466,16 @@ const handleAddDiscipline = async (e) => {
                   <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Add Category</button>
                 </form>
 
+                {role === 'super_admin' && (
+                  <div style={{ background: 'var(--surface)', border: '2px solid var(--primary)', borderRadius: 'var(--radius-xl)', marginBottom: '20px', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '16px' }}>Super Admin</h3>
+                      <span style={{ fontSize: '11px', background: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>super_admin</span>
+                      <span style={{ fontSize: '12.5px', color: 'var(--text-soft)' }}>Full access everywhere. Only one account may hold this role.</span>
+                    </div>
+                  </div>
+                )}
+
                 {userCategories
                   .slice()
                   .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
@@ -6473,7 +6483,7 @@ const handleAddDiscipline = async (e) => {
                     <CategoryCard
                       key={cat.id}
                       cat={cat}
-                      roles={roles.filter(r => (r.category || 'staff') === cat.key)}
+                      roles={roles.filter(r => r.key !== 'super_admin' && (r.category || 'staff') === cat.key)}
                       levelValues={levelValues}
                       holders={valHolders}
                       open={!!openCats[cat.id]}

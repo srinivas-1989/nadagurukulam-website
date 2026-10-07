@@ -1030,9 +1030,26 @@ const guard = async (table, id, body = {}, req = null) => {
     const { data: target } = await supabase.from('users').select('role_key').eq('id', targetUserId).maybeSingle();
     if (target?.role_key === 'super_admin') return 'Super Admin already has Full access everywhere.';
     if (writer.role_key !== 'super_admin') {
-      const writerLevel = await getAccessLevel(writer, 'users');
+      // Nobody edits their own access — otherwise a delegated admin could
+      // promote themselves past whatever the Super Admin actually gave them.
+      if (String(targetUserId) === String(writer.id))
+        return 'You cannot change your own permissions. Ask a Super Admin.';
+      // Delegation is bounded: an admin may hand out only what they hold
+      // themselves, module by module, so access can never be laundered upward.
+      const moduleKey = payload?.module_key
+        || (await supabase.from('user_permissions').select('module_key').eq('id', id).single()).data?.module_key;
+      const [writerLevel, writerGrant] = await Promise.all([
+        getAccessLevel(writer, 'users'),
+        moduleKey
+          ? supabase.from('role_permissions').select('access_level').eq('role_key', writer.role_key).eq('module_key', moduleKey).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
       if (LEVEL_ORDER[writerLevel] < LEVEL_ORDER['Full'])
         return 'Only Super Admin can grant permissions to other users.';
+      const ceiling = Math.max(LEVEL_ORDER[writerGrant.data?.access_level] ?? 0, LEVEL_ORDER[await getAccessLevel(writer, moduleKey)] ?? 0);
+      const asked = payload?.access_level;
+      if (asked && LEVEL_ORDER[asked] > ceiling)
+        return `You can grant at most ${Object.keys(LEVEL_ORDER).find(k => LEVEL_ORDER[k] === ceiling) || 'no access'} on ${moduleKey} — that is all you hold there.`;
     }
   }
   if (table === 'users' && id) {
