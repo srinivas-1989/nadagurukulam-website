@@ -38,7 +38,10 @@ function genTempPassword() {
   return crypto.randomBytes(9).toString('base64url').slice(0, 12);
 }
 function genOTP() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // CSPRNG: Math.random() is predictable, which weakens a 6-digit code that
+  // guards login and password change.
+  const n = crypto.randomInt(0, 1000000);
+  return String(n).padStart(6, '0');
 }
 let mailer = null;
 function getMailer() {
@@ -118,14 +121,14 @@ app.get('/api/health', (req, res) => res.json({ ok: true, cms: mongoose.connecti
 // Public feeds — no auth; only published rows. Ponytail: if disciplines need
 // draft/published later, add status col + filter here.
 app.get('/api/public/events', async (req, res) => {
-  try { const { data, error } = await supabase.from('events').select('*').eq('status', 'published').order('date', { ascending: false }); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
+  try { const { data, error } = await supabase.from('events').select('id, title, description, date, venue').eq('status', 'published').order('date', { ascending: false }); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/public/jobs', async (req, res) => {
-  try { const { data, error } = await supabase.from('jobs').select('*').eq('status', 'published').order('created_at', { ascending: false }); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
+  try { const { data, error } = await supabase.from('jobs').select('id, title, department, type, description, created_at').eq('status', 'published').order('created_at', { ascending: false }); if (error) throw error; res.json(data || []); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/public/disciplines', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('disciplines').select('*, program_categories(name, duration_value, duration_unit)').order('name');
+    const { data, error } = await supabase.from('disciplines').select('id, name, description, levels, structure_mode, year_count, semesters_per_year, month_count, period_minutes, category_id, program_categories(name, duration_value, duration_unit)').order('name');
     if (error) throw error;
     const rows = (data || []).map(r => ({
       ...r,
@@ -194,6 +197,14 @@ app.post('/api/public/signup', async (req, res) => {
     const { name, email, phone, password, role_key, program_id, roll_no, year_of_commencement } = req.body;
     if (!name || !email || !password || !role_key) return res.status(400).json({ error: 'Missing required fields' });
     const emailLower = String(email).trim().toLowerCase();
+
+    // Self-signup picks the applicant role only. Any elevated or administrative
+    // key is refused here — otherwise anyone can POST role_key:'super_admin'
+    // and wait for approval. Role changes go through Super Admin approval.
+    const SELF_SIGNUP_ROLES = new Set(['diploma', 'university', 'certificate']);
+    if (!SELF_SIGNUP_ROLES.has(String(role_key))) {
+      return res.status(400).json({ error: 'That role cannot be self-assigned. Choose diploma, university or certificate.' });
+    }
 
     // Create Auth User
     const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
@@ -1192,7 +1203,9 @@ app.post('/api/auth/request-otp', async (req, res) => {
       return res.status(429).json({ error: 'Too many requests — try again shortly' });
     }
     const { data: user } = await supabase.from('users').select('id, email').ilike('email', email).single();
-    if (!user) return res.status(404).json({ error: 'No user with that email' });
+    // Same response either way, so this endpoint can't be used to discover
+    // which emails have accounts.
+    if (!user) return res.json({ ok: true, emailSent: false });
     await supabase.from('user_otps').update({ consumed: true }).eq('user_id', user.id).eq('consumed', false);
     const otp = genOTP();
     const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -1210,10 +1223,17 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const otp = String(req.body.otp || '').trim();
     if (!email || !otp) return res.status(400).json({ error: 'email and otp are required' });
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    // A 6-digit code is only ~20 bits; without a guess limit it is brute-forceable.
+    if (!checkOtpRate(`ver:${ip}`, 10, 60000) || !checkOtpRate(`ver:${email}`, 5, 60000)) {
+      return res.status(429).json({ error: 'Too many attempts — try again shortly' });
+    }
     const { data: user } = await supabase.from('users').select('id').ilike('email', email).single();
     if (!user) return res.status(404).json({ error: 'No user with that email' });
     const { data: row } = await supabase.from('user_otps').select('id, expires_at, consumed').eq('user_id', user.id).eq('otp_code', otp).eq('consumed', false).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).single();
     if (!row) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    // Not consumed here: this endpoint validates only. The consuming step is
+    // first-password-change, so a UI can pre-check a code before submitting it.
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1701,6 +1721,9 @@ app.post('/api/admin/users/:id/reject-signup', authMiddleware, async (req, res) 
 // KYC endpoints
 app.get('/api/users/:id/kyc', authMiddleware, async (req, res) => {
   try {
+    const isSelf = String(req.auth.profile.id) === String(req.params.id);
+    const level = await getAccessLevel(req.auth.profile, 'users');
+    if (!isSelf && !canAccess(level, 'update')) return res.status(403).json({ error: 'Unauthorized to view KYC documents' });
     const { data, error } = await supabase.from('user_kyc_docs').select('*').eq('user_id', req.params.id);
     if (error) throw error;
     res.json(data || []);
@@ -1709,6 +1732,9 @@ app.get('/api/users/:id/kyc', authMiddleware, async (req, res) => {
 
 app.post('/api/users/:id/kyc', authMiddleware, async (req, res) => {
   try {
+    const isSelf = String(req.auth.profile.id) === String(req.params.id);
+    const level = await getAccessLevel(req.auth.profile, 'users');
+    if (!isSelf && !canAccess(level, 'update')) return res.status(403).json({ error: 'Unauthorized to submit KYC documents' });
     const { doc_type, doc_number, file_url } = req.body;
     if (!doc_type || !doc_number || !file_url) return res.status(400).json({ error: 'doc_type, doc_number, and file_url are required' });
     const { data, error } = await supabase.from('user_kyc_docs').insert([{ user_id: req.params.id, doc_type, doc_number, file_url }]).select();
@@ -1719,6 +1745,14 @@ app.post('/api/users/:id/kyc', authMiddleware, async (req, res) => {
 
 app.delete('/api/user-kyc-docs/:id', authMiddleware, async (req, res) => {
   try {
+    const level = await getAccessLevel(req.auth.profile, 'users');
+    const { data: doc } = await supabase.from('user_kyc_docs').select('user_id').eq('id', req.params.id).single();
+    if (!doc) return res.status(404).json({ error: 'KYC document not found' });
+    const isOwner = String(doc.user_id) === String(req.auth.profile.id);
+    // A user withdraws their own document; deleting anyone else's needs Full.
+    if (!isOwner && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER.Full) {
+      return res.status(403).json({ error: 'Full on Users required to delete another user KYC doc' });
+    }
     const { error } = await supabase.from('user_kyc_docs').delete().eq('id', req.params.id);
     if (error) throw error;
     res.json({ ok: true });
@@ -2176,9 +2210,11 @@ app.post('/api/curriculum/parse', authMiddleware, (req, res, next) => {
 });
 
 // Curriculum detailed syllabus content endpoint
-app.get('/api/curriculum-content/:key', async (req, res) => {
+app.get('/api/curriculum-content/:key', authMiddleware, async (req, res) => {
   try {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
+    const level = await getAccessLevel(req.auth.profile, 'curriculum');
+    if (!canAccess(level, 'list')) return res.status(403).json({ error: 'You do not have View access for curriculum content.' });
     const doc = await CurriculumContent.findOne({ key: req.params.key }).lean();
     res.json(doc ? { key: doc.key, content: doc.content } : { key: req.params.key, content: null });
   } catch (err) { res.status(500).json({ error: err.message }); }

@@ -1244,7 +1244,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
 
   const loadSyllabus = (courseId) => {
     if (!courseId) return;
-    fetch(`${apiUrl}/api/curriculum-content/course_${courseId}`)
+    apiCall(`${apiUrl}/api/curriculum-content/course_${courseId}`)
       .then(r => r.json())
       .then(d => setSyllabusContent(d.content))
       .catch(() => setSyllabusContent(null));
