@@ -1295,6 +1295,26 @@ app.post('/api/roles', authMiddleware, rolesCreate);
 app.put('/api/roles/:id', authMiddleware, rolesUpdate);
 app.delete('/api/roles/:id', authMiddleware, rolesDelete);
 
+// Course Registrations Status update (drop vs delete preservation)
+app.put('/api/course_registrations/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const level = await getAccessLevel(req.auth.profile, 'curriculum');
+    const { data: cur } = await supabase.from('course_registrations').select('*').eq('id', req.params.id).maybeSingle();
+    if (!cur) return res.status(404).json({ error: 'Registration not found' });
+    // A student may only drop their own registration; Manage+ can set any status.
+    const isOwner = cur.student_id === req.auth?.profile?.id;
+    if (!isOwner && !canAccess(level, 'update')) return res.status(403).json({ error: 'You do not have Manage access for this module.' });
+    const next = String(req.body.status || '');
+    if (!['registered', 'completed', 'dropped'].includes(next)) {
+      return res.status(400).json({ error: 'status must be one of: registered, completed, dropped' });
+    }
+    const { data, error } = await supabase.from('course_registrations').update({ status: next }).eq('id', req.params.id).select().single();
+    if (error) throw error;
+    await recordAudit(req, { action: 'update', entityType: 'course_registrations', entityId: req.params.id, summary: `Course registration status ${cur.status} → ${next}`, previousValue: cur, newValue: data });
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Enrolments: Student → Batch membership. Gates on the `batches` module
 // because the roster is the batch's own responsibility. Membership changes
 // are never a hard delete — the row is kept and marked 'dropped' so historical

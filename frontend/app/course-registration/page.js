@@ -56,8 +56,11 @@ export default function CourseRegistrationPage() {
   }
 
   async function drop(regId) {
-    if (!confirm('Drop this course registration?')) return;
-    const res = await apiCall(`/api/course_registrations/${regId}`, { method: 'DELETE' });
+    if (!confirm('Drop this course registration? The row is kept for historical records and no longer counts toward capacity.')) return;
+    const res = await apiCall(`/api/course_registrations/${regId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'dropped' })
+    });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       setError(j.error || 'Could not drop registration.');
@@ -101,18 +104,16 @@ export default function CourseRegistrationPage() {
       {openOfferings.map(o => {
         const course = courses.find(c => c.id === o.course_id);
         const term = terms.find(t => t.id === o.term_id);
-        const registeredCount = myRegs.filter(r => r.course_offering_id === o.id && r.status === 'registered').length;
-        const isFull = o.capacity && registeredCount >= o.capacity;
         return (
           <div key={o.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <strong style={{ fontSize: '14px' }}>{course ? `${course.code} - ${course.name}` : 'Unknown Course'}</strong>
               <div style={{ color: 'var(--text-faint)', fontSize: '12px' }}>
-                {term?.name || 'No term'}{o.capacity ? ` · ${registeredCount}/${o.capacity} enrolled` : ''}
+                {term?.name || 'No term'}{o.capacity ? ` · seats: ${o.capacity}` : ''}
               </div>
             </div>
-            <button disabled={isFull} onClick={() => register(o.id)} style={{ background: isFull ? 'var(--bg)' : 'var(--primary)', color: isFull ? 'var(--text-faint)' : '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: isFull ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
-              {isFull ? 'Full' : 'Register'}
+            <button onClick={() => register(o.id)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+              Register
             </button>
           </div>
         );
