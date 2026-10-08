@@ -9,12 +9,14 @@ const btnPrimary = { ...btn, background: 'var(--primary)', color: '#fff', border
 
 export default function AccessControlPage() {
   const [users, setUsers] = useState([]);
+  const [sections, setSections] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [userId, setUserId] = useState('');
   const [sectionId, setSectionId] = useState('');
 
   useEffect(() => {
     supabase.from('users').select('id, name, role_key').order('name').then(({ data }) => setUsers(data || []));
+    supabase.from('evaluation_sections').select('id, title').then(({ data }) => setSections(data || []));
     supabase.from('dossier_section_assignments').select('*, users(name), evaluation_sections(title)').order('created_at').then(({ data }) => setAssignments(data || []));
   }, []);
 
