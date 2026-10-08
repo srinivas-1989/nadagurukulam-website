@@ -24,9 +24,12 @@ insert into public.role_permissions (role_key, module_key, access_level)
 select 'super_admin', m, 'Full' from unnest(array[
   'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans',
   'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries',
-  'activities', 'roles'
+  'performances', 'roles'
 ]) as m
 on conflict (role_key, module_key) do nothing;
+
+-- module renamed: co-curricular activities are now "performances"
+delete from public.role_permissions where module_key = 'activities';
 
 alter table public.role_permissions enable row level security;
 insert into public.role_permissions (role_key, module_key, access_level)

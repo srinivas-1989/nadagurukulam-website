@@ -281,22 +281,22 @@ create policy "Super Admin can manage enquiries"
 -- ============================================================================
 -- ACTIVITIES
 -- ============================================================================
-drop policy if exists "Activities readable by batch members" on public.activities;
-create policy "Activities readable by batch members"
-  on public.activities for select
+drop policy if exists "Student performances readable by batch members" on public.student_performances;
+create policy "Student performances readable by batch members"
+  on public.student_performances for select
   to authenticated
   using (
     batch_id = any(public.my_batch_ids())
     or public.my_role_key() in ('teacher', 'admin', 'super_admin')
-    or public.has_permission('activities', array['View','Manage','Full'])
+    or public.has_permission('performances', array['View','Manage','Full'])
   );
 
-drop policy if exists "Super Admin / Admin can manage activities" on public.activities;
-create policy "Super Admin / Admin can manage activities"
-  on public.activities for all
+drop policy if exists "Super Admin / Admin can manage student performances" on public.student_performances;
+create policy "Super Admin / Admin can manage student performances"
+  on public.student_performances for all
   to authenticated
-  using (public.has_permission('activities', array['Manage','Full']))
-  with check (public.has_permission('activities', array['Manage','Full']));
+  using (public.has_permission('performances', array['Manage','Full']))
+  with check (public.has_permission('performances', array['Manage','Full']));
 
 -- ============================================================================
 -- DOCUMENTS & DOCUMENT ACCESS LOG
@@ -822,7 +822,7 @@ create policy "Relationships readable by student mentor or roles manager"
     or public.has_permission('roles', array['View','Manage','Full'])
   );
 
-drop policy if exists "Roles managers can manage student relationships" on public.student_relationships;
+drop policy if exists "Roles managers manage student relationships" on public.student_relationships;
 create policy "Roles managers manage student relationships"
   on public.student_relationships for all
   to authenticated
@@ -843,7 +843,7 @@ create policy "Progress notes readable by author student or mentor"
     or (not is_confidential and public.has_permission('roles', array['View','Manage','Full']))
   );
 
-drop policy if exists "Roles managers can manage mentor progress notes" on public.mentor_progress_notes;
+drop policy if exists "Roles managers manage mentor progress notes" on public.mentor_progress_notes;
 create policy "Roles managers manage mentor progress notes"
   on public.mentor_progress_notes for all
   to authenticated

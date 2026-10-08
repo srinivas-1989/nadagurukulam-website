@@ -84,7 +84,7 @@ async function testCrudPermissions() {
     users: 'users', curriculum: 'curriculum', batches: 'batches',
     timetable: 'timetable', liveclasses: 'liveclasses', lessonplans: 'lessonplans',
     assignments: 'assignments', feedback: 'feedback', events: 'events',
-    jobs: 'jobs', enquiries: 'enquiries', activities: 'activities',
+    jobs: 'jobs', enquiries: 'enquiries', performances: 'performances',
     courses: 'curriculum', course_modules: 'curriculum',
     roles: 'roles', role_permissions: 'roles'
   };

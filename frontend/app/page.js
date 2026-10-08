@@ -578,7 +578,7 @@ export default function Home() {
     { key: 'events', name: 'Events', desc: 'Staff drafts, Admin publishes to public site.' },
     { key: 'jobs', name: 'Jobs', desc: 'Faculty & Staff postings, applicant tracking.' },
     { key: 'enquiries', name: 'Enquiries', desc: 'Admissions & general enquiries inbox.' },
-    { key: 'activities', name: 'Activities', desc: 'Competitions, performances, achievements.' },
+    { key: 'performances', name: 'Performances', desc: 'Co-curricular performances, competitions, achievements.' },
     { key: 'projects', name: 'Projects', desc: 'Student portfolio — works beyond curriculum.' },
     { key: 'certificates', name: 'Certificates', desc: 'Institutional + external achievements.' },
     { key: 'roles', name: 'Roles', desc: 'Create roles and set what each can do in every module.' },
@@ -604,7 +604,7 @@ export default function Home() {
     events: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M12 12.5l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></>,
     jobs: <><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M15.5 21V6a2 2 0 0 0-2-2h-3a2 2 0 0 0-2 2v15" /><path d="M2 12.5h20" /></>,
     enquiries: <><path d="M3 5.5h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" /><path d="M2.5 7l9.5 6.5L21.5 7" /></>,
-    activities: <><circle cx="12" cy="9" r="5.5" /><path d="M8.6 13.6 7 22l5-2.8 5 2.8-1.6-8.4" /><path d="M12 6.5l1 2 2.2.3-1.6 1.6.4 2.2-2-1-2 1 .4-2.2L8.8 8.8l2.2-.3z" /></>,
+    performances: <><circle cx="12" cy="9" r="5.5" /><path d="M8.6 13.6 7 22l5-2.8 5 2.8-1.6-8.4" /><path d="M12 6.5l1 2 2.2.3-1.6 1.6.4 2.2-2-1-2 1 .4-2.2L8.8 8.8l2.2-.3z" /></>,
     projects: <><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /><path d="M12 11.5v5M9.5 14h5" /></>,
     certificates: <><circle cx="12" cy="8.5" r="6" /><path d="M8.6 13.4 7.4 22.5 12 20l4.6 2.5-1.2-9.1" /><path d="M10 8.5l1.4 1.4 2.6-2.6" /></>,
     roles: <><path d="M12 22s8-4 8-10V5.2L12 2 4 5.2V12c0 6 8 10 8 10z" /><path d="M9.2 12.2l2 2 3.6-3.8" /></>,
@@ -643,7 +643,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const [dbData, setDbData] = useState({
     users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
-    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
+    live_sessions: [], lesson_plans: [], assignments: [], feedback: [], performances: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
     class_entries: [], class_confirmations: [], academic_years: [], terms: [], course_offerings: [], course_registrations: [], enrollments: []
   });
   const [roles, setRoles] = useState([]);
@@ -1076,7 +1076,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     events: { label: 'Events', sub: d => `${(d.events || []).filter(e => e.status === 'published').length} published` },
     jobs: { label: 'Jobs', sub: d => `${(d.jobs || []).filter(j => j.status === 'open').length} open` },
     enquiries: { label: 'Enquiries', sub: d => `${(d.enquiries || []).filter(e => e.status === 'new').length} new` },
-    activities: { label: 'Activities', sub: () => 'competitions & achievements' },
+    performances: { label: 'Performances', sub: () => 'co-curricular performances' },
     projects: { label: 'Projects', sub: () => 'student portfolio' },
     certificates: { label: 'Certificates', sub: () => 'issued achievements' },
     roles: { label: 'Roles', sub: d => `${(d.role_permissions || []).length} permission rows` },
@@ -1299,7 +1299,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
         ['users', 'users'], ['curriculum', 'curriculum'], ['batches', 'batches'], ['timetable', 'timetable'], ['timetable_periods', 'timetable_periods'],
         ['events', 'events'], ['enquiries', 'enquiries'], ['jobs', 'jobs'], ['courses', 'courses'],
         ['course_modules', 'course_modules'], ['course_module_topics', 'course_module_topics'], ['examination_types', 'examination_types'], ['program_categories', 'program_categories'], ['course_syllabi', 'course_syllabi'], ['liveclasses', 'live_sessions'],
-        ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
+        ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['performances', 'student_performances'], ['projects', 'projects'], ['certificates', 'certificates'],
         ['role_permissions', 'role_permissions'], ['user_permissions', 'user_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions'],
         ['academic_years', 'academic_years'], ['terms', 'terms'],
         ['course_offerings', 'course_offerings'], ['course_registrations', 'course_registrations'], ['enrollments', 'enrollments']
@@ -1984,7 +1984,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   const handleAddActivity = async (e) => {
     e.preventDefault();
     if (!newActivityBatch || !newActivityTitle || !newActivityDate) return;
-    await apiCall(`${apiUrl}/api/activities`, {
+    await apiCall(`${apiUrl}/api/student_performances`, {
       method: 'POST',
       body: JSON.stringify({ batch_id: newActivityBatch, title: newActivityTitle, category: newActivityCategory, date: newActivityDate, description: newActivityDesc })
     });
@@ -5760,9 +5760,9 @@ const handleAddDiscipline = async (e) => {
             )}
 
             {/* ACTIVITIES MODULE */}
-            {activeModule === 'activities' && (
+            {activeModule === 'performances' && (
               <div>
-                {canCreate('activities') && (
+                {canCreate('performances') && (
                   <form onSubmit={handleAddActivity} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <select value={newActivityBatch} onChange={e => setNewActivityBatch(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 200px' }}>
                       <option value="">Select Batch...</option>
@@ -5777,12 +5777,12 @@ const handleAddDiscipline = async (e) => {
                     </select>
                     <input type="date" value={newActivityDate} onChange={e => setNewActivityDate(e.target.value)} required style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} />
                     <textarea placeholder="Description / Evidence" value={newActivityDesc} onChange={e => setNewActivityDesc(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
-                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>{perm('activities') === 'Submits' ? 'Submit Activity' : 'Add Activity'}</button>
+                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>{perm('performances') === 'Submits' ? 'Submit Performance' : 'Add Performance'}</button>
                   </form>
                 )}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-                  {dbData.activities.length === 0 ? (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No activities logged yet.</div>
+                  {dbData.performances.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No performances logged yet.</div>
                   ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                       <thead>
@@ -5791,7 +5791,7 @@ const handleAddDiscipline = async (e) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {dbData.activities.map(a => {
+                        {dbData.performances.map(a => {
                           const batch = dbData.batches.find(b => b.id === a.batch_id);
                           return (
                             <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -5801,7 +5801,7 @@ const handleAddDiscipline = async (e) => {
                               <td style={{ padding: '12px' }}>{a.date}</td>
                               <td style={{ padding: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.description}</td>
                               <td style={{ padding: '12px' }}>
-                                {canAdmin('activities') && <button onClick={() => handleDelete('activities', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
+                                {canAdmin('performances') && <button onClick={() => handleDelete('student_performances', a.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
                               </td>
                             </tr>
                           );
@@ -6702,7 +6702,7 @@ const handleAddDiscipline = async (e) => {
 
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration', 'lms'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration', 'lms'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module

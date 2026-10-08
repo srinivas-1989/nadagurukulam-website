@@ -357,7 +357,7 @@ const API_TO_MODULE = {
   users: 'users', curriculum: 'curriculum', batches: 'batches',
   timetable: 'timetable', liveclasses: 'liveclasses', lessonplans: 'lessonplans',
   assignments: 'assignments', feedback: 'feedback', events: 'events',
-  jobs: 'jobs', enquiries: 'enquiries', activities: 'activities',
+  jobs: 'jobs', enquiries: 'enquiries', performances: 'performances',
   lessons: 'lms', resources: 'lms', lesson_activities: 'lms',
   learning_outcomes: 'lms', outcome_mappings: 'lms',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
@@ -374,7 +374,7 @@ const API_TO_MODULE = {
 // Reverse: table name → module_key (crud is instantiated with table names)
 const TABLE_TO_MODULE = {
   disciplines: 'curriculum', timetable_slots: 'timetable', timetable_periods: 'timetable',
-  live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
+  live_sessions: 'liveclasses', lesson_plans: 'lessonplans', student_performances: 'performances',
   lessons: 'lms', resources: 'lms', lesson_activities: 'lms',
   learning_outcomes: 'lms', outcome_mappings: 'lms',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
@@ -405,7 +405,7 @@ async function getOwnedBatchIds(profileId) {
   return [...ids];
 }
 
-const OWN_BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects']);
+const OWN_BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'student_performances', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects']);
 
 function applyListScope(query, table, level, profile, ownedBatchIds) {
   if (table === 'assignment_submissions') {
@@ -494,7 +494,7 @@ async function checkRowOwnership(table, level, profile, rowId) {
   }
   if (level === 'Own') {
     const owned = await getOwnedBatchIds(profile.id);
-    const BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'activities', 'class_entries', 'class_confirmations', 'assignment_submissions']);
+    const BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'student_performances', 'class_entries', 'class_confirmations', 'assignment_submissions']);
     if (BATCH_TABLES.has(table)) return owned.includes(row.batch_id);
     if (table === 'batches') return owned.includes(row.id);
     if (table === 'events' || table === 'jobs' || table === 'lesson_plans') return row.author_id === profile.id;
@@ -1330,7 +1330,7 @@ const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_e
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
 const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);

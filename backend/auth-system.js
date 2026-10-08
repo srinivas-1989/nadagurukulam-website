@@ -204,7 +204,11 @@ class PermissionSystem {
       'events': 'events',
       'jobs': 'jobs',
       'enquiries': 'enquiries',
-      'activities': 'activities',
+      'performances': 'performances',
+      'lessons': 'lms', 'resources': 'lms', 'lesson_activities': 'lms',
+      'learning_outcomes': 'lms', 'outcome_mappings': 'lms',
+      'faculty_assignments': 'curriculum', 'student_relationships': 'roles',
+      'mentor_progress_notes': 'roles',
       'courses': 'curriculum',
       'course_modules': 'curriculum',
       'course_module_topics': 'curriculum',
@@ -233,7 +237,7 @@ class PermissionSystem {
     if (path.startsWith('/api/events')) return 'events';
     if (path.startsWith('/api/jobs')) return 'jobs';
     if (path.startsWith('/api/enquiries')) return 'enquiries';
-    if (path.startsWith('/api/activities')) return 'activities';
+    if (path.startsWith('/api/student_performances')) return 'performances';
     if (path.startsWith('/api/courses')) return 'curriculum';
     if (path.startsWith('/api/course_modules')) return 'curriculum';
     if (path.startsWith('/api/course_module_topics')) return 'curriculum';

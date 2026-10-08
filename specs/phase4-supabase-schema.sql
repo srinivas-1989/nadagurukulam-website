@@ -136,7 +136,10 @@ create table if not exists public.feedback (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create table if not exists public.activities (
+-- Co-curricular events/performances. Was `activities`, renamed to
+-- student_performances to stop colliding with the LMS lesson activities
+-- (manual §12) — this side is Events, Productions and Performances (§18).
+create table if not exists public.student_performances (
   id uuid default uuid_generate_v4() primary key,
   batch_id uuid references public.batches(id) on delete cascade not null,
   title text not null,
@@ -145,6 +148,25 @@ create table if not exists public.activities (
   description text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Rename in place for databases created before the rename.
+do $$ begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'activities'
+  ) and not exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'student_performances'
+  ) then
+    execute 'alter table public.activities rename to student_performances';
+  elsif exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'activities'
+  ) then
+    -- both present: the rename never ran, so this is the leftover original
+    execute 'drop table public.activities';
+  end if;
+end $$;
 
 
 -- 4. DOCUMENTS & SENSITIVE STORAGE
@@ -242,7 +264,13 @@ alter table public.session_attendance enable row level security;
 alter table public.lesson_plans enable row level security;
 alter table public.assignments enable row level security;
 alter table public.feedback enable row level security;
-alter table public.activities enable row level security;
+do $$ begin
+  -- renamed to student_performances by supabase-rename-activities-to-performances.sql
+  if exists (select 1 from information_schema.tables where table_schema='public' and table_name='activities') then
+    execute 'alter table public.activities enable row level security';
+  end if;
+end $$;
+alter table public.student_performances enable row level security;
 alter table public.documents enable row level security;
 alter table public.document_access_log enable row level security;
 alter table public.events enable row level security;
