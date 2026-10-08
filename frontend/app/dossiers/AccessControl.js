@@ -43,28 +43,6 @@ export default function AccessControlPage() {
         </div>
       </div>
 
-      {activeBp && (
-        <div style={panel}>
-          <h4>Sections & Access</h4>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <select style={input} onChange={(e) => setSectionId(e.target.value)}>
-              <option value="">Select section</option>
-              {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-            </select>
-            <select style={input} onChange={(e) => setUserId(e.target.value)}>
-              <option value="">Select user</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role_key})</option>)}
-            </select>
-            <button style={btnPrimary} onClick={assignSection}>Grant</button>
-          </div>
-          {assignments.map(a => (
-            <div key={a.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>
-              <span>{a.users.name}</span> → <span style={{ fontSize: '11px', color: 'var(--text-soft)' }}>{a.evaluation_sections.title}</span>
-              <button style={{ marginLeft: '8px', padding: '4px 8px', fontSize: '11px' }} onClick={() => revoke(a.id)}>× Revoke</button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      {assignments.map(a => (
   );
 }
