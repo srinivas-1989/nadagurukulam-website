@@ -7,6 +7,7 @@ import AdmissionsPage from './admissions/page';
 import AcademicCalendarPage from './academic-calendar/page';
 import CourseOfferingsPage from './course-offerings/page';
 import MyRegistrationsPage from './course-registration/page';
+import LmsPage from './lms/page';
 
 // The column holds a year, but a date picker is far easier to hit than a
 // number box, so the UI collects a date and these take its year.
@@ -586,7 +587,8 @@ export default function Home() {
     { key: 'admissions', name: 'Admissions', desc: 'Applications, screening, auditions, and admission decisions.' },
     { key: 'academic-calendar', name: 'Academic Calendar', desc: 'Academic years and terms in which courses are offered.' },
     { key: 'course-offerings', name: 'Course Offerings', desc: 'Define which courses are offered to which batches in a term.' },
-    { key: 'course-registration', name: 'My Registrations', desc: 'Register for and drop offered courses.' }
+    { key: 'course-registration', name: 'My Registrations', desc: 'Register for and drop offered courses.' },
+    { key: 'lms', name: 'Learning Management', desc: 'Modules to lessons to resources and activities.' }
   ];
 
   const MODULE_ICONS = {
@@ -611,6 +613,7 @@ export default function Home() {
     'academic-calendar': <><rect x="3" y="4.5" width="18" height="16.5" rx="2" /><path d="M16 2.5v4M8 2.5v4M3 10h18" /><path d="M7.5 14h3v3h-3z" /></>,
     'course-offerings': <><path d="M3 7.5l9-4.5 9 4.5-9 4.5-9-4.5z" /><path d="M6.5 10v5c0 1.7 2.5 3 5.5 3s5.5-1.3 5.5-3v-5" /><path d="M21 7.5v5.5" /></>,
     'course-registration': <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7" /><path d="M8.6 17.4l2 2 4-4.2" /></>,
+    lms: <><path d="M3 5.5h7a2 2 0 0 1 2 2v11a1.6 1.6 0 0 0-1.6-1.6H3z" /><path d="M21 5.5h-7a2 2 0 0 0-2 2v11a1.6 1.6 0 0 1 1.6-1.6H21z" /></>,
     admissions: <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /><path d="M9 14.5l2 2 4-4.2" /></>,
     student: <><circle cx="12" cy="7" r="3.6" /><path d="M4.5 21v-1.5A5.5 5.5 0 0 1 10 14h4a5.5 5.5 0 0 1 5.5 5.5V21" /><path d="M2.5 9.5h4M17.5 9.5h4" /></>
   };
@@ -6695,10 +6698,11 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'academic-calendar' && <AcademicCalendarPage />}
             {activeModule === 'course-offerings' && <CourseOfferingsPage />}
             {activeModule === 'course-registration' && <MyRegistrationsPage />}
+            {activeModule === 'lms' && <LmsPage />}
 
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration', 'lms'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module

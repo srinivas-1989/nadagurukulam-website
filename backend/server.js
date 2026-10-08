@@ -358,6 +358,8 @@ const API_TO_MODULE = {
   timetable: 'timetable', liveclasses: 'liveclasses', lessonplans: 'lessonplans',
   assignments: 'assignments', feedback: 'feedback', events: 'events',
   jobs: 'jobs', enquiries: 'enquiries', activities: 'activities',
+  lessons: 'lms', resources: 'lms', lesson_activities: 'lms',
+  learning_outcomes: 'lms', outcome_mappings: 'lms',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   academic_years: 'curriculum', terms: 'curriculum',
@@ -372,6 +374,8 @@ const API_TO_MODULE = {
 const TABLE_TO_MODULE = {
   disciplines: 'curriculum', timetable_slots: 'timetable', timetable_periods: 'timetable',
   live_sessions: 'liveclasses', lesson_plans: 'lessonplans',
+  lessons: 'lms', resources: 'lms', lesson_activities: 'lms',
+  learning_outcomes: 'lms', outcome_mappings: 'lms',
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   academic_years: 'curriculum', terms: 'curriculum',

@@ -30,5 +30,5 @@ on conflict (role_key, module_key) do nothing;
 
 alter table public.role_permissions enable row level security;
 insert into public.role_permissions (role_key, module_key, access_level)
-select 'super_admin', m, 'Full' from unnest(array['organisation','admissions']) as m
+select 'super_admin', m, 'Full' from unnest(array['organisation','admissions','lms']) as m
 on conflict (role_key, module_key) do nothing;
