@@ -41,3 +41,9 @@ on conflict (role_key, module_key) do nothing;
 insert into public.role_permissions (role_key, module_key, access_level)
 select 'super_admin', m, 'Full' from unnest(array['mentorship', 'assessment', 'residential', 'dossiers']) as m
 on conflict (role_key, module_key) do nothing;
+
+-- The blueprint builder is a separate module from the dossier itself: editing
+-- the form that every mentor fills is a different risk from filling one.
+insert into public.role_permissions (role_key, module_key, access_level)
+select 'super_admin', 'dossiers-admin', 'Full'
+on conflict (role_key, module_key) do nothing;
