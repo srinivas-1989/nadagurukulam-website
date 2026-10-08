@@ -809,3 +809,43 @@ create policy "Reporting managers can manage reporting"
   to authenticated
   using (public.has_permission('organisation', array['Manage','Full']))
   with check (public.has_permission('organisation', array['Manage','Full']));
+
+-- Student, mentor, or roles manager can see a relationship; confidential
+-- notes stay hidden from everyone but their author.
+drop policy if exists "Relationships readable by student mentor or roles manager" on public.student_relationships;
+create policy "Relationships readable by student mentor or roles manager"
+  on public.student_relationships for select
+  to authenticated
+  using (
+    student_id = public.my_user_id()
+    or mentor_id = public.my_user_id()
+    or public.has_permission('roles', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Roles managers can manage student relationships" on public.student_relationships;
+create policy "Roles managers manage student relationships"
+  on public.student_relationships for all
+  to authenticated
+  using (public.has_permission('roles', array['Manage','Full']))
+  with check (public.has_permission('roles', array['Manage','Full']));
+
+drop policy if exists "Progress notes readable by author student or mentor" on public.mentor_progress_notes;
+create policy "Progress notes readable by author student or mentor"
+  on public.mentor_progress_notes for select
+  to authenticated
+  using (
+    author_id = public.my_user_id()
+    or exists (
+      select 1 from public.student_relationships r
+      where r.id = mentor_progress_notes.relationship_id
+        and (r.student_id = public.my_user_id() or r.mentor_id = public.my_user_id())
+    )
+    or (not is_confidential and public.has_permission('roles', array['View','Manage','Full']))
+  );
+
+drop policy if exists "Roles managers can manage mentor progress notes" on public.mentor_progress_notes;
+create policy "Roles managers manage mentor progress notes"
+  on public.mentor_progress_notes for all
+  to authenticated
+  using (public.has_permission('roles', array['Manage','Full']))
+  with check (public.has_permission('roles', array['Manage','Full']));

@@ -8,6 +8,7 @@ const btn = { background: 'var(--primary)', color: '#fff', border: 'none', paddi
 
 const RESOURCE_TYPES = ['video', 'audio', 'pdf', 'notation', 'image', 'external_link', 'downloadable'];
 const ACTIVITY_TYPES = ['assignment', 'quiz', 'discussion', 'practice_submission', 'reflection', 'project'];
+const RELATIONSHIP_TYPES = ['guru', 'academic_mentor', 'course_faculty', 'hostel_mentor', 'advisor'];
 
 function StatusBadge({ value }) {
   if (!value) return null;
@@ -21,6 +22,9 @@ export default function LmsPage() {
   const [resources, setResources] = useState([]);
   const [activities, setActivities] = useState([]);
   const [outcomes, setOutcomes] = useState([]);
+  const [relationships, setRelationships] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [people, setPeople] = useState([]);
   const [courseId, setCourseId] = useState('');
   const [moduleId, setModuleId] = useState('');
   const [lessonId, setLessonId] = useState('');
@@ -44,10 +48,12 @@ export default function LmsPage() {
 
   async function reload() {
     try {
-      const [c, m, l, r, a, o] = await Promise.all([
+      const [c, m, l, r, a, o, rel, n, p] = await Promise.all([
         apiCall('/api/courses'), apiCall('/api/course_modules'),
         apiCall('/api/lessons'), apiCall('/api/resources'),
         apiCall('/api/lesson_activities'), apiCall('/api/learning_outcomes'),
+        apiCall('/api/student_relationships'), apiCall('/api/mentor_progress_notes'),
+        apiCall('/api/users'),
       ]);
       setCourses(Array.isArray(c) ? c : []);
       setModules(Array.isArray(m) ? m : []);
@@ -55,6 +61,9 @@ export default function LmsPage() {
       setResources(Array.isArray(r) ? r : []);
       setActivities(Array.isArray(a) ? a : []);
       setOutcomes(Array.isArray(o) ? o : []);
+      setRelationships(Array.isArray(rel) ? rel : []);
+      setNotes(Array.isArray(n) ? n : []);
+      setPeople(Array.isArray(p) ? p : []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -117,6 +126,15 @@ export default function LmsPage() {
     submit('/api/learning_outcomes', {
       course_id: courseId, code: f.get('code'), statement: f.get('statement'),
       bloom_level: f.get('bloom_level') || null,
+    }).then(() => e.target.reset());
+  }
+
+  function addRelationship(e) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    submit('/api/student_relationships', {
+      student_id: f.get('student_id'), mentor_id: f.get('mentor_id'),
+      relationship_type: f.get('relationship_type'), scope: f.get('scope'),
     }).then(() => e.target.reset());
   }
 
@@ -277,6 +295,57 @@ export default function LmsPage() {
           {courseOutcomes.length === 0 && <p style={{ color: 'var(--text-faint)', fontSize: '13px' }}>No outcomes defined.</p>}
         </form>
       )}
+
+      <form onSubmit={addRelationship} style={cardStyle}>
+        <h3 style={{ color: 'var(--primary)', fontSize: '15px', marginBottom: '12px' }}>Guru, Mentor &amp; Advisor Relationships ({relationships.length})</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+          <select name="student_id" style={inputStyle} required>
+            <option value="">Select Student...</option>
+            {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select name="mentor_id" style={inputStyle} required>
+            <option value="">Select Mentor...</option>
+            {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select name="relationship_type" style={inputStyle}>
+            {RELATIONSHIP_TYPES.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+          </select>
+          <select name="scope" style={inputStyle}>
+            <option value="institutional">Institutional</option>
+            <option value="campus">Campus</option>
+            <option value="department">Department</option>
+            <option value="course">Course</option>
+            <option value="assigned">Assigned</option>
+          </select>
+          <button type="submit" style={btn}>Assign Mentor</button>
+        </div>
+        {relationships.map(r => {
+          const student = people.find(p => p.id === r.student_id);
+          const mentor = people.find(p => p.id === r.mentor_id);
+          const relNotes = notes.filter(n => n.relationship_id === r.id);
+          return (
+            <div key={r.id} style={{ ...cardStyle, marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                <div>
+                  <strong>{student?.name || '—'}</strong>
+                  <span style={{ color: 'var(--text-faint)' }}> → </span>
+                  <strong>{mentor?.name || '—'}</strong>
+                  <span style={{ marginLeft: '8px' }}><StatusBadge value={r.relationship_type.replace('_', ' ')} /></span>
+                  <span style={{ marginLeft: '6px' }}><StatusBadge value={r.status} /></span>
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{relNotes.length} notes</span>
+              </div>
+              {relNotes.map(n => (
+                <div key={n.id} style={{ fontSize: '12px', color: 'var(--text-faint)', marginTop: '6px', paddingLeft: '10px', borderLeft: '2px solid var(--border)' }}>
+                  <strong style={{ color: 'var(--text)' }}>{n.title}</strong>{n.is_confidential ? ' (confidential)' : ''}
+                  <div>{n.content}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        {relationships.length === 0 && <p style={{ color: 'var(--text-faint)', fontSize: '13px' }}>No mentoring relationships recorded.</p>}
+      </form>
     </div>
   );
 }

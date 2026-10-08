@@ -367,6 +367,7 @@ const API_TO_MODULE = {
   roles: 'roles', role_permissions: 'roles', user_permissions: 'roles',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
+  student_relationships: 'roles', mentor_progress_notes: 'roles',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
 };
@@ -382,6 +383,7 @@ const TABLE_TO_MODULE = {
   course_offerings: 'curriculum', course_registrations: 'curriculum', faculty_assignments: 'curriculum',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
+  student_relationships: 'roles', mentor_progress_notes: 'roles',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
 };
@@ -818,6 +820,33 @@ const crud = (table, orderCol = 'created_at') => ({
         // mirror the lead teacher onto course_offerings.faculty_id so registration and timetable code stays correct
         if (payload.is_lead && payload.status !== 'ended') {
           await supabase.from('course_offerings').update({ faculty_id: payload.user_id }).eq('id', payload.course_offering_id);
+        }
+      }
+      if (table === 'student_relationships') {
+        const relTypes = ['guru','academic_mentor','course_faculty','hostel_mentor','advisor'];
+        if (!payload.student_id) return res.status(400).json({ error: 'student_id is required' });
+        if (!payload.mentor_id) return res.status(400).json({ error: 'mentor_id is required' });
+        if (payload.student_id === payload.mentor_id) return res.status(400).json({ error: 'A person cannot be their own mentor.' });
+        if (payload.relationship_type && !relTypes.includes(payload.relationship_type)) return res.status(400).json({ error: 'Invalid relationship type' });
+        if (payload.status && !['active','suspended','ended'].includes(payload.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (payload.start_date && payload.end_date && payload.end_date < payload.start_date) return res.status(400).json({ error: 'end_date cannot be before start_date' });
+        // one active relationship of each type per student — replacing a mentor
+        // ends the old row rather than stacking a second guru on the student
+        if (!payload.status || payload.status === 'active') {
+          const { data: existing } = await supabase.from('student_relationships').select('id,mentor_id').eq('student_id', payload.student_id).eq('relationship_type', payload.relationship_type).eq('status', 'active');
+          if ((existing || []).some(r => r.mentor_id !== payload.mentor_id)) return res.status(409).json({ error: 'Student already has an active relationship of this type.' });
+        }
+        for (const k of ['end_date','notes']) if (payload[k] === '') payload[k] = null;
+      }
+      if (table === 'mentor_progress_notes') {
+        if (!payload.relationship_id) return res.status(400).json({ error: 'relationship_id is required' });
+        if (!payload.title) return res.status(400).json({ error: 'title is required' });
+        if (!payload.content) return res.status(400).json({ error: 'content is required' });
+        // a mentor may only write notes on relationships they hold
+        const { data: rel } = await supabase.from('student_relationships').select('id,mentor_id,student_id').eq('id', payload.relationship_id).maybeSingle();
+        if (!rel) return res.status(404).json({ error: 'Relationship not found' });
+        if (rel.mentor_id !== req.auth.user.id && rel.student_id !== req.auth.user.id) {
+          return res.status(403).json({ error: 'Only the mentor or the student can record progress notes.' });
         }
       }
       if (table === 'timetable_slots') {
