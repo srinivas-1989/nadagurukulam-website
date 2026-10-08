@@ -606,7 +606,13 @@ export default function Home() {
     projects: <><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /><path d="M12 11.5v5M9.5 14h5" /></>,
     certificates: <><circle cx="12" cy="8.5" r="6" /><path d="M8.6 13.4 7.4 22.5 12 20l4.6 2.5-1.2-9.1" /><path d="M10 8.5l1.4 1.4 2.6-2.6" /></>,
     roles: <><path d="M12 22s8-4 8-10V5.2L12 2 4 5.2V12c0 6 8 10 8 10z" /><path d="M9.2 12.2l2 2 3.6-3.8" /></>,
-    teachinglogs: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path d="M16.8 17.8l1.2 1.2 2.2-2.3" /></>
+    teachinglogs: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path d="M16.8 17.8l1.2 1.2 2.2-2.3" /></>,
+    organisation: <><rect x="9" y="2.5" width="6" height="5" rx="1.2" /><rect x="2.5" y="16.5" width="6" height="5" rx="1.2" /><rect x="15.5" y="16.5" width="6" height="5" rx="1.2" /><path d="M12 7.5v4M5.5 16.5v-2.2h13v2.2" /></>,
+    'academic-calendar': <><rect x="3" y="4.5" width="18" height="16.5" rx="2" /><path d="M16 2.5v4M8 2.5v4M3 10h18" /><path d="M7.5 14h3v3h-3z" /></>,
+    'course-offerings': <><path d="M3 7.5l9-4.5 9 4.5-9 4.5-9-4.5z" /><path d="M6.5 10v5c0 1.7 2.5 3 5.5 3s5.5-1.3 5.5-3v-5" /><path d="M21 7.5v5.5" /></>,
+    'course-registration': <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7" /><path d="M8.6 17.4l2 2 4-4.2" /></>,
+    admissions: <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /><path d="M9 14.5l2 2 4-4.2" /></>,
+    student: <><circle cx="12" cy="7" r="3.6" /><path d="M4.5 21v-1.5A5.5 5.5 0 0 1 10 14h4a5.5 5.5 0 0 1 5.5 5.5V21" /><path d="M2.5 9.5h4M17.5 9.5h4" /></>
   };
 
 // All state declarations at top (fix: move undefined state hooks to prevent errors)

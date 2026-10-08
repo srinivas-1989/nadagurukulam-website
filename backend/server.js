@@ -2094,8 +2094,122 @@ app.post('/api/organisation/units', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Organisation: institutions / campuses / positions / reporting ─────────
+// Plain-text name/code fields are trimmed and length-capped at the boundary
+// rather than in the UI, so every client gets the same guarantee.
+
+const orgCrud = (table, orderCol, { fields, validate }) => {
+  app.get(`/api/organisation/${fields.route}`, authMiddleware, async (req, res) => {
+    try {
+      const level = await requireLevel(req, res, 'organisation', 'list');
+      if (!level) return;
+      const { data, error } = await supabase.from(table).select('*').order(orderCol);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post(`/api/organisation/${fields.route}`, authMiddleware, async (req, res) => {
+    try {
+      const level = await requireLevel(req, res, 'organisation', 'create');
+      if (!level) return;
+      const payload = {};
+      for (const [key, maxLen] of Object.entries(fields.columns)) {
+        if (req.body[key] === undefined) continue;
+        payload[key] = req.body[key] === '' ? null : String(req.body[key]).trim().slice(0, maxLen);
+      }
+      const err = validate(payload);
+      if (err) return res.status(400).json({ error: err });
+      const { data, error } = await supabase.from(table).insert([payload]).select();
+      if (error) throw error;
+      await recordAudit(req, {
+        action: 'create', entityType: table, entityId: data[0].id,
+        summary: `Created ${fields.label} "${data[0].name || data[0].title || data[0].code}"`,
+        newValue: data[0],
+      });
+      res.status(201).json(data[0]);
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: `${fields.label} code already exists` });
+      res.status(500).json({ error: e.message });
+    }
+  });
+};
+
+orgCrud('institutions', 'name', {
+  fields: { route: 'institutions', label: 'Institution', columns: { name: 160, code: 40, type: 80 } },
+  validate: (p) => (!p.name ? 'name is required' : !p.code ? 'code is required' : null),
+});
+orgCrud('campuses', 'name', {
+  fields: { route: 'campuses', label: 'Campus', columns: { name: 160, code: 40, institution_id: 36 } },
+  validate: (p) => (!p.name ? 'name is required' : !p.code ? 'code is required' : null),
+});
+orgCrud('positions', 'title', {
+  fields: { route: 'positions', label: 'Position', columns: { unit_id: 36, title: 160, description: 500 } },
+  validate: (p) => (!p.title ? 'title is required' : null),
+});
+
+// A reporting line is historical, not mutable: it is closed with effective_to
+// and a new row is inserted, so past org charts stay reproducible.
+app.post('/api/organisation/reporting', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'organisation', 'create');
+    if (!level) return;
+    const supervisor_id = String(req.body.supervisor_id || '');
+    const subordinate_id = String(req.body.subordinate_id || '');
+    if (!supervisor_id || !subordinate_id) return res.status(400).json({ error: 'supervisor_id and subordinate_id are required' });
+    if (supervisor_id === subordinate_id) return res.status(400).json({ error: 'A person cannot report to themselves' });
+    const effective_from = req.body.effective_from || new Date().toISOString().slice(0, 10);
+    const { data: dupe } = await supabase.from('reporting_relationships')
+      .select('id').eq('supervisor_id', supervisor_id).eq('subordinate_id', subordinate_id)
+      .is('effective_to', null).maybeSingle();
+    if (dupe) return res.status(409).json({ error: 'This reporting line is already open' });
+    const { data, error } = await supabase.from('reporting_relationships')
+      .insert([{ supervisor_id, subordinate_id, effective_from }]).select();
+    if (error) throw error;
+    await recordAudit(req, {
+      action: 'create', entityType: 'reporting_relationships', entityId: data[0].id,
+      summary: `Added reporting line from ${supervisor_id} to ${subordinate_id}`,
+      newValue: data[0],
+    });
+    res.status(201).json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/organisation/reporting', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'organisation', 'list');
+    if (!level) return;
+    const { data, error } = await supabase.from('reporting_relationships').select('*').order('effective_from', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Closing a line writes history rather than deleting it.
+app.post('/api/organisation/reporting/:id/close', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'organisation', 'update');
+    if (!level) return;
+    const effective_to = req.body.effective_to || new Date().toISOString().slice(0, 10);
+    const { data: cur } = await supabase.from('reporting_relationships').select('*').eq('id', req.params.id).single();
+    if (!cur) return res.status(404).json({ error: 'Reporting line not found' });
+    if (cur.effective_to) return res.status(409).json({ error: 'This line is already closed' });
+    const { data, error } = await supabase.from('reporting_relationships')
+      .update({ effective_to }).eq('id', req.params.id).select();
+    if (error) throw error;
+    await recordAudit(req, {
+      action: 'update', entityType: 'reporting_relationships', entityId: req.params.id,
+      summary: `Closed reporting line effective ${effective_to}`,
+      previousValue: cur, newValue: data[0],
+    });
+    res.json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Admissions endpoints
 const APPLICATION_STATUSES = ['submitted', 'screening', 'audition', 'selected', 'admitted', 'rejected'];
+const SCREENING_STATUSES = ['pending', 'pass', 'fail'];
+const AUDITION_STATUSES = ['scheduled', 'completed', 'passed', 'failed'];
 
 app.get('/api/admissions/applications', authMiddleware, async (req, res) => {
   try {
@@ -2130,6 +2244,107 @@ app.post('/api/admissions/applications', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admissions pipeline only moves forward: rejected and admitted are terminal,
+// so a decision already recorded cannot be silently rewritten.
+const APPLICATION_FLOW = ['submitted', 'screening', 'audition', 'selected', 'admitted', 'rejected'];
+
+app.put('/api/admissions/applications/:id', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'admissions', 'update');
+    if (!level) return;
+    const { data: cur } = await supabase.from('admissions_applications').select('*').eq('id', req.params.id).maybeSingle();
+    if (!cur) return res.status(404).json({ error: 'Application not found' });
+    const patch = {};
+    if (req.body.status !== undefined) {
+      const next = String(req.body.status);
+      if (!APPLICATION_FLOW.includes(next)) return res.status(400).json({ error: `status must be one of: ${APPLICATION_FLOW.join(', ')}` });
+      const from = APPLICATION_FLOW.indexOf(cur.status);
+      const to = APPLICATION_FLOW.indexOf(next);
+      // A terminal decision stays put; anything else may only move forward.
+      if (cur.status === 'admitted' || cur.status === 'rejected') {
+        if (next !== cur.status) return res.status(409).json({ error: `Application is already ${cur.status} and cannot be changed.` });
+      } else if (to <= from) {
+        return res.status(409).json({ error: `Cannot move from ${cur.status} back to ${next}.` });
+      }
+      patch.status = next;
+    }
+    if (req.body.programme_id !== undefined) patch.programme_id = req.body.programme_id || null;
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
+    const { data, error } = await supabase.from('admissions_applications').update(patch).eq('id', req.params.id).select();
+    if (error) throw error;
+    await recordAudit(req, {
+      action: 'update', entityType: 'admissions_applications', entityId: req.params.id,
+      summary: `Application status ${cur.status} → ${patch.status || cur.status}`,
+      previousValue: cur, newValue: data[0],
+    });
+    res.json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+const admissionsCrud = (table, route, { label, columns, validate }) => {
+  app.get(`/api/admissions/${route}`, authMiddleware, async (req, res) => {
+    try {
+      const level = await requireLevel(req, res, 'admissions', 'list');
+      if (!level) return;
+      let query = supabase.from(table).select('*').order('created_at', { ascending: false });
+      if (req.query.application_id) query = query.eq('application_id', req.query.application_id);
+      const { data, error } = await query;
+      if (error) throw error;
+      res.json(data || []);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post(`/api/admissions/${route}`, authMiddleware, async (req, res) => {
+    try {
+      const level = await requireLevel(req, res, 'admissions', 'create');
+      if (!level) return;
+      const payload = {};
+      for (const [key, maxLen] of Object.entries(columns)) {
+        if (req.body[key] === undefined) continue;
+        payload[key] = req.body[key] === '' ? null : String(req.body[key]).trim().slice(0, maxLen);
+      }
+      const err = validate(payload);
+      if (err) return res.status(400).json({ error: err });
+      const { data, error } = await supabase.from(table).insert([payload]).select();
+      if (error) throw error;
+      await recordAudit(req, {
+        action: 'create', entityType: table, entityId: data[0].id,
+        summary: `Created ${label} ${data[0].id}`, newValue: data[0],
+      });
+      res.status(201).json(data[0]);
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: `A ${label} with these details already exists` });
+      res.status(500).json({ error: e.message });
+    }
+  });
+};
+
+admissionsCrud('applicants', 'applicants', {
+  label: 'Applicant',
+  columns: { name: 120, email: 160, phone: 20, date_of_birth: 10 },
+  validate: (p) => (!p.name ? 'name is required' : !p.email ? 'email is required'
+    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email) ? 'email is not valid' : null),
+});
+admissionsCrud('screening_records', 'screening', {
+  label: 'Screening record',
+  columns: { application_id: 36, reviewer_id: 36, score: 3, feedback: 1000, status: 10 },
+  validate: (p) => {
+    if (!p.application_id) return 'application_id is required';
+    if (p.status && !SCREENING_STATUSES.includes(p.status)) return `status must be one of: ${SCREENING_STATUSES.join(', ')}`;
+    if (p.score !== undefined && p.score !== null && (isNaN(Number(p.score)) || Number(p.score) < 0 || Number(p.score) > 100))
+      return 'score must be 0-100';
+    return null;
+  },
+});
+admissionsCrud('auditions', 'auditions', {
+  label: 'Audition',
+  columns: { application_id: 36, audition_date: 10, panelists: 2000, rubric_scores: 2000, status: 10 },
+  validate: (p) => {
+    if (!p.application_id) return 'application_id is required';
+    if (p.status && !AUDITION_STATUSES.includes(p.status)) return `status must be one of: ${AUDITION_STATUSES.join(', ')}`;
+    return null;
+  },
+});
 
 app.get('/api/cms', async (req, res) => {
   try {
