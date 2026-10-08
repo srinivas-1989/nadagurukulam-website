@@ -24,7 +24,7 @@ export default function AcademicMasterPage() {
   async function reload() {
     try {
       const [d, b] = await Promise.all([
-        apiCall('/api/disciplines').then(r => r.json()),
+        apiCall('/api/curriculum').then(r => r.json()),
         apiCall('/api/batches').then(r => r.json()),
       ]);
       setDisciplines(Array.isArray(d) ? d : []);
@@ -41,7 +41,7 @@ export default function AcademicMasterPage() {
   async function addDiscipline(e) {
     e.preventDefault();
     const f = new FormData(e.target);
-    const res = await apiCall('/api/disciplines', {
+    const res = await apiCall('/api/curriculum', {
         method: 'POST',
         body: JSON.stringify({ name: f.get('name'), description: f.get('description') || null }),
     });
@@ -55,7 +55,7 @@ export default function AcademicMasterPage() {
     const f = new FormData(e.target);
     const res = await apiCall('/api/batches', {
         method: 'POST',
-        body: JSON.stringify({ name: f.get('name'), discipline_id: f.get('discipline_id') || null, academic_year_id: f.get('academic_year_id') || null }),
+        body: JSON.stringify({ name: f.get('name'), discipline_id: f.get('discipline_id'), level: f.get('level') }),
     });
     if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error || 'Could not create batch.'); return; }
     e.target.reset();
@@ -83,10 +83,11 @@ export default function AcademicMasterPage() {
         <form onSubmit={addBatch} style={cardStyle}>
             <h3 style={{ color: 'var(--primary)', marginBottom: '12px' }}>Batches</h3>
             <input name="name" placeholder="Batch Name (e.g. 2026-30)" style={{ ...inputStyle, width: '100%', marginBottom: '10px' }} required />
-            <select name="discipline_id" style={{ ...inputStyle, width: '100%', marginBottom: '10px' }}>
+            <select name="discipline_id" style={{ ...inputStyle, width: '100%', marginBottom: '10px' }} required>
                 <option value="">Select Programme...</option>
                 {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
+            <input name="level" placeholder="Level (e.g. Beginner / Semester I)" style={{ ...inputStyle, width: '100%', marginBottom: '10px' }} required />
             <button type="submit" style={primaryBtn}>Add Batch</button>
             <ul style={{ listStyle: 'none', padding: 0, marginTop: '16px' }}>
                 {batches.map(b => <li key={b.id} style={{ padding: '6px 0', borderTop: '1px solid var(--border)' }}>{b.name} <span style={{ color: 'var(--text-faint)' }}>({disciplines.find(d => d.id === b.discipline_id)?.name || '—'})</span></li>)}

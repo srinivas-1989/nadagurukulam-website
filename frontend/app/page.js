@@ -11,6 +11,7 @@ import StudentRelationshipsPage from './student-relationships/page';
 import LmsPage from './lms/page';
 import PublicPortalPage from './public-portal/page';
 import StudentAssessmentPage from './dossiers/page';
+import AcademicMasterPage from './academic-master/page';
 import { CmsSections } from './public-sections';
 
 // The column holds a year, but a date picker is far easier to hit than a
@@ -590,6 +591,7 @@ export default function Home() {
     { key: 'organisation', name: 'Organisation', desc: 'Institution, campuses, and reporting structure.' },
     { key: 'admissions', name: 'Admissions', desc: 'Applications, screening, auditions, and admission decisions.' },
     { key: 'academic-calendar', name: 'Academic Calendar', desc: 'Academic years and terms in which courses are offered.' },
+    { key: 'academic-master', name: 'Academic Master', desc: 'Programmes / streams and batches — core academic structure.' },
     { key: 'course-offerings', name: 'Course Offerings', desc: 'Define which courses are offered to which batches in a term.' },
     { key: 'course-registration', name: 'My Registrations', desc: 'Register for and drop offered courses.' },
     { key: 'lms', name: 'Learning Management', desc: 'Modules to lessons to resources and activities.' },
@@ -619,6 +621,7 @@ export default function Home() {
     teachinglogs: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path d="M16.8 17.8l1.2 1.2 2.2-2.3" /></>,
     organisation: <><rect x="9" y="2.5" width="6" height="5" rx="1.2" /><rect x="2.5" y="16.5" width="6" height="5" rx="1.2" /><rect x="15.5" y="16.5" width="6" height="5" rx="1.2" /><path d="M12 7.5v4M5.5 16.5v-2.2h13v2.2" /></>,
     'academic-calendar': <><rect x="3" y="4.5" width="18" height="16.5" rx="2" /><path d="M16 2.5v4M8 2.5v4M3 10h18" /><path d="M7.5 14h3v3h-3z" /></>,
+    'academic-master': <><path d="M12 3l9 4.5-9 4.5-9-4.5L12 3z" /><path d="M3 12l9 4.5 9-4.5" /><path d="M3 16.5L12 21l9-4.5" /></>,
     'course-offerings': <><path d="M3 7.5l9-4.5 9 4.5-9 4.5-9-4.5z" /><path d="M6.5 10v5c0 1.7 2.5 3 5.5 3s5.5-1.3 5.5-3v-5" /><path d="M21 7.5v5.5" /></>,
     'course-registration': <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7" /><path d="M8.6 17.4l2 2 4-4.2" /></>,
     lms: <><path d="M3 5.5h7a2 2 0 0 1 2 2v11a1.6 1.6 0 0 0-1.6-1.6H3z" /><path d="M21 5.5h-7a2 2 0 0 0-2 2v11a1.6 1.6 0 0 1 1.6-1.6H21z" /></>,
@@ -6714,6 +6717,7 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'organisation' && <OrganisationPage />}
             {activeModule === 'admissions' && <AdmissionsPage />}
             {activeModule === 'academic-calendar' && <AcademicCalendarPage />}
+            {activeModule === 'academic-master' && <AcademicMasterPage />}
             {activeModule === 'course-offerings' && <CourseOfferingsPage />}
             {activeModule === 'course-registration' && <MyRegistrationsPage />}
             {activeModule === 'mentorship' && <StudentRelationshipsPage />}
@@ -6723,7 +6727,7 @@ const handleAddDiscipline = async (e) => {
 
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
