@@ -695,3 +695,53 @@ create policy "Certificates deletable by owner or manager"
   on public.certificates for delete
   to authenticated
   using (student_id = public.my_user_id() or public.has_permission('certificates', array['Manage','Full']));
+
+-- ============================================================================
+-- COURSE OFFERINGS & REGISTRATION
+-- ============================================================================
+drop policy if exists "Course offerings readable by batch members" on public.course_offerings;
+create policy "Course offerings readable by batch members"
+  on public.course_offerings for select
+  to authenticated
+  using (
+    batch_id = any(public.my_batch_ids())
+    or faculty_id = public.my_user_id()
+    or public.has_permission('curriculum', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Curriculum managers can manage course offerings" on public.course_offerings;
+create policy "Curriculum managers can manage course offerings"
+  on public.course_offerings for all
+  to authenticated
+  using (public.has_permission('curriculum', array['Manage','Full']))
+  with check (public.has_permission('curriculum', array['Manage','Full']));
+
+-- Registrations are the student's own record: readable by the student, the
+-- offering's batch members (to take a roster), the teaching faculty, and
+-- curriculum managers.
+drop policy if exists "Course registrations readable by student and batch" on public.course_registrations;
+create policy "Course registrations readable by student and batch"
+  on public.course_registrations for select
+  to authenticated
+  using (
+    student_id = public.my_user_id()
+    or exists (
+      select 1 from public.course_offerings o
+      where o.id = public.course_registrations.course_offering_id
+        and (o.faculty_id = public.my_user_id()
+             or o.batch_id = any(public.my_batch_ids()))
+    )
+    or public.has_permission('curriculum', array['Manage','Full'])
+  );
+
+drop policy if exists "Students can self-register for course offerings" on public.course_registrations;
+create policy "Students can self-register for course offerings"
+  on public.course_registrations for insert
+  to authenticated
+  with check (student_id = public.my_user_id());
+
+drop policy if exists "Students can drop their own registration" on public.course_registrations;
+create policy "Students can drop their own registration"
+  on public.course_registrations for delete
+  to authenticated
+  using (student_id = public.my_user_id());

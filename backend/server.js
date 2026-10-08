@@ -375,6 +375,7 @@ const TABLE_TO_MODULE = {
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   academic_years: 'curriculum', terms: 'curriculum',
+  course_offerings: 'curriculum', course_registrations: 'curriculum',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
@@ -763,6 +764,31 @@ const crud = (table, orderCol = 'created_at') => ({
           payload.version_number = rows && rows[0] ? Number(rows[0].version_number) + 1 : 1;
         } else payload.version_number = Math.max(1, Math.round(Number(payload.version_number)) || 1);
         if (payload.notes === '') payload.notes = null;
+      }
+      if (table === 'course_offerings') {
+        if (!payload.course_id) return res.status(400).json({ error: 'course_id is required' });
+        if (payload.status && !['planned','active','completed','cancelled'].includes(payload.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (payload.capacity !== undefined && payload.capacity !== null && payload.capacity !== '') {
+          const cap = Number(payload.capacity);
+          if (!Number.isFinite(cap) || cap < 1) return res.status(400).json({ error: 'capacity must be 1 or more' });
+          payload.capacity = Math.round(cap);
+        } else payload.capacity = null;
+        for (const k of ['term_id','batch_id','faculty_id']) if (payload[k] === '') payload[k] = null;
+        if (payload.notes === '') payload.notes = null;
+      }
+      if (table === 'course_registrations') {
+        if (!payload.course_offering_id) return res.status(400).json({ error: 'course_offering_id is required' });
+        const studentId = String(req.body.student_id || req.auth?.profile?.id);
+        const { data: offering } = await supabase.from('course_offerings').select('id,capacity,status').eq('id', payload.course_offering_id).maybeSingle();
+        if (!offering) return res.status(404).json({ error: 'Course offering not found' });
+        if (offering.status === 'cancelled' || offering.status === 'completed') return res.status(409).json({ error: `This offering is ${offering.status} and no longer accepts registrations.` });
+        if (offering.capacity) {
+          const { count } = await supabase.from('course_registrations').select('id', { count: 'exact', head: true }).eq('course_offering_id', payload.course_offering_id).neq('status', 'dropped');
+          if ((count || 0) >= offering.capacity) return res.status(409).json({ error: 'This offering is full.' });
+        }
+        payload.student_id = studentId;
+        const { data: dupe } = await supabase.from('course_registrations').select('id').eq('course_offering_id', payload.course_offering_id).eq('student_id', studentId).maybeSingle();
+        if (dupe) return res.status(409).json({ error: 'Already registered for this offering.' });
       }
       if (table === 'timetable_slots') {
         if (payload.subjects !== undefined) {
@@ -1243,9 +1269,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'activities', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
