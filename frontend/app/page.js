@@ -7,6 +7,7 @@ import AdmissionsPage from './admissions/page';
 import AcademicCalendarPage from './academic-calendar/page';
 import CourseOfferingsPage from './course-offerings/page';
 import MyRegistrationsPage from './course-registration/page';
+import StudentRelationshipsPage from './student-relationships/page';
 import LmsPage from './lms/page';
 import PublicPortalPage from './public-portal/page';
 import { CmsSections } from './public-sections';
@@ -591,6 +592,7 @@ export default function Home() {
     { key: 'course-offerings', name: 'Course Offerings', desc: 'Define which courses are offered to which batches in a term.' },
     { key: 'course-registration', name: 'My Registrations', desc: 'Register for and drop offered courses.' },
     { key: 'lms', name: 'Learning Management', desc: 'Modules to lessons to resources and activities.' },
+    { key: 'mentorship', name: 'Guru & Mentors', desc: 'Guru, academic mentor, hostel mentor — with progress notes.' },
     { key: 'public-portal', name: 'Public Portal', desc: 'Every heading, label, image, and link on the public website.' }
   ];
 
@@ -618,6 +620,7 @@ export default function Home() {
     'course-registration': <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7" /><path d="M8.6 17.4l2 2 4-4.2" /></>,
     lms: <><path d="M3 5.5h7a2 2 0 0 1 2 2v11a1.6 1.6 0 0 0-1.6-1.6H3z" /><path d="M21 5.5h-7a2 2 0 0 0-2 2v11a1.6 1.6 0 0 1 1.6-1.6H21z" /></>,
     'public-portal': <><circle cx="12" cy="12" r="9.2" /><path d="M2.8 12h18.4" /><path d="M12 2.8c2.4 2.6 3.6 5.6 3.6 9.2s-1.2 6.6-3.6 9.2c-2.4-2.6-3.6-5.6-3.6-9.2S9.6 5.4 12 2.8z" /></>,
+    mentorship: <><path d="M12 20.5s-7-4.4-7-9.2a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 4.8-7 9.2-7 9.2z" /></>,
     admissions: <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /><path d="M9 14.5l2 2 4-4.2" /></>,
     student: <><circle cx="12" cy="7" r="3.6" /><path d="M4.5 21v-1.5A5.5 5.5 0 0 1 10 14h4a5.5 5.5 0 0 1 5.5 5.5V21" /><path d="M2.5 9.5h4M17.5 9.5h4" /></>
   };
@@ -6708,6 +6711,7 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'academic-calendar' && <AcademicCalendarPage />}
             {activeModule === 'course-offerings' && <CourseOfferingsPage />}
             {activeModule === 'course-registration' && <MyRegistrationsPage />}
+            {activeModule === 'mentorship' && <StudentRelationshipsPage />}
             {activeModule === 'lms' && <LmsPage />}
             {activeModule === 'public-portal' && <PublicPortalPage />}
 

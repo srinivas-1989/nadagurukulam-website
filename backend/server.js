@@ -378,7 +378,7 @@ const API_TO_MODULE = {
   roles: 'roles', role_permissions: 'roles', user_permissions: 'roles',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
-  student_relationships: 'roles', mentor_progress_notes: 'roles',
+  student_relationships: 'mentorship', mentor_progress_notes: 'mentorship',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
 };
@@ -394,7 +394,7 @@ const TABLE_TO_MODULE = {
   course_offerings: 'curriculum', course_registrations: 'curriculum', faculty_assignments: 'curriculum',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
-  student_relationships: 'roles', mentor_progress_notes: 'roles',
+  student_relationships: 'mentorship', mentor_progress_notes: 'mentorship',
   assignment_submissions: 'assignments',
   projects: 'projects', certificates: 'certificates'
 };
@@ -853,11 +853,17 @@ const crud = (table, orderCol = 'created_at') => ({
         if (!payload.relationship_id) return res.status(400).json({ error: 'relationship_id is required' });
         if (!payload.title) return res.status(400).json({ error: 'title is required' });
         if (!payload.content) return res.status(400).json({ error: 'content is required' });
-        // a mentor may only write notes on relationships they hold
+        // authorship is server-assigned — never taken from the client
+        payload.author_id = req.auth.profile.id;
+        // mentor_progress_notes.mentor_id/student_id reference public.users.id,
+        // so this compares profile ids, not Supabase auth uids.
         const { data: rel } = await supabase.from('student_relationships').select('id,mentor_id,student_id').eq('id', payload.relationship_id).maybeSingle();
         if (!rel) return res.status(404).json({ error: 'Relationship not found' });
-        if (rel.mentor_id !== req.auth.user.id && rel.student_id !== req.auth.user.id) {
-          return res.status(403).json({ error: 'Only the mentor or the student can record progress notes.' });
+        // A mentor or the student may note their own relationship; Manage+ staff
+        // administer records on anyone's behalf.
+        if (rel.mentor_id !== req.auth.profile.id && rel.student_id !== req.auth.profile.id
+            && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) {
+          return res.status(403).json({ error: 'Only the mentor, the student, or a mentorship manager can record progress notes.' });
         }
       }
       if (table === 'timetable_slots') {
@@ -1348,9 +1354,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'faculty_assignments', 'student_relationships', 'mentor_progress_notes', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);

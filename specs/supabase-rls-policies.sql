@@ -810,24 +810,31 @@ create policy "Reporting managers can manage reporting"
   using (public.has_permission('organisation', array['Manage','Full']))
   with check (public.has_permission('organisation', array['Manage','Full']));
 
--- Student, mentor, or roles manager can see a relationship; confidential
+-- Student, mentor, or mentorship manager can see a relationship; confidential
 -- notes stay hidden from everyone but their author.
+--
+-- Gated on 'mentorship', not 'roles': a mentor record is sensitive student
+-- data and must not fall open to anyone who can merely view the permission
+-- editor.
 drop policy if exists "Relationships readable by student mentor or roles manager" on public.student_relationships;
-create policy "Relationships readable by student mentor or roles manager"
+drop policy if exists "Roles managers manage student relationships" on public.student_relationships;
+drop policy if exists "Roles managers manage mentor progress notes" on public.mentor_progress_notes;
+drop policy if exists "Relationships readable by student mentor or mentorship manager" on public.student_relationships;
+create policy "Relationships readable by student mentor or mentorship manager"
   on public.student_relationships for select
   to authenticated
   using (
     student_id = public.my_user_id()
     or mentor_id = public.my_user_id()
-    or public.has_permission('roles', array['View','Manage','Full'])
+    or public.has_permission('mentorship', array['View','Manage','Full'])
   );
 
-drop policy if exists "Roles managers manage student relationships" on public.student_relationships;
-create policy "Roles managers manage student relationships"
+drop policy if exists "Mentorship managers manage student relationships" on public.student_relationships;
+create policy "Mentorship managers manage student relationships"
   on public.student_relationships for all
   to authenticated
-  using (public.has_permission('roles', array['Manage','Full']))
-  with check (public.has_permission('roles', array['Manage','Full']));
+  using (public.has_permission('mentorship', array['Manage','Full']))
+  with check (public.has_permission('mentorship', array['Manage','Full']));
 
 drop policy if exists "Progress notes readable by author student or mentor" on public.mentor_progress_notes;
 create policy "Progress notes readable by author student or mentor"
@@ -840,12 +847,12 @@ create policy "Progress notes readable by author student or mentor"
       where r.id = mentor_progress_notes.relationship_id
         and (r.student_id = public.my_user_id() or r.mentor_id = public.my_user_id())
     )
-    or (not is_confidential and public.has_permission('roles', array['View','Manage','Full']))
+    or (not is_confidential and public.has_permission('mentorship', array['View','Manage','Full']))
   );
 
-drop policy if exists "Roles managers manage mentor progress notes" on public.mentor_progress_notes;
-create policy "Roles managers manage mentor progress notes"
+drop policy if exists "Mentorship managers manage mentor progress notes" on public.mentor_progress_notes;
+create policy "Mentorship managers manage mentor progress notes"
   on public.mentor_progress_notes for all
   to authenticated
-  using (public.has_permission('roles', array['Manage','Full']))
-  with check (public.has_permission('roles', array['Manage','Full']));
+  using (public.has_permission('mentorship', array['Manage','Full']))
+  with check (public.has_permission('mentorship', array['Manage','Full']));

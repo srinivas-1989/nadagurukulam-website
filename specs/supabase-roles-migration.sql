@@ -35,3 +35,9 @@ alter table public.role_permissions enable row level security;
 insert into public.role_permissions (role_key, module_key, access_level)
 select 'super_admin', m, 'Full' from unnest(array['organisation','admissions','lms','public-portal']) as m
 on conflict (role_key, module_key) do nothing;
+
+-- Guru/mentor records are their own module so that holding permission-editor
+-- access never implies the right to read every student's mentor history.
+insert into public.role_permissions (role_key, module_key, access_level)
+select 'super_admin', m, 'Full' from unnest(array['mentorship']) as m
+on conflict (role_key, module_key) do nothing;
