@@ -641,7 +641,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], activities: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
-    class_entries: [], class_confirmations: [], academic_years: [], terms: [], course_offerings: [], course_registrations: []
+    class_entries: [], class_confirmations: [], academic_years: [], terms: [], course_offerings: [], course_registrations: [], enrollments: []
   });
   const [roles, setRoles] = useState([]);
   const [userCategories, setUserCategories] = useState([]);
@@ -1299,7 +1299,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['activities', 'activities'], ['projects', 'projects'], ['certificates', 'certificates'],
         ['role_permissions', 'role_permissions'], ['user_permissions', 'user_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions'],
         ['academic_years', 'academic_years'], ['terms', 'terms'],
-        ['course_offerings', 'course_offerings'], ['course_registrations', 'course_registrations']
+        ['course_offerings', 'course_offerings'], ['course_registrations', 'course_registrations'], ['enrollments', 'enrollments']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
         apiCall(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])
@@ -2065,6 +2065,25 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const res = await apiCall(`${apiUrl}/api/batches/${id}`, { method: 'PUT', body: JSON.stringify({ name: editBatchName.trim(), discipline_id: editBatchDisc || null, level: editBatchLevel.trim(), faculty_id: editBatchFaculty || null, capacity: Number(editBatchCapacity) || 20 }) });
     if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Update failed'); return; }
     setEditingBatch(null); fetchData();
+  };
+
+  // Roster — Student → Batch membership. Leaving a batch sets status to
+  // 'dropped' rather than deleting the row, so past attendance and results
+  // keep pointing at the batch the student actually belonged to.
+  const [rosterBatch, setRosterBatch] = useState('');
+  const [rosterStudent, setRosterStudent] = useState('');
+
+  const handleEnrollStudent = async (e) => {
+    e.preventDefault();
+    if (!rosterBatch || !rosterStudent) return;
+    const res = await apiCall(`${apiUrl}/api/enrollments`, { method: 'POST', body: JSON.stringify({ batch_id: rosterBatch, student_id: rosterStudent }) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Could not enrol student'); return; }
+    setRosterStudent(''); fetchData();
+  };
+  const handleEnrollmentStatus = async (id, status) => {
+    const res = await apiCall(`${apiUrl}/api/enrollments/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); alert(j.error || 'Could not update enrolment'); return; }
+    fetchData();
   };
 
   // Timetable — dynamic columns (timetable_periods table) with 8-period fallback.
@@ -6004,6 +6023,64 @@ const handleAddDiscipline = async (e) => {
                         })}
                       </tbody>
                     </table>
+                  )}
+
+                  {/* Roster — who is in this batch */}
+                  {canCreate('batches') && (
+                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                      <h3 style={{ margin: '0 0 4px', fontSize: '15px' }}>Roster</h3>
+                      <p style={{ margin: '0 0 12px', fontSize: '12px', color: 'var(--text-faint)' }}>
+                        Leaving a batch marks the student dropped — the record is kept so past attendance and
+                        results stay attributable to the batch they actually sat in.
+                      </p>
+                      <form onSubmit={handleEnrollStudent} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        <select value={rosterBatch} onChange={e => setRosterBatch(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                          <option value="">Select batch…</option>
+                          {dbData.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                        <select value={rosterStudent} onChange={e => setRosterStudent(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', flex: 1, minWidth: 180 }}>
+                          <option value="">Select student…</option>
+                          {dbData.users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </select>
+                        <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Enrol</button>
+                      </form>
+
+                      {rosterBatch ? (
+                        (() => {
+                          const rows = dbData.enrollments.filter(e => e.batch_id === rosterBatch);
+                          if (!rows.length) return <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>No students enrolled in this batch yet.</p>;
+                          return (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ background: 'var(--bg)', textAlign: 'left' }}>
+                                  <th style={{ padding: '8px' }}>Student</th>
+                                  <th style={{ padding: '8px' }}>Enrolled</th>
+                                  <th style={{ padding: '8px' }}>Status</th>
+                                  <th style={{ padding: '8px' }}>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {rows.map(e => {
+                                  const stu = dbData.users.find(u => u.id === e.student_id);
+                                  return (
+                                    <tr key={e.id} style={{ borderBottom: '1px solid var(--border)', opacity: e.status === 'dropped' ? 0.55 : 1 }}>
+                                      <td style={{ padding: '8px', fontWeight: 600 }}>{stu?.name || 'Unknown'}</td>
+                                      <td style={{ padding: '8px', color: 'var(--text-soft)' }}>{e.enrolled_at ? new Date(e.enrolled_at).toLocaleDateString() : '—'}</td>
+                                      <td style={{ padding: '8px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '12px', background: e.status === 'enrolled' ? 'var(--primary)' : 'var(--text-faint)', color: '#fff' }}>{e.status}</span></td>
+                                      <td style={{ padding: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                        {e.status !== 'completed' && <button onClick={() => handleEnrollmentStatus(e.id, 'completed')} style={{ background: 'none', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Complete</button>}
+                                        {e.status !== 'dropped' && <button onClick={() => handleEnrollmentStatus(e.id, 'dropped')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Drop</button>}
+                                        {e.status === 'dropped' && <button onClick={() => handleEnrollmentStatus(e.id, 'enrolled')} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Reinstate</button>}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          );
+                        })()
+                      ) : <p style={{ fontSize: '13px', color: 'var(--text-faint)' }}>Select a batch to see its roster.</p>}
+                    </div>
                   )}
                 </div>
               </div>

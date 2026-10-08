@@ -1295,6 +1295,84 @@ app.post('/api/roles', authMiddleware, rolesCreate);
 app.put('/api/roles/:id', authMiddleware, rolesUpdate);
 app.delete('/api/roles/:id', authMiddleware, rolesDelete);
 
+// Enrolments: Student → Batch membership. Gates on the `batches` module
+// because the roster is the batch's own responsibility. Membership changes
+// are never a hard delete — the row is kept and marked 'dropped' so historical
+// results stay attributable to the batch the student actually sat in.
+app.get('/api/enrollments', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'batches', 'list');
+    if (!level) return;
+    let query = supabase.from('enrollments').select('*');
+    if (req.query.batch_id) query = query.eq('batch_id', req.query.batch_id);
+    if (req.query.student_id) query = query.eq('student_id', req.query.student_id);
+    const { data, error } = await query.order('enrolled_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/enrollments', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'batches', 'create');
+    if (!level) return;
+    const student_id = req.body.student_id;
+    const batch_id = req.body.batch_id;
+    if (!student_id || !batch_id) return res.status(400).json({ error: 'student_id and batch_id are required' });
+    const { data: student } = await supabase.from('users').select('id, role_key').eq('id', student_id).maybeSingle();
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    const { data: existing } = await supabase.from('enrollments').select('id,status').eq('student_id', student_id).eq('batch_id', batch_id).maybeSingle();
+    if (existing && existing.status !== 'dropped') return res.status(409).json({ error: 'Student is already enrolled in this batch.' });
+    if (existing) {
+      // Re-enrolling into a batch they left: revive the row rather than
+      // creating a duplicate, so one batch has one enrolment per student.
+      const { data, error } = await supabase.from('enrollments').update({ status: 'enrolled' }).eq('id', existing.id).select().single();
+      if (error) throw error;
+      await recordAudit(req, { action: 'update', entityType: 'enrollments', entityId: existing.id, summary: `Re-enrolled student ${student_id} into batch ${batch_id}`, previousValue: existing, newValue: data });
+      return res.status(200).json(data);
+    }
+    const { data, error } = await supabase.from('enrollments').insert([{ student_id, batch_id }]).select().single();
+    if (error) throw error;
+    await recordAudit(req, { action: 'create', entityType: 'enrollments', entityId: data.id, summary: `Enrolled student ${student_id} into batch ${batch_id}`, newValue: data });
+    res.status(201).json(data);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Student is already enrolled in this batch.' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Leaving a batch is a status change, not a delete — the manual requires the
+// enrolment row survive so past attendance and results keep their batch context.
+app.put('/api/enrollments/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'batches', 'update');
+    if (!level) return;
+    const { data: cur } = await supabase.from('enrollments').select('*').eq('id', req.params.id).maybeSingle();
+    if (!cur) return res.status(404).json({ error: 'Enrolment not found' });
+    const next = String(req.body.status || '');
+    if (!['enrolled', 'completed', 'dropped'].includes(next)) {
+      return res.status(400).json({ error: 'status must be one of: enrolled, completed, dropped' });
+    }
+    const { data, error } = await supabase.from('enrollments').update({ status: next }).eq('id', req.params.id).select().single();
+    if (error) throw error;
+    await recordAudit(req, { action: 'update', entityType: 'enrollments', entityId: req.params.id, summary: `Enrolment status ${cur.status} → ${next}`, previousValue: cur, newValue: data });
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/enrollments/:id', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'batches', 'delete');
+    if (!level) return;
+    const { data: cur } = await supabase.from('enrollments').select('*').eq('id', req.params.id).maybeSingle();
+    if (!cur) return res.status(404).json({ error: 'Enrolment not found' });
+    const { error } = await supabase.from('enrollments').delete().eq('id', req.params.id);
+    if (error) throw error;
+    await recordAudit(req, { action: 'delete', entityType: 'enrollments', entityId: req.params.id, summary: `Deleted enrolment of student ${cur.student_id} from batch ${cur.batch_id}`, previousValue: cur });
+    res.status(204).send();
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // The caller's own effective access per module, role baseline folded together
 // with their own grants. The portal renders its navigation from this, so a
 // person never needs read access to the whole grant tables.

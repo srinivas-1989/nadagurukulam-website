@@ -405,7 +405,29 @@ create policy "Enrollments readable by student or faculty"
   using (
     student_id = public.my_user_id()
     or batch_id = any(public.my_batch_ids())
+    or public.has_permission('batches', array['Manage','Full'])
   );
+
+-- A student may join or leave their own batch; staff Manage+ may move anyone.
+-- "Leaving" is an update to status, never a delete, so results stay attributable.
+drop policy if exists "Enrollments insertable by self or staff" on public.enrollments;
+create policy "Enrollments insertable by self or staff"
+  on public.enrollments for insert
+  to authenticated
+  with check (student_id = public.my_user_id() or public.has_permission('batches', array['Manage','Full']));
+
+drop policy if exists "Enrollments updatable by self or staff" on public.enrollments;
+create policy "Enrollments updatable by self or staff"
+  on public.enrollments for update
+  to authenticated
+  using (student_id = public.my_user_id() or public.has_permission('batches', array['Manage','Full']))
+  with check (student_id = public.my_user_id() or public.has_permission('batches', array['Manage','Full']));
+
+drop policy if exists "Enrollments deletable by staff only" on public.enrollments;
+create policy "Enrollments deletable by staff only"
+  on public.enrollments for delete
+  to authenticated
+  using (public.has_permission('batches', array['Manage','Full']));
 
 -- ============================================================================
 -- SESSION ATTENDANCE
