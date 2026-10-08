@@ -41,6 +41,9 @@ const FILES = [
   path.join(__dirname, '../../specs/supabase-lms-hierarchy.sql'),
   path.join(__dirname, '../../specs/supabase-faculty-assignments.sql'),
   path.join(__dirname, '../../specs/supabase-student-relationships.sql'),
+  path.join(__dirname, '../../specs/supabase-attendance-assessment.sql'),
+  path.join(__dirname, '../../specs/supabase-residential-events.sql'),
+  path.join(__dirname, '../../specs/supabase-student-dossiers.sql'),
   // Policies must run last: every table they reference has to exist first.
   path.join(__dirname, '../../specs/supabase-rls-policies.sql'),
 ];

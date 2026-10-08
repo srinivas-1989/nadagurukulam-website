@@ -39,5 +39,5 @@ on conflict (role_key, module_key) do nothing;
 -- Guru/mentor records are their own module so that holding permission-editor
 -- access never implies the right to read every student's mentor history.
 insert into public.role_permissions (role_key, module_key, access_level)
-select 'super_admin', m, 'Full' from unnest(array['mentorship']) as m
+select 'super_admin', m, 'Full' from unnest(array['mentorship', 'assessment', 'residential', 'dossiers']) as m
 on conflict (role_key, module_key) do nothing;
