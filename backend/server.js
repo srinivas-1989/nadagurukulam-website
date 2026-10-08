@@ -379,7 +379,7 @@ const TABLE_TO_MODULE = {
   courses: 'curriculum', course_modules: 'curriculum', course_module_topics: 'curriculum',
   examination_types: 'curriculum', program_categories: 'curriculum', course_syllabi: 'curriculum',
   academic_years: 'curriculum', terms: 'curriculum',
-  course_offerings: 'curriculum', course_registrations: 'curriculum',
+  course_offerings: 'curriculum', course_registrations: 'curriculum', faculty_assignments: 'curriculum',
   category_level_values: 'roles', user_categories: 'roles',
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   assignment_submissions: 'assignments',
@@ -799,6 +799,26 @@ const crud = (table, orderCol = 'created_at') => ({
         payload.student_id = studentId;
         const { data: dupe } = await supabase.from('course_registrations').select('id').eq('course_offering_id', payload.course_offering_id).eq('student_id', studentId).maybeSingle();
         if (dupe) return res.status(409).json({ error: 'Already registered for this offering.' });
+      }
+      if (table === 'faculty_assignments') {
+        if (!payload.course_offering_id) return res.status(400).json({ error: 'course_offering_id is required' });
+        if (!payload.user_id) return res.status(400).json({ error: 'user_id is required' });
+        const roles = ['teacher','guest_guru','accompanist','assistant','visiting'];
+        if (payload.role && !roles.includes(payload.role)) return res.status(400).json({ error: 'Invalid role' });
+        if (payload.status && !['active','replaced','ended'].includes(payload.status)) return res.status(409).json({ error: 'Invalid status' });
+        if (payload.start_date && payload.end_date && payload.end_date < payload.start_date) return res.status(400).json({ error: 'end_date cannot be before start_date' });
+        const { data: offering } = await supabase.from('course_offerings').select('id').eq('id', payload.course_offering_id).maybeSingle();
+        if (!offering) return res.status(404).json({ error: 'Course offering not found' });
+        // one lead per offering — the lead teacher is the single accountable teacher
+        if (payload.is_lead) {
+          const { data: leads } = await supabase.from('faculty_assignments').select('id,user_id').eq('course_offering_id', payload.course_offering_id).eq('is_lead', true).eq('status', 'active');
+          if ((leads || []).some(l => l.user_id !== payload.user_id)) return res.status(409).json({ error: 'This offering already has a lead teacher.' });
+        }
+        for (const k of ['start_date','end_date','notes']) if (payload[k] === '') payload[k] = null;
+        // mirror the lead teacher onto course_offerings.faculty_id so registration and timetable code stays correct
+        if (payload.is_lead && payload.status !== 'ended') {
+          await supabase.from('course_offerings').update({ faculty_id: payload.user_id }).eq('id', payload.course_offering_id);
+        }
       }
       if (table === 'timetable_slots') {
         if (payload.subjects !== undefined) {

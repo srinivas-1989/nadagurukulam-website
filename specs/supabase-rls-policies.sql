@@ -738,6 +738,22 @@ create policy "Curriculum managers can manage course offerings"
   using (public.has_permission('curriculum', array['Manage','Full']))
   with check (public.has_permission('curriculum', array['Manage','Full']));
 
+drop policy if exists "Assigned faculty can read their assignments" on public.faculty_assignments;
+create policy "Assigned faculty can read their assignments"
+  on public.faculty_assignments for select
+  to authenticated
+  using (
+    user_id = public.my_user_id()
+    or public.has_permission('curriculum', array['View','Manage','Full'])
+  );
+
+drop policy if exists "Curriculum managers can manage faculty assignments" on public.faculty_assignments;
+create policy "Curriculum managers can manage faculty assignments"
+  on public.faculty_assignments for all
+  to authenticated
+  using (public.has_permission('curriculum', array['Manage','Full']))
+  with check (public.has_permission('curriculum', array['Manage','Full']));
+
 -- Registrations are the student's own record: readable by the student, the
 -- offering's batch members (to take a roster), the teaching faculty, and
 -- curriculum managers.
