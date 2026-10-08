@@ -9,15 +9,54 @@ const ghostBtn = { background: 'var(--surface)', border: '1px solid var(--border
 const dangerBtn = { background: 'none', border: '1px solid #e0a0a0', color: '#8b1f1f', padding: '7px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' };
 const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-soft)', marginBottom: '4px' };
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+
+async function apiCall(path, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+  return fetch(`${API_URL}${path}`, { ...options, headers });
+}
+
 // The backend declares every field; this only decides how to draw one.
-function Field({ field, value, onChange }) {
+function Field({ field, value, onChange, apiCall, setError }) {
   const set = v => onChange(field.key, v);
+  const [busy, setBusy] = useState(false);
+
+  // Images go through the portal's own /api/upload so they land in Supabase
+  // Storage and come back as a real URL. Storing a data: URI instead would put
+  // megabytes of base64 into a Mongo document and break every <img src>.
+  async function upload(file) {
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { setError('Image too large (max 15 MB)'); return; }
+    setBusy(true);
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(',')[1] || '');
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const res = await apiCall('/api/upload', {
+        method: 'POST',
+        body: JSON.stringify({ filename: file.name, mime: file.type || 'application/octet-stream', data: b64 }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Upload failed — check the "attachments" Storage bucket');
+      set(j.url);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (field.kind === 'boolean') {
     return (
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
         <input type="checkbox" checked={value === true} onChange={e => set(e.target.checked)} />
         <span>{field.label}</span>
+        {field.required && <span style={{ color: 'var(--primary)' }}>*</span>}
       </label>
     );
   }
@@ -37,13 +76,10 @@ function Field({ field, value, onChange }) {
         <label style={labelStyle}>{field.label}</label>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <input value={value || ''} onChange={e => set(e.target.value)} placeholder="Image URL" style={inputStyle} />
-          <input type="file" accept="image/*" onChange={e => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            const r = new FileReader();
-            r.onload = () => set(String(r.result).split(',')[1] || '');
-            r.readAsDataURL(f);
-          }} style={{ fontSize: '12px' }} title="Upload (portal uploads via /api/upload — paste URL for external images)" />
+          <label style={{ fontSize: '12px', whiteSpace: 'nowrap', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Uploading…' : 'Upload'}
+            <input type="file" accept="image/*" disabled={busy} onChange={e => upload(e.target.files?.[0])} style={{ display: 'none' }} />
+          </label>
         </div>
         {value && <img src={value} alt="" style={{ marginTop: '6px', maxHeight: '90px', borderRadius: '6px', border: '1px solid var(--border)' }} />}
       </div>
@@ -59,7 +95,7 @@ function Field({ field, value, onChange }) {
   );
 }
 
-function GroupEditor({ group, content, onChange }) {
+function GroupEditor({ group, content, onChange, setError }) {
   if (group.repeat) {
     const items = Array.isArray(content[group.key]) ? content[group.key] : [];
     const setItems = next => onChange(group.key, next);
@@ -78,12 +114,17 @@ function GroupEditor({ group, content, onChange }) {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
               <strong style={{ fontSize: '13px', color: 'var(--text-soft)' }}>Item {idx + 1}</strong>
               <span style={{ flex: 1 }} />
-              <button style={{ ...dangerBtn, marginRight: '6px' }} onClick={() => setItems(items.filter((_, i) => i !== idx))} disabled={idx === 0}>↑</button>
+              <button
+                style={{ ...dangerBtn, marginRight: '6px' }}
+                onClick={() => { const next = [...items]; [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]; setItems(next); }}
+                disabled={idx === 0}
+                title="Move up"
+              >↑</button>
               <button style={dangerBtn} onClick={() => setItems(items.filter((_, i) => i !== idx))}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {group.repeat.fields.map(f => (
-                <Field key={f.key} field={f} value={item[f.key]} onChange={v => {
+                <Field key={f.key} field={f} value={item[f.key]} setError={setError} onChange={v => {
                   const next = [...items];
                   next[idx] = { ...next[idx], [f.key]: v };
                   setItems(next);
@@ -101,7 +142,7 @@ function GroupEditor({ group, content, onChange }) {
       <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: 'var(--primary)' }}>{group.label}</h4>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '14px' }}>
         {group.fields.map(f => (
-          <Field key={f.key} field={f} value={content[f.key]} onChange={v => onChange(f.key, v)} />
+          <Field key={f.key} field={f} value={content[f.key]} setError={setError} onChange={v => onChange(f.key, v)} />
         ))}
       </div>
     </div>
@@ -117,38 +158,52 @@ export default function PublicPortalPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
-
-  async function apiCall(path, options = {}) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
-    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-    return fetch(`${apiUrl}${path}`, { ...options, headers });
-  }
-
   async function loadBlock(key) {
     try {
       const res = await apiCall(`/api/cms/${key}`);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
       const j = await res.json();
+      // A never-saved block is legitimately empty; that is not the same as a
+      // failed read, which must not present as blank content ready to overwrite.
       const c = j.content || {};
       setContent(c);
       setSaved(c);
-    } catch { setContent({}); setSaved({}); }
+      setError('');
+    } catch (e) {
+      setContent(null);
+      setSaved(null);
+      setError(`Could not load "${key}": ${e.message}`);
+    }
   }
 
   useEffect(() => {
+    let cancelled = false;
     apiCall('/api/cms/schemas')
-      .then(r => r.json())
-      .then(list => {
-        setSchemas(list);
-        if (list.length && !activeKey) setActiveKey(list[0].key);
+      .then(async r => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+        return r.json();
       })
-      .catch(() => setError('Failed to load CMS schemas'));
+      .then(list => {
+        if (cancelled) return;
+        setSchemas(list);
+        if (list.length) setActiveKey(list[0].key);
+      })
+      .catch(e => { if (!cancelled) setError(e.message || 'Failed to load CMS schemas'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => { if (activeKey) loadBlock(activeKey); }, [activeKey]);
 
+  // A block that fails to load (Mongo down, 503) must not look like empty content.
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(''), 6000);
+    return () => clearTimeout(t);
+  }, [error]);
+
   async function handleSave() {
+    if (content === null) return;
     setSaving(true);
     try {
       const res = await apiCall(`/api/cms/${activeKey}`, { method: 'PUT', body: JSON.stringify(content) });
@@ -160,10 +215,10 @@ export default function PublicPortalPage() {
     setSaving(false);
   }
 
-  function handleReset() { setContent(saved); setError(''); }
+  function handleReset() { setContent(saved); }
 
   const activeSchema = schemas.find(s => s.key === activeKey);
-  const dirty = JSON.stringify(content) !== JSON.stringify(saved);
+  const dirty = content !== null && JSON.stringify(content) !== JSON.stringify(saved);
 
   return (
     <div>
@@ -194,11 +249,19 @@ export default function PublicPortalPage() {
             ))}
           </div>
 
-          {activeSchema && (
+          {activeSchema && content === null && (
+            <div style={cardStyle}>
+              <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
+                Could not read this block. Saving is disabled so real content isn&apos;t overwritten — fix the error above, then pick another tab and back.
+              </p>
+            </div>
+          )}
+
+          {activeSchema && content !== null && (
             <div style={cardStyle}>
               <h4 style={{ margin: '0 0 16px', fontSize: '15px', color: 'var(--primary)' }}>{activeSchema.label}</h4>
               {activeSchema.groups.map(g => (
-                <GroupEditor key={g.key} group={g} content={content} onChange={(k, v) => setContent(prev => ({ ...prev, [k]: v }))} />
+                <GroupEditor key={g.key} group={g} content={content} setError={setError} onChange={(k, v) => setContent(prev => ({ ...prev, [k]: v }))} />
               ))}
               <div style={{ display: 'flex', gap: '8px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                 <button style={primaryBtn} onClick={handleSave} disabled={!dirty || saving}>
