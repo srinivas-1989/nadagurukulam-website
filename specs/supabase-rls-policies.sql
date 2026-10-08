@@ -745,3 +745,29 @@ create policy "Students can drop their own registration"
   on public.course_registrations for delete
   to authenticated
   using (student_id = public.my_user_id());
+-- Fix RLS for positions and reporting_relationships (appended)
+drop policy if exists "Positions readable with organisation access" on public.positions;
+create policy "Positions readable with organisation access"
+  on public.positions for select
+  to authenticated
+  using (public.has_permission('organisation', array['View','Self','Submits','Own','Manage','Full']));
+
+drop policy if exists "Positions managers can manage positions" on public.positions;
+create policy "Positions managers can manage positions"
+  on public.positions for all
+  to authenticated
+  using (public.has_permission('organisation', array['Manage','Full']))
+  with check (public.has_permission('organisation', array['Manage','Full']));
+
+drop policy if exists "Reporting readable with organisation access" on public.reporting_relationships;
+create policy "Reporting readable with organisation access"
+  on public.reporting_relationships for select
+  to authenticated
+  using (public.has_permission('organisation', array['View','Self','Submits','Own','Manage','Full']));
+
+drop policy if exists "Reporting managers can manage reporting" on public.reporting_relationships;
+create policy "Reporting managers can manage reporting"
+  on public.reporting_relationships for all
+  to authenticated
+  using (public.has_permission('organisation', array['Manage','Full']))
+  with check (public.has_permission('organisation', array['Manage','Full']));

@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS applicants (
 CREATE TABLE IF NOT EXISTS admissions_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   applicant_id UUID REFERENCES applicants(id) ON DELETE CASCADE,
-  programme_id UUID,
+  programme_id UUID REFERENCES disciplines(id) ON DELETE SET NULL,
   status TEXT DEFAULT 'submitted', -- submitted, screening, audition, selected, admitted, rejected
   submitted_at TIMESTAMPTZ DEFAULT now(),
   created_at TIMESTAMPTZ DEFAULT now()
