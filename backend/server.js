@@ -380,7 +380,9 @@ const API_TO_MODULE = {
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   student_relationships: 'mentorship', mentor_progress_notes: 'mentorship',
   assignment_submissions: 'assignments',
-  projects: 'projects', certificates: 'certificates'
+  projects: 'projects', certificates: 'certificates',
+  evaluation_blueprints: 'dossiers', evaluation_sections: 'dossiers',
+  evaluation_questions: 'dossiers', student_assessments: 'dossiers'
 };
 // Reverse: table name → module_key (crud is instantiated with table names)
 const TABLE_TO_MODULE = {
@@ -396,7 +398,13 @@ const TABLE_TO_MODULE = {
   class_entries: 'teachinglogs', class_confirmations: 'teachinglogs',
   student_relationships: 'mentorship', mentor_progress_notes: 'mentorship',
   assignment_submissions: 'assignments',
-  projects: 'projects', certificates: 'certificates'
+  projects: 'projects', certificates: 'certificates',
+  attendance_states: 'assessment', class_sessions: 'assessment', attendance_records: 'assessment',
+  grading_schemes: 'assessment', rubrics: 'assessment', rubric_criteria: 'assessment',
+  assessment_plans: 'assessment', assessments: 'assessment', assessment_submissions: 'assessment',
+  evaluations: 'assessment', results: 'assessment', result_corrections: 'assessment',
+  evaluation_blueprints: 'dossiers', evaluation_sections: 'dossiers', evaluation_questions: 'dossiers',
+  student_assessments: 'dossiers', dossier_section_assignments: 'dossiers', student_assessment_versions: 'dossiers'
 };
 
 // ── Row-level scoping helpers ──────────────────────────────────────────────
@@ -720,6 +728,36 @@ const crud = (table, orderCol = 'created_at') => ({
         if (req.body.verified !== undefined && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) delete req.body.verified;
         if (req.body.verified_by !== undefined) delete req.body.verified_by;
       }
+      if (table === 'class_sessions') {
+        if (!req.body.course_offering_id) return res.status(400).json({ error: 'course_offering_id is required' });
+        if (!req.body.session_date) return res.status(400).json({ error: 'session_date is required' });
+        if (req.body.status && !['planned','held','cancelled'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (req.body.start_time && req.body.end_time && req.body.end_time < req.body.start_time) return res.status(400).json({ error: 'end_time cannot be before start_time' });
+      }
+      if (table === 'attendance_records') {
+        if (!req.body.class_session_id || !req.body.student_id || !req.body.state_id) return res.status(400).json({ error: 'class_session_id, student_id, state_id required' });
+      }
+      if (table === 'assessment_plans') {
+        if (!req.body.course_offering_id || !req.body.name) return res.status(400).json({ error: 'course_offering_id and name required' });
+        if (req.body.status && !['draft','published','locked'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+      }
+      if (table === 'assessments') {
+        if (!req.body.plan_id || !req.body.title) return res.status(400).json({ error: 'plan_id and title required' });
+        if (req.body.status && !['draft','published','open','closed','evaluated'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (req.body.assessment_scope && !['internal','external','practical','skill'].includes(req.body.assessment_scope)) return res.status(400).json({ error: 'Invalid assessment_scope' });
+      }
+      if (table === 'assessment_submissions') {
+        if (!req.body.assessment_id || !req.body.student_id || !req.body.course_offering_id) return res.status(400).json({ error: 'assessment_id, student_id, course_offering_id required' });
+        if (req.body.status && !['pending','submitted','evaluated'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+      }
+      if (table === 'evaluations') {
+        if (!req.body.submission_id) return res.status(400).json({ error: 'submission_id required' });
+      }
+      if (table === 'results') {
+        if (!req.body.course_offering_id || !req.body.student_id) return res.status(400).json({ error: 'course_offering_id and student_id required' });
+        if (req.body.outcome && !['pass','fail','pending'].includes(req.body.outcome)) return res.status(400).json({ error: 'Invalid outcome' });
+      }
+
       // ── courses: hours input → auto periods via program mins (reverse of before); also normalize exam hrs/mins ──
       let payload = { ...req.body };
       if (table === 'courses') {
@@ -1354,9 +1392,9 @@ const rolesDelete = async (req, res) => {
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
 const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'faculty_assignments', 'student_relationships', 'mentor_progress_notes', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'faculty_assignments', 'student_relationships', 'mentor_progress_notes', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories', 'attendance_states', 'class_sessions', 'attendance_records', 'grading_schemes', 'rubrics', 'rubric_criteria', 'assessment_plans', 'assessments', 'assessment_submissions', 'evaluations', 'results', 'result_corrections', 'evaluation_blueprints', 'evaluation_sections', 'evaluation_questions', 'dossier_section_assignments'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
@@ -2603,5 +2641,8 @@ app.put('/api/cms/:key', authMiddleware, async (req, res) => {
     res.json({ key: block.key, content: block.content });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+const { registerDossierRoutes } = require('./dossiers');
+registerDossierRoutes({ app, authMiddleware, supabase, requireLevel, recordAudit });
 
 app.listen(PORT, () => console.log(`Nada Gurukulam API active on ${PORT}`));
