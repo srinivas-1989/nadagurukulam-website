@@ -5,6 +5,8 @@ import { useImageCropper } from './ImageCropModal';
 import OrganisationPage from './organisation/page';
 import AdmissionsPage from './admissions/page';
 import AcademicCalendarPage from './academic-calendar/page';
+import CourseOfferingsPage from './course-offerings/page';
+import MyRegistrationsPage from './course-registration/page';
 
 // The column holds a year, but a date picker is far easier to hit than a
 // number box, so the UI collects a date and these take its year.
@@ -582,7 +584,9 @@ export default function Home() {
     { key: 'teachinglogs', name: 'Teaching Logs', desc: 'Weekly class logs & XLSX exports (Mon–Sat).' },
     { key: 'organisation', name: 'Organisation', desc: 'Institution, campuses, and reporting structure.' },
     { key: 'admissions', name: 'Admissions', desc: 'Applications, screening, auditions, and admission decisions.' },
-    { key: 'academic-calendar', name: 'Academic Calendar', desc: 'Academic years and terms in which courses are offered.' }
+    { key: 'academic-calendar', name: 'Academic Calendar', desc: 'Academic years and terms in which courses are offered.' },
+    { key: 'course-offerings', name: 'Course Offerings', desc: 'Define which courses are offered to which batches in a term.' },
+    { key: 'course-registration', name: 'My Registrations', desc: 'Register for and drop offered courses.' }
   ];
 
   const MODULE_ICONS = {
@@ -6606,10 +6610,12 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'organisation' && <OrganisationPage />}
             {activeModule === 'admissions' && <AdmissionsPage />}
             {activeModule === 'academic-calendar' && <AcademicCalendarPage />}
+            {activeModule === 'course-offerings' && <CourseOfferingsPage />}
+            {activeModule === 'course-registration' && <MyRegistrationsPage />}
 
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles', 'organisation', 'admissions', 'academic-calendar'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'activities', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module

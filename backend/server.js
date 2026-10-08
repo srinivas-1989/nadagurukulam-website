@@ -422,6 +422,12 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
     if (level === 'Manage' || level === 'Full') return query;
     return query.eq('student_id', profile.id);
   }
+  if (table === 'course_registrations') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return query.eq('student_id', profile.id);
+  }
+  // course_offerings stays a readable catalogue: students need to see open
+  // offerings in order to register for one. Registrations are the private part.
   if (level === 'View' || level === 'Submits' || level === 'Manage' || level === 'Full') return query;
 
   if (level === 'Self') {
