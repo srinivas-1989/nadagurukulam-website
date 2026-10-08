@@ -6717,7 +6717,7 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'mentorship' && <StudentRelationshipsPage />}
             {activeModule === 'lms' && <LmsPage />}
             {activeModule === 'public-portal' && <PublicPortalPage />}
-            {activeModule === 'dossiers' && <DossiersPage />}
+            {activeModule === 'dossiers' && <StudentAssessmentPage />}
 
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
