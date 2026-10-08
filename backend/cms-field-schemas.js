@@ -2,30 +2,45 @@
 // PUBLIC PORTAL CMS — field schemas
 // ----------------------------------------------------------------------------
 // The public website is data, not code. Each block below declares its fields;
-// the portal renders an editor from this list and the public site renders from
-// the saved values. Adding a heading, renaming a label or inserting a new field
-// is therefore a data edit, not a redeploy.
+// the portal builds its editor from this list and the public site renders from
+// the saved values. Renaming a heading or inserting a new field is therefore a
+// data edit, not a redeploy.
 //
-// Field kinds: text | textarea | richtext | image | link | email | tel | number
+// Group shapes:
+//   { key, label, fields }              → plain fields, stored as content[key]
+//   { key, label, repeat: { fields } }  → repeatable list, stored as content[key]
+//     so two repeatable groups in one block can never collide on the key.
+//
+// Field kinds: text | textarea | richtext | image | link | email | tel | boolean
 // ---------------------------------------------------------------------------
-// Reference site inventory (nadagurukulam.org) — nav, founder message, vision,
-// courses, faculty, campus gallery, contact, footer columns, legal pages.
+// Blocks mirror the live reference site (nadagurukulam.org).
 // ---------------------------------------------------------------------------
 
-const REPEAT_BLOCKS = [
-  { key: 'items', label: 'Items', min: 0, fields: [
-      { key: 'title', label: 'Title', kind: 'text', required: true },
-      { key: 'subtitle', label: 'Subtitle', kind: 'text' },
-      { key: 'body', label: 'Body', kind: 'richtext' },
-      { key: 'image', label: 'Image', kind: 'image' },
-      { key: 'link', label: 'Link', kind: 'link' },
-      { key: 'linkLabel', label: 'Link label', kind: 'text' },
-    ] },
+const ITEM_FIELDS = [
+  { key: 'title', label: 'Title', kind: 'text', required: true },
+  { key: 'subtitle', label: 'Subtitle', kind: 'text' },
+  { key: 'body', label: 'Body', kind: 'richtext' },
+  { key: 'image', label: 'Image', kind: 'image' },
+  { key: 'link', label: 'Link', kind: 'link' },
+];
+
+const IMG_CAPTION_FIELDS = [
+  { key: 'title', label: 'Caption', kind: 'text' },
+  { key: 'image', label: 'Image', kind: 'image', required: true },
+  { key: 'link', label: 'Link', kind: 'link' },
+];
+
+const LEGAL_PAGE_FIELDS = [
+  { key: 'title', label: 'Title', kind: 'text', required: true },
+  { key: 'slug', label: 'URL slug', kind: 'text', required: true },
+  { key: 'body', label: 'Content', kind: 'richtext' },
+  { key: 'showInFooter', label: 'Show in footer', kind: 'boolean' },
+  { key: 'published', label: 'Published', kind: 'boolean' },
 ];
 
 const CMS_FIELD_SCHEMAS = {
   home: {
-    label: 'Home — Hero & Disciplines',
+    label: 'Home — Hero, Disciplines, Footer',
     groups: [
       { key: 'hero', label: 'Hero', fields: [
           { key: 'heroTagline', label: 'Tagline', kind: 'text' },
@@ -43,133 +58,145 @@ const CMS_FIELD_SCHEMAS = {
           { key: 'disciplinesEmptyText', label: 'Empty-state text', kind: 'text' },
         ] },
       { key: 'events', label: 'Events strip', fields: [
+          { key: 'showEvents', label: 'Show published events', kind: 'boolean' },
           { key: 'eventsHeading', label: 'Heading', kind: 'text' },
           { key: 'eventsSub', label: 'Subline', kind: 'textarea' },
-          { key: 'showEvents', label: 'Show published events', kind: 'boolean' },
         ] },
       { key: 'jobs', label: 'Careers strip', fields: [
-          { key: 'jobsHeading', label: 'Heading', kind: 'text' },
           { key: 'showJobs', label: 'Show published jobs', kind: 'boolean' },
+          { key: 'jobsHeading', label: 'Heading', kind: 'text' },
         ] },
       { key: 'enquiry', label: 'Enquiry form', fields: [
+          { key: 'showEnquiryForm', label: 'Show enquiry form', kind: 'boolean' },
           { key: 'enquiryHeading', label: 'Heading', kind: 'text' },
           { key: 'enquirySub', label: 'Subline', kind: 'textarea' },
-          { key: 'showEnquiryForm', label: 'Show enquiry form', kind: 'boolean' },
         ] },
       { key: 'footer', label: 'Footer', fields: [
+          { key: 'footerLogo', label: 'Footer logo', kind: 'image' },
           { key: 'footerAddress', label: 'Address', kind: 'textarea' },
           { key: 'footerPhone', label: 'Phone', kind: 'tel' },
           { key: 'footerEmail', label: 'Email', kind: 'email' },
-          { key: 'footerLogo', label: 'Footer logo', kind: 'image' },
           { key: 'footerCopyright', label: 'Copyright line', kind: 'text' },
         ] },
     ],
   },
 
-  // ── Navigation ────────────────────────────────────────────────────────────
   navigation: {
-    label: 'Navigation',
+    label: 'Navigation — header & footer links',
     groups: [
-      { key: 'header', label: 'Header links', repeat: REPEAT_BLOCKS[0] },
-      { key: 'footerExplore', label: 'Footer — Explore column', repeat: REPEAT_BLOCKS[0] },
-      { key: 'footerQuick', label: 'Footer — Quick links column', repeat: REPEAT_BLOCKS[0] },
+      { key: 'header', label: 'Header links', repeat: { fields: ITEM_FIELDS } },
+      { key: 'footerExplore', label: 'Footer — Explore column', repeat: { fields: ITEM_FIELDS } },
+      { key: 'footerQuick', label: 'Footer — Quick links column', repeat: { fields: ITEM_FIELDS } },
     ],
   },
 
-  // ── Founder's message (#founder) ─────────────────────────────────────────
   founder: {
     label: "Founder's Message",
     groups: [
-      { key: 'main', label: 'Message', fields: [
+      { key: 'founder', label: 'Message', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'founderName', label: 'Founder name', kind: 'text' },
           { key: 'founderRole', label: 'Role / title', kind: 'text' },
-          { key: 'signature', label: 'Signature image', kind: 'image' },
           { key: 'body', label: 'Message', kind: 'richtext' },
           { key: 'portrait', label: 'Portrait', kind: 'image' },
-          { key: 'show', label: 'Show section', kind: 'boolean' },
+          { key: 'signature', label: 'Signature image', kind: 'image' },
         ] },
     ],
   },
 
-  // ── Our Vision (#ourvision) ──────────────────────────────────────────────
   vision: {
     label: 'Our Vision',
     groups: [
-      { key: 'main', label: 'Vision', fields: [
+      { key: 'vision', label: 'Vision', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'subheading', label: 'Subheading', kind: 'text' },
           { key: 'body', label: 'Body', kind: 'richtext' },
-          { key: 'pillars', label: 'Pillars', repeat: REPEAT_BLOCKS[0] },
           { key: 'image', label: 'Image', kind: 'image' },
-          { key: 'show', label: 'Show section', kind: 'boolean' },
         ] },
+      { key: 'pillars', label: 'Pillars', repeat: { fields: ITEM_FIELDS } },
     ],
   },
 
-  // ── About the institution ────────────────────────────────────────────────
   about: {
     label: 'About Our Institution',
     groups: [
-      { key: 'main', label: 'About', fields: [
+      { key: 'about', label: 'About', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'body', label: 'Body', kind: 'richtext' },
           { key: 'image', label: 'Image', kind: 'image' },
-          { key: 'highlights', label: 'Highlights', repeat: REPEAT_BLOCKS[0] },
-          { key: 'show', label: 'Show section', kind: 'boolean' },
         ] },
+      { key: 'highlights', label: 'Highlights', repeat: { fields: ITEM_FIELDS } },
     ],
   },
 
-  // ── Campus (#campus) ─────────────────────────────────────────────────────
   campus: {
     label: 'Upcoming Campus',
     groups: [
-      { key: 'main', label: 'Campus', fields: [
+      { key: 'campus', label: 'Campus', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'subheading', label: 'Subheading', kind: 'text' },
           { key: 'body', label: 'Body', kind: 'richtext' },
           { key: 'videoUrl', label: 'Walkthrough video URL', kind: 'link' },
           { key: 'videoPoster', label: 'Video poster image', kind: 'image' },
-          { key: 'gallery', label: 'Gallery images', repeat: { ...REPEAT_BLOCKS[0], label: 'Images', fields: [
-              { key: 'title', label: 'Caption', kind: 'text' },
-              { key: 'image', label: 'Image', kind: 'image' },
-              { key: 'link', label: 'Link', kind: 'link' },
-            ] } },
           { key: 'ctaLabel', label: 'Button label', kind: 'text' },
           { key: 'ctaLink', label: 'Button link', kind: 'link' },
-          { key: 'show', label: 'Show section', kind: 'boolean' },
         ] },
+      { key: 'gallery', label: 'Gallery images', repeat: { fields: IMG_CAPTION_FIELDS } },
     ],
   },
 
-  // ── Contact / CTA block ("Create something beautiful with us") ───────────
   contact: {
     label: 'Contact Strip',
     groups: [
-      { key: 'main', label: 'Contact', fields: [
+      { key: 'contact', label: 'Contact', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
           { key: 'heading', label: 'Heading', kind: 'text' },
           { key: 'body', label: 'Body', kind: 'textarea' },
           { key: 'ctaLabel', label: 'Button label', kind: 'text' },
           { key: 'ctaLink', label: 'Button link', kind: 'link' },
-          { key: 'show', label: 'Show section', kind: 'boolean' },
         ] },
     ],
   },
 
-  // ── Legal pages ──────────────────────────────────────────────────────────
   legal: {
     label: 'Legal Pages',
     groups: [
-      { key: 'pages', label: 'Pages', repeat: { key: 'pages', label: 'Pages', fields: [
-          { key: 'title', label: 'Title', kind: 'text', required: true },
-          { key: 'slug', label: 'URL slug', kind: 'text', required: true },
-          { key: 'body', label: 'Content', kind: 'richtext' },
-          { key: 'showInFooter', label: 'Show in footer', kind: 'boolean' },
-          { key: 'published', label: 'Published', kind: 'boolean' },
-        ] } },
+      { key: 'pages', label: 'Pages', repeat: { fields: LEGAL_PAGE_FIELDS } },
     ],
   },
 };
 
-module.exports = { CMS_FIELD_SCHEMAS };
+// Rejects anything the schema doesn't declare, so a stale client can't smuggle
+// fields into a published block.
+const validateCmsContent = (schema, content) => {
+  const known = new Set();
+  for (const g of schema.groups || []) {
+    if (g.repeat) known.add(g.key);
+    for (const f of (g.repeat ? g.repeat.fields : g.fields) || []) {
+      known.add(g.repeat ? `${g.key}.${f.key}` : f.key);
+    }
+  }
+
+  const bad = Object.keys(content).filter(k => !known.has(k));
+
+  for (const g of schema.groups || []) {
+    if (!g.repeat) continue;
+    const items = content[g.key];
+    if (items == null) continue;
+    if (!Array.isArray(items)) return `"${g.key}" must be a list`;
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return `"${g.key}" entries must be objects`;
+      for (const k of Object.keys(item)) {
+        if (!g.repeat.fields.some(f => f.key === k)) bad.push(`${g.key}.${k}`);
+      }
+    }
+  }
+
+  return bad.length ? `Unknown field(s) for this block: ${[...new Set(bad)].join(', ')}` : null;
+};
+
+module.exports = { CMS_FIELD_SCHEMAS, validateCmsContent };

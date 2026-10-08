@@ -2497,6 +2497,26 @@ admissionsCrud('auditions', 'auditions', {
   },
 });
 
+// ============================================================================
+// PUBLIC PORTAL CMS
+// ----------------------------------------------------------------------------
+// Public site content is data. `CMS_FIELD_SCHEMAS` declares every editable
+// field per block, so the portal builds its editor from the schema and the
+// public site renders from stored values — no content lives in JSX.
+//
+// Reads are public (the website is public). Writes require Manage on
+// 'public-portal', so it is grantable per role like any other module.
+// ============================================================================
+const CMS_MODULE = 'public-portal';
+
+app.get('/api/cms/schemas', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, CMS_MODULE, 'list');
+    if (!level) return;
+    res.json(Object.entries(CMS_FIELD_SCHEMAS).map(([key, s]) => ({ key, label: s.label, groups: s.groups })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/cms', async (req, res) => {
   try {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
@@ -2513,21 +2533,31 @@ app.get('/api/cms/:key', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Writes are permission-gated here, not in RLS: the API runs on the service-role
+// client, which bypasses RLS entirely, so this handler is the only real gate.
 app.put('/api/cms/:key', authMiddleware, async (req, res) => {
   try {
     if (!cmsReady) return res.status(503).json({ error: 'MongoDB not connected' });
-    const isSuper = req.auth.profile.role_key === 'super_admin';
-    if (!isSuper) {
-      const level = await getAccessLevel(req.auth.profile, 'curriculum');
-      if (!level || (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Full']) {
-        return res.status(403).json({ error: 'Only Super Admin (or Full on Curriculum) can edit site content.' });
-      }
-    }
+    const schema = CMS_FIELD_SCHEMAS[req.params.key];
+    if (!schema) return res.status(404).json({ error: `Unknown CMS block "${req.params.key}"` });
+
+    const level = await requireLevel(req, res, CMS_MODULE, 'update');
+    if (!level) return;
+
+    const content = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const err = validateCmsContent(schema, content);
+    if (err) return res.status(400).json({ error: err });
+
     const block = await CmsBlock.findOneAndUpdate(
       { key: req.params.key },
-      { key: req.params.key, content: req.body },
+      { key: req.params.key, content },
       { upsert: true, new: true, runValidators: true }
     ).lean();
+
+    await recordAudit(req, {
+      action: 'update', entityType: 'cms_block', entityId: block.key,
+      summary: `Edited public site block "${schema.label}"`, newValue: content,
+    });
     res.json({ key: block.key, content: block.content });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
