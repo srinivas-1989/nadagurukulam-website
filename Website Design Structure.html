@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Design Structure - Nada Gurukulam</title>
+    <style>
+        :root {
+            --primary: #78281F; /* Maroon */
+            --accent: #D35400;  /* Saffron */
+            --bg: #FDFEFE;      /* Cream */
+            --surface: #FFFFFF;
+            --border: #E5E7EB;
+            --text: #1F2937;
+            --text-soft: #4B5563;
+            --text-faint: #9CA3AF;
+            --radius-xl: 12px;
+            --radius: 8px;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 40px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        h1, h2, h3 {
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 8px;
+            margin-top: 24px;
+        }
+        h1 { font-size: 2.25rem; margin-top: 0; }
+        h2 { font-size: 1.5rem; }
+        h3 { font-size: 1.2rem; border-bottom: none; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+        th {
+            background-color: var(--bg);
+            color: var(--primary);
+        }
+        code, pre {
+            background: #F3F4F6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            padding: 14px;
+            overflow-x: auto;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Nada Gurukulam — Complete Website & Portal Design Structure</h1>
+    <p>Comprehensive technical and architectural specification for replicating the entire web application and portal design.</p>
+
+    <h2>1. Core Stack & Infrastructure</h2>
+    <ul>
+        <li><strong>Frontend</strong>: Next.js 16 App Router (Turbopack), React Client Components, Single-file portal architecture (<code>frontend/app/page.js</code>).</li>
+        <li><strong>Backend</strong>: Express.js server (port 10000), modular auth middleware, direct Supabase & MongoDB connectors.</li>
+        <li><strong>Database</strong>: Supabase Postgres (Relational Core: Auth, Roles, Permissions, Users, Curriculum Structure, Syllabi) + MongoDB (CMS blocks & rich content).</li>
+        <li><strong>Deployment</strong>: Render (Backend) + Vercel (Frontend).</li>
+    </ul>
+
+    <h2>2. Visual Identity & Design Tokens</h2>
+    <ul>
+        <li><strong>Primary Color</strong>: Maroon (<code>#78281F</code> / <code>var(--primary)</code>)</li>
+        <li><strong>Accent Color</strong>: Saffron (<code>#D35400</code> / <code>var(--accent)</code>)</li>
+        <li><strong>Background</strong>: Cream / Warm White (<code>#FDFEFE</code> / <code>var(--bg)</code>)</li>
+        <li><strong>Surface/Card</strong>: Pure White (<code>#FFFFFF</code> / <code>var(--surface)</code>)</li>
+        <li><strong>Corner Radius</strong>: Two-side-rounded / <code>12px</code> (<code>var(--radius-xl)</code>)</li>
+    </ul>
+
+    <h2>3. Portal Shell & Dashboard Architecture</h2>
+    <ul>
+        <li><strong>Sidebar Design</strong>: Full-height maroon navigation bar (<code>nav.portal-sidebar</code>). Includes branded logo, user avatar/profile access, and active module navigation list.</li>
+        <li><strong>Collapsible Functionality</strong>: Managed via React <code>collapsed</code> state. Toggle button (<code>.ndg-side-toggle</code>) positioned outside the nav for consistent layout behavior. Uses ARIA attributes for accessibility.</li>
+        <li><strong>Dashboard Overview</strong>: Unified 4-column widget grid (<code>.ndg-widget-grid</code>).</li>
+        <li><strong>Dynamic Row-Packing</strong>: 4 units per line. Stat widgets occupy 1 unit, Section widgets occupy 2+ units (auto-filling rows).</li>
+        <li><strong>User Customization</strong>: Toggleable Stat vs Section kinds in Edit Mode, persisted in Supabase (`dashboard_widgets.kind`).</li>
+    </ul>
+
+    <h2>4. Curriculum & Syllabus Module Structure</h2>
+    <table>
+        <tr>
+            <th>Layer</th>
+            <th>Table / Collection</th>
+            <th>Key Attributes</th>
+        </tr>
+        <tr>
+            <td>Program Category</td>
+            <td><code>program_categories</code></td>
+            <td><code>id, name, duration_value, duration_unit, sort_order</code></td>
+        </tr>
+        <tr>
+            <td>Discipline</td>
+            <td><code>disciplines</code></td>
+            <td><code>id, category_id, name, structure_mode (semester/yearly/monthly), year_count, semesters_per_year, period_minutes</code></td>
+        </tr>
+        <tr>
+            <td>Course</td>
+            <td><code>courses</code></td>
+            <td><code>id, discipline_id, code, name, year_label, semester_number, credits, examination_type_id</code></td>
+        </tr>
+        <tr>
+            <td>Syllabus & Modules</td>
+            <td><code>course_syllabi</code>, <code>course_modules</code>, <code>course_module_topics</code></td>
+            <td>Versioned syllabi, structured teaching hours, RBT levels, CO mappings, topics.</td>
+        </tr>
+        <tr>
+            <td>CMS Content</td>
+            <td>MongoDB: <code>curriculum_content</code></td>
+            <td>Flexible rich text content keyed by <code>course_${courseId}</code>.</td>
+        </tr>
+    </table>
+
+    <h2>5. Role-Based Access Control (RBAC)</h2>
+    <ul>
+        <li><strong>7 Levels</strong>: None(0) < View(1) < Self(2) < Submits(3) < Own(4) < Manage(5) < Full(6).</li>
+        <li><strong>Self-Service Profile</strong>: Sidebar username and public-header name trigger profile modal; <code>PUT /api/me</code> edits allowlisted fields (<code>name</code>, <code>phone</code>, <code>designation</code>).</li>
+        <li><strong>Ragged Role Tree</strong>: <code>user_categories</code> and <code>category_level_values</code> self-referential tree supporting varying depth per branch.</li>
+    </ul>
+</div>
+</body>
+</html>
