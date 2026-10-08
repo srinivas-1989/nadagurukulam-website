@@ -71,6 +71,9 @@ export function CmsSections({ blocks }) {
   const campus = blocks?.campus?.campus;
   const gallery = blocks?.campus?.gallery;
   const contact = blocks?.contact?.contact;
+  const faculty = blocks?.faculty?.faculty;
+  const galleryBlock = blocks?.gallery?.gallery;
+  const admission = blocks?.admission?.admission;
 
   return (
     <>
@@ -121,6 +124,53 @@ export function CmsSections({ blocks }) {
           {campus.videoUrl && (
             <a href={campus.videoUrl} target="_blank" rel="noopener noreferrer" style={ctaStyle}>{campus.ctaLabel || 'Watch the walkthrough video'}</a>
           )}
+        </section>
+      )}
+
+      {faculty && faculty.show !== false && (faculty.heading || blocks?.faculty?.members?.length > 0) && (
+        <section style={sectionStyle}>
+          <p style={kickerStyle}>Experienced mentors &amp; guides</p>
+          <h3 style={headingStyle}>{faculty.heading}</h3>
+          <Text value={faculty.subheading} style={{ fontSize: '16px' }} />
+          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            {(blocks?.faculty?.members || []).map((m, i) => (
+              <div key={i} style={{ ...cardStyle, textAlign: 'center' }}>
+                {m.image && <img src={m.image} alt={m.title || ''} style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '50%', margin: '0 auto 12px' }} />}
+                <h4 style={{ margin: 0, fontSize: '14.5px', color: 'var(--primary)' }}>{m.title}</h4>
+                {m.subtitle && <div style={{ fontSize: '12.5px', color: 'var(--text-faint)', marginTop: '4px' }}>{m.subtitle}</div>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {galleryBlock && galleryBlock.show !== false && (galleryBlock.heading || blocks?.gallery?.images?.length > 0) && (
+        <section style={sectionStyle}>
+          <h3 style={headingStyle}>{galleryBlock.heading}</h3>
+          <Text value={galleryBlock.subheading} style={{ fontSize: '16px' }} />
+          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            {(blocks?.gallery?.images || []).map((g, i) => (
+              <figure key={i} style={{ margin: 0 }}>
+                <img src={g.image} alt={g.title || ''} style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: 'var(--radius-xl)' }} />
+                {g.title && <figcaption style={{ marginTop: '8px', fontSize: '13px', color: 'var(--text-soft)' }}>{g.title}</figcaption>}
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {admission && admission.show !== false && (admission.heading || admission.body) && (
+        <section style={{ ...sectionStyle, background: 'var(--bg-saffron)', borderRadius: 'var(--radius-xl)', padding: '32px', textAlign: 'center' }}>
+          <h3 style={headingStyle}>{admission.heading}</h3>
+          <Text value={admission.body} style={{ maxWidth: '60ch', marginLeft: 'auto', marginRight: 'auto' }} />
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '18px' }}>
+            {admission.formUrl && (
+              <a href={admission.formUrl} download style={ctaStyle}>{admission.formLabel || 'Download the form'}</a>
+            )}
+            {admission.ctaLink && (
+              <a href={admission.ctaLink} target="_blank" rel="noopener noreferrer" style={{ ...ctaStyle, background: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)' }}>{admission.ctaLabel || 'Apply online'}</a>
+            )}
+          </div>
         </section>
       )}
 

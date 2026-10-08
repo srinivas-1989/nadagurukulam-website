@@ -30,6 +30,13 @@ const IMG_CAPTION_FIELDS = [
   { key: 'link', label: 'Link', kind: 'link' },
 ];
 
+const FACULTY_FIELDS = [
+  { key: 'title', label: 'Name', kind: 'text', required: true },
+  { key: 'subtitle', label: 'Role / specialisation', kind: 'text' },
+  { key: 'image', label: 'Photo', kind: 'image' },
+  { key: 'body', label: 'Bio', kind: 'textarea' },
+];
+
 const LEGAL_PAGE_FIELDS = [
   { key: 'title', label: 'Title', kind: 'text', required: true },
   { key: 'slug', label: 'URL slug', kind: 'text', required: true },
@@ -166,6 +173,48 @@ const CMS_FIELD_SCHEMAS = {
     label: 'Legal Pages',
     groups: [
       { key: 'pages', label: 'Pages', repeat: { fields: LEGAL_PAGE_FIELDS } },
+    ],
+  },
+
+  // Faculty is admin-curated rather than a public view of the users table:
+  // publishing from `users` would expose student and staff records to anyone.
+  faculty: {
+    label: 'Faculty Directory',
+    groups: [
+      { key: 'faculty', label: 'Directory', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
+          { key: 'heading', label: 'Heading', kind: 'text' },
+          { key: 'subheading', label: 'Subline', kind: 'textarea' },
+        ] },
+      { key: 'members', label: 'Faculty', repeat: { fields: FACULTY_FIELDS } },
+    ],
+  },
+
+  gallery: {
+    label: 'Gallery',
+    groups: [
+      { key: 'gallery', label: 'Gallery', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
+          { key: 'heading', label: 'Heading', kind: 'text' },
+          { key: 'subheading', label: 'Subline', kind: 'textarea' },
+        ] },
+      { key: 'images', label: 'Images', repeat: { fields: IMG_CAPTION_FIELDS } },
+    ],
+  },
+
+  admission: {
+    label: 'Admission',
+    groups: [
+      { key: 'admission', label: 'Admission', fields: [
+          { key: 'show', label: 'Show section', kind: 'boolean' },
+          { key: 'heading', label: 'Heading', kind: 'text' },
+          { key: 'body', label: 'Body', kind: 'textarea' },
+          { key: 'formLabel', label: 'Form button label', kind: 'text' },
+          { key: 'formUrl', label: 'Form file URL', kind: 'link' },
+          { key: 'ctaLabel', label: 'Secondary button label', kind: 'text' },
+          { key: 'ctaLink', label: 'Secondary button link', kind: 'link' },
+        ] },
+      { key: 'programs', label: 'Programs', repeat: { fields: ITEM_FIELDS } },
     ],
   },
 };
