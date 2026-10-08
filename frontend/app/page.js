@@ -8,6 +8,8 @@ import AcademicCalendarPage from './academic-calendar/page';
 import CourseOfferingsPage from './course-offerings/page';
 import MyRegistrationsPage from './course-registration/page';
 import LmsPage from './lms/page';
+import PublicPortalPage from './public-portal/page';
+import { CmsSections } from './public-sections';
 
 // The column holds a year, but a date picker is far easier to hit than a
 // number box, so the UI collects a date and these take its year.
@@ -588,7 +590,8 @@ export default function Home() {
     { key: 'academic-calendar', name: 'Academic Calendar', desc: 'Academic years and terms in which courses are offered.' },
     { key: 'course-offerings', name: 'Course Offerings', desc: 'Define which courses are offered to which batches in a term.' },
     { key: 'course-registration', name: 'My Registrations', desc: 'Register for and drop offered courses.' },
-    { key: 'lms', name: 'Learning Management', desc: 'Modules to lessons to resources and activities.' }
+    { key: 'lms', name: 'Learning Management', desc: 'Modules to lessons to resources and activities.' },
+    { key: 'public-portal', name: 'Public Portal', desc: 'Every heading, label, image, and link on the public website.' }
   ];
 
   const MODULE_ICONS = {
@@ -614,6 +617,7 @@ export default function Home() {
     'course-offerings': <><path d="M3 7.5l9-4.5 9 4.5-9 4.5-9-4.5z" /><path d="M6.5 10v5c0 1.7 2.5 3 5.5 3s5.5-1.3 5.5-3v-5" /><path d="M21 7.5v5.5" /></>,
     'course-registration': <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h7" /><path d="M8.6 17.4l2 2 4-4.2" /></>,
     lms: <><path d="M3 5.5h7a2 2 0 0 1 2 2v11a1.6 1.6 0 0 0-1.6-1.6H3z" /><path d="M21 5.5h-7a2 2 0 0 0-2 2v11a1.6 1.6 0 0 1 1.6-1.6H21z" /></>,
+    'public-portal': <><circle cx="12" cy="12" r="9.2" /><path d="M2.8 12h18.4" /><path d="M12 2.8c2.4 2.6 3.6 5.6 3.6 9.2s-1.2 6.6-3.6 9.2c-2.4-2.6-3.6-5.6-3.6-9.2S9.6 5.4 12 2.8z" /></>,
     admissions: <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /><path d="M9 14.5l2 2 4-4.2" /></>,
     student: <><circle cx="12" cy="7" r="3.6" /><path d="M4.5 21v-1.5A5.5 5.5 0 0 1 10 14h4a5.5 5.5 0 0 1 5.5 5.5V21" /><path d="M2.5 9.5h4M17.5 9.5h4" /></>
   };
@@ -1219,13 +1223,22 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     heroLede: "Nada Gurukulam blends India's timeless classical performing arts traditions with contemporary academic management under Sadguru Sri Madhusudan Sai. 100% free of cost.",
     disciplinesHeading: 'Disciplines Taught',
     disciplinesSub: 'Offered completely free of charge, funded entirely by donations.',
+    disciplinesEmptyText: "Disciplines will appear here once they're added in the portal (Curriculum module).",
+    showEvents: true,
+    eventsHeading: 'Events',
+    eventsSub: 'Only published events appear here.',
+    showJobs: true,
+    jobsHeading: 'Careers',
+    showEnquiryForm: true,
+    enquiryHeading: 'Enquire',
+    enquirySub: "Admissions or general — we'll get back on the contact you share.",
     footerAddress: 'Nada Gurukulam, Muddenahalli, India',
     footerPhone: '+91 99999 99999',
-    footerEmail: 'contact@nadagurukulam.org'
+    footerEmail: 'contact@nadagurukulam.org',
+    footerCopyright: '© {year} Nada Gurukulam. All rights reserved.',
   };
   const [cmsHome, setCmsHome] = useState(null);
-  const [cmsEditing, setCmsEditing] = useState(false);
-  const [cmsForm, setCmsForm] = useState(CMS_FALLBACK);
+  const [cmsBlocks, setCmsBlocks] = useState({});
   const cms = { ...CMS_FALLBACK, ...(cmsHome || {}) };
   const [pubDisciplines, setPubDisciplines] = useState([]);
   const [pubEvents, setPubEvents] = useState([]);
@@ -1281,15 +1294,16 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     setEditingSyllabus(false);
   };
 
-  const loadCms = () => fetch(`${apiUrl}/api/cms/home`).then(r => r.json()).then(d => setCmsHome(d.content)).catch(() => {});
-
-  const handleSaveCms = async () => {
-    const res = await apiCall(`${apiUrl}/api/cms/home`, {
-      method: 'PUT',
-      body: JSON.stringify(cmsForm)
-    });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.error || 'Save failed'); return; }
-    setCmsEditing(false); loadCms();
+  const loadCms = () => {
+    fetch(`${apiUrl}/api/cms/home`).then(r => r.json()).then(d => setCmsHome(d.content)).catch(() => {});
+    fetch(`${apiUrl}/api/cms`).then(r => r.json()).then(list => {
+      if (!Array.isArray(list)) return;
+      Promise.all(list.map(b => fetch(`${apiUrl}/api/cms/${b.key}`).then(r => r.json()).then(j => [b.key, j.content]))).then(pairs => {
+        const map = {};
+        for (const [k, c] of pairs) map[k] = c;
+        setCmsBlocks(map);
+      });
+    }).catch(() => {});
   };
 
   const fetchData = async () => {
@@ -3033,27 +3047,6 @@ const handleAddDiscipline = async (e) => {
             <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', bottom: '16px', border: '1px dashed var(--divider)', borderRadius: 'var(--radius-xl)', pointerEvents: 'none', opacity: 0.5 }} />
             <img className="ndg-watermark" src="/ndg-mark-transparent.png" alt="" style={{ bottom: '-40px', right: '3vw', width: '300px', height: 'auto', opacity: 0.14 }} />
             <div className="ndg-hero-inner">
-              {role === 'super_admin' && !cmsEditing && (
-                <button onClick={() => { setCmsForm(cms); setCmsEditing(true); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.7)', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '6px 14px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, zIndex: 2 }}>
-                  ✏️ Edit homepage copy
-                </button>
-              )}
-              {cmsEditing ? (
-                <div style={{ position: 'relative', background: 'var(--surface)', padding: '18px', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)', maxWidth: '640px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input value={cmsForm.heroHeading} onChange={e => setCmsForm({ ...cmsForm, heroHeading: e.target.value })} placeholder="Hero heading" style={{ padding: '8px', border: '1px solid var(--border)', fontSize: '18px', fontWeight: 600 }} />
-                  <input value={cmsForm.heroTagline} onChange={e => setCmsForm({ ...cmsForm, heroTagline: e.target.value })} placeholder="Tagline (script)" className="font-script" style={{ padding: '8px', border: '1px solid var(--border)', fontSize: '18px' }} />
-                  <textarea value={cmsForm.heroLede} onChange={e => setCmsForm({ ...cmsForm, heroLede: e.target.value })} placeholder="Lede paragraph" rows={3} style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                  <input value={cmsForm.disciplinesHeading} onChange={e => setCmsForm({ ...cmsForm, disciplinesHeading: e.target.value })} placeholder="Disciplines section heading" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                  <input value={cmsForm.disciplinesSub} onChange={e => setCmsForm({ ...cmsForm, disciplinesSub: e.target.value })} placeholder="Disciplines section subline" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                  <input value={cmsForm.footerAddress} onChange={e => setCmsForm({ ...cmsForm, footerAddress: e.target.value })} placeholder="Footer Address" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                  <input value={cmsForm.footerPhone} onChange={e => setCmsForm({ ...cmsForm, footerPhone: e.target.value })} placeholder="Footer Phone" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                  <input value={cmsForm.footerEmail} onChange={e => setCmsForm({ ...cmsForm, footerEmail: e.target.value })} placeholder="Footer Email" style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={handleSaveCms} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Save</button>
-                    <button onClick={() => setCmsEditing(false)} style={{ background: 'none', border: '1px solid var(--border)', padding: '8px 18px', borderRadius: 'var(--radius-xl-sm)', cursor: 'pointer' }}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
                 <>
                   <h1 style={{ fontSize: 'clamp(32px, 4vw, 48px)', color: 'var(--primary-deep)', maxWidth: '18ch', margin: 0, position: 'relative', zIndex: 1 }}>
                     {cms.heroHeading}
@@ -3065,11 +3058,26 @@ const handleAddDiscipline = async (e) => {
                     {cms.heroLede}
                   </p>
                 </>
+              {cms.heroImage && (
+                <img src={cms.heroImage} alt="" style={{ position: 'relative', zIndex: 1, marginTop: '24px', maxWidth: '100%', borderRadius: 'var(--radius-xl)' }} />
               )}
-              <div style={{ marginTop: '30px', position: 'relative', zIndex: 1 }}>
-                <button onClick={() => setView('login')} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 28px', fontWeight: 600, cursor: 'pointer', fontSize: '15px', borderRadius: 'var(--radius-xl-sm)' }}>
-                  Access Academic Portal
-                </button>
+              <div style={{ marginTop: '30px', position: 'relative', zIndex: 1, display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {cms.heroCtaLabel && (
+                  <button
+                    onClick={() => cms.heroCtaLink ? window.open(cms.heroCtaLink, '_blank', 'noopener') : setView('login')}
+                    style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '12px 28px', fontWeight: 600, cursor: 'pointer', fontSize: '15px', borderRadius: 'var(--radius-xl-sm)' }}
+                  >
+                    {cms.heroCtaLabel}
+                  </button>
+                )}
+                {cms.heroSecondaryLabel && (
+                  <button
+                    onClick={() => cms.heroSecondaryLink ? window.open(cms.heroSecondaryLink, '_blank', 'noopener') : setView('login')}
+                    style={{ background: 'var(--surface)', color: 'var(--primary)', border: '1px solid var(--primary)', padding: '12px 26px', fontWeight: 600, cursor: 'pointer', fontSize: '15px', borderRadius: 'var(--radius-xl-sm)' }}
+                  >
+                    {cms.heroSecondaryLabel}
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -3083,7 +3091,7 @@ const handleAddDiscipline = async (e) => {
               const groups = {};
               all.forEach(a => { const k = a.category_name || 'Other'; (groups[k] = groups[k] || []).push(a); });
               const keys = Object.keys(groups).sort();
-              if (all.length===0) return <p style={{ color: 'var(--text-faint)' }}>Disciplines will appear here as they&apos;re added in the portal (Curricula module).</p>;
+              if (all.length===0) return <p style={{ color: 'var(--text-faint)' }}>{cms.disciplinesEmptyText}</p>;
               return keys.map(cat => (
                 <div key={cat} style={{ marginBottom: '22px' }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary-deep)', marginBottom: '10px', letterSpacing: '0.04em' }}>{cat.toUpperCase()}</div>
@@ -3098,10 +3106,10 @@ const handleAddDiscipline = async (e) => {
                 </div>
               ));
             })()}
-            {pubEvents.length > 0 && (
+            {cms.showEvents !== false && pubEvents.length > 0 && (
               <section style={{ marginTop: '48px' }}>
-                <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Upcoming Events</h3>
-                <p style={{ color: 'var(--text-soft)', marginBottom: '16px' }}>Published from the portal — only what Admin has approved appears here.</p>
+                <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>{cms.eventsHeading}</h3>
+                <p style={{ color: 'var(--text-soft)', marginBottom: '16px' }}>{cms.eventsSub}</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
                   {pubEvents.map(ev => (
                     <div key={ev.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '18px' }}>
@@ -3113,9 +3121,9 @@ const handleAddDiscipline = async (e) => {
                 </div>
               </section>
             )}
-            {pubJobs.length > 0 && (
+            {cms.showJobs !== false && pubJobs.length > 0 && (
               <section style={{ marginTop: '48px' }}>
-                <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>Careers</h3>
+                <h3 style={{ fontSize: '22px', color: 'var(--primary-deep)', marginBottom: '8px' }}>{cms.jobsHeading}</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {pubJobs.map(j => (
                     <div key={j.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '16px 18px', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -3126,9 +3134,10 @@ const handleAddDiscipline = async (e) => {
                 </div>
               </section>
             )}
+{cms.showEnquiryForm !== false && (
             <section style={{ marginTop: '48px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '22px' }}>
-              <h3 style={{ fontSize: '18px', color: 'var(--primary-deep)', marginBottom: '6px' }}>Enquire</h3>
-              <p style={{ fontSize: '13.5px', color: 'var(--text-soft)', marginBottom: '14px' }}>Admissions or general — we&apos;ll get back on the contact you share.</p>
+              <h3 style={{ fontSize: '18px', color: 'var(--primary-deep)', marginBottom: '6px' }}>{cms.enquiryHeading}</h3>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-soft)', marginBottom: '14px' }}>{cms.enquirySub}</p>
               {pubEnqSent && <div style={{ background: 'var(--bg-saffron)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius)', fontSize: '13px', marginBottom: '12px' }}>{pubEnqSent}</div>}
               <form onSubmit={async (e) => {
                 e.preventDefault();
@@ -3147,12 +3156,13 @@ const handleAddDiscipline = async (e) => {
                 <button type="submit" style={{ alignSelf: 'flex-start', background: 'var(--primary)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 'var(--radius-xl-sm)', fontWeight: 600, cursor: 'pointer' }}>Send enquiry</button>
               </form>
             </section>
+            )}
           </main>
 
           <footer style={{ background: 'var(--surface-muted)', borderTop: '1px solid var(--border)', padding: '40px 24px', marginTop: '60px' }}>
             <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
               <div>
-                <img src="/ndg-logo-landscape-transparent.png" alt="Nada Gurukulam" style={{ width: '220px', height: 'auto', display: 'block', margin: '0 0 10px' }} />
+                <img src={cms.footerLogo || '/ndg-logo-landscape-transparent.png'} alt="Nada Gurukulam" style={{ width: '220px', height: 'auto', display: 'block', margin: '0 0 10px' }} />
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-soft)' }}>{cms.footerAddress}</p>
               </div>
               <div style={{ fontSize: '14px', color: 'var(--text-soft)', textAlign: 'right' }}>
@@ -3161,7 +3171,7 @@ const handleAddDiscipline = async (e) => {
               </div>
             </div>
             <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '12px', color: 'var(--text-faint)', borderTop: '1px solid var(--divider)', paddingTop: '16px' }}>
-              © {new Date().getFullYear()} Nada Gurukulam. All rights reserved.
+              {(cms.footerCopyright || '').replace('{year}', new Date().getFullYear())}
             </div>
           </footer>
         </div>
@@ -6699,10 +6709,11 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'course-offerings' && <CourseOfferingsPage />}
             {activeModule === 'course-registration' && <MyRegistrationsPage />}
             {activeModule === 'lms' && <LmsPage />}
+            {activeModule === 'public-portal' && <PublicPortalPage />}
 
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration', 'lms'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'course-offerings', 'course-registration', 'lms', 'public-portal'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
