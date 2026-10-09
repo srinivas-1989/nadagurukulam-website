@@ -10,6 +10,7 @@ import MyRegistrationsPage from './course-registration/page';
 import StudentRelationshipsPage from './student-relationships/page';
 import LmsPage from './lms/page';
 import ResidentialPage from './residential/page';
+import EventsPage from './events/page';
 import PublicPortalPage from './public-portal/page';
 import StudentAssessmentPage from './dossiers/page';
 import AcademicMasterPage from './academic-master/page';
@@ -6620,48 +6621,8 @@ const handleAddDiscipline = async (e) => {
               </div>
             )}
 
-            {/* EVENTS MODULE (Staff/Admin draft → Admin publishes to public site) */}
-            {activeModule === 'events' && (
-              <div>
-                {canCreate('events') && (
-                  <form onSubmit={handleAddEvent} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '16px', borderRadius: 'var(--radius-xl)', marginBottom: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <input placeholder="Event title (e.g. Annual Day)" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 220px' }} />
-                    <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)' }} />
-                    <input placeholder="Venue" value={newEventVenue} onChange={e => setNewEventVenue(e.target.value)} required style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 160px' }} />
-                    <textarea placeholder="Description" value={newEventDesc} onChange={e => setNewEventDesc(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border)', flex: '1 1 100%', minHeight: '60px' }} />
-                    <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', flex: '1 1 100%' }}>Save Draft</button>
-                  </form>
-                )}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-                  {dbData.events.length === 0 ? (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)' }}>No events yet.</div>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                          <th style={{ padding: '12px' }}>Event</th><th style={{ padding: '12px' }}>Date</th><th style={{ padding: '12px' }}>Venue</th><th style={{ padding: '12px' }}>Status</th><th style={{ padding: '12px' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dbData.events.map(ev => (
-                          <tr key={ev.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '12px' }}><b>{ev.title}</b><br /><span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>{ev.description}</span></td>
-                            <td style={{ padding: '12px' }}>{ev.date}</td>
-                            <td style={{ padding: '12px' }}>{ev.venue}</td>
-                            <td style={{ padding: '12px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '12px', background: ev.status === 'published' ? 'var(--primary)' : ev.status === 'archived' ? 'var(--text-faint)' : 'var(--accent)', color: '#fff' }}>{ev.status}</span></td>
-                            <td style={{ padding: '12px' }}>
-                              {canAdmin('events') && ev.status === 'draft' && <button onClick={() => handleEventTransition(ev.id, 'published')} style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Publish</button>}
-                              {canAdmin('events') && ev.status === 'published' && <button onClick={() => handleEventTransition(ev.id, 'archived')} style={{ background: 'var(--text-faint)', color: '#fff', border: 'none', padding: '2px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Archive</button>}
-                              {canAdmin('events') && <button onClick={() => handleDelete('events', ev.id)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* EVENTS MODULE */}
+            {activeModule === 'events' && <EventsPage />}
 
             {/* ENQUIRIES MODULE (public form inbox: new → contacted → converted / closed) */}
             {activeModule === 'enquiries' && (
@@ -6727,10 +6688,10 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'lms' && <LmsPage />}
             {activeModule === 'public-portal' && <PublicPortalPage />}
             {activeModule === 'dossiers' && <StudentAssessmentPage />}
-
+            {activeModule === 'residential' && <ResidentialPage />}
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
