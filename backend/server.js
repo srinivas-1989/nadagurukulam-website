@@ -389,7 +389,9 @@ const API_TO_MODULE = {
   hostel_outings: 'residential', hostel_room_transfers: 'residential',
   hostel_incidents: 'residential', productions: 'events',
   production_participants: 'events', production_sessions: 'events',
-  production_travel: 'events'
+  production_travel: 'events',
+  employees: 'hr', salary_slips: 'hr',
+  fee_structures: 'finance', fee_items: 'finance', fee_payments: 'finance'
 };
 // Reverse: table name → module_key (crud is instantiated with table names)
 const TABLE_TO_MODULE = {
@@ -418,7 +420,9 @@ const TABLE_TO_MODULE = {
   hostel_outings: 'residential', hostel_room_transfers: 'residential',
   hostel_incidents: 'residential', productions: 'events',
   production_participants: 'events', production_sessions: 'events',
-  production_travel: 'events'
+  production_travel: 'events',
+  employees: 'hr', salary_slips: 'hr',
+  fee_structures: 'finance', fee_items: 'finance', fee_payments: 'finance'
 };
 
 // ── Row-level scoping helpers ──────────────────────────────────────────────
@@ -1404,11 +1408,11 @@ const rolesDelete = async (req, res) => {
 };
 
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
-const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates']);
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
-const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at' };
+const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at', employees: 'created_at', fee_structures: 'name', fee_items: 'name', fee_payments: 'payment_date', salary_slips: 'created_at' };
 
-const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'faculty_assignments', 'student_relationships', 'mentor_progress_notes', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories', 'attendance_states', 'class_sessions', 'attendance_records', 'grading_schemes', 'rubrics', 'rubric_criteria', 'assessment_plans', 'assessments', 'assessment_submissions', 'evaluations', 'results', 'result_corrections', 'evaluation_blueprints', 'evaluation_sections', 'evaluation_questions', 'dossier_section_assignments', 'hostels', 'hostel_blocks', 'hostel_floors', 'hostel_rooms', 'hostel_beds', 'hostel_allocations', 'warden_assignments', 'hostel_leave_requests', 'hostel_outings', 'hostel_room_transfers', 'hostel_incidents', 'productions', 'production_participants', 'production_sessions', 'production_travel'];
+const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'faculty_assignments', 'student_relationships', 'mentor_progress_notes', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories', 'attendance_states', 'class_sessions', 'attendance_records', 'grading_schemes', 'rubrics', 'rubric_criteria', 'assessment_plans', 'assessments', 'assessment_submissions', 'evaluations', 'results', 'result_corrections', 'evaluation_blueprints', 'evaluation_sections', 'evaluation_questions', 'dossier_section_assignments', 'hostels', 'hostel_blocks', 'hostel_floors', 'hostel_rooms', 'hostel_beds', 'hostel_allocations', 'warden_assignments', 'hostel_leave_requests', 'hostel_outings', 'hostel_room_transfers', 'hostel_incidents', 'productions', 'production_participants', 'production_sessions', 'production_travel', 'employees', 'salary_slips', 'fee_structures', 'fee_items', 'fee_payments'];
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);

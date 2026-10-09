@@ -11,6 +11,8 @@ import StudentRelationshipsPage from './student-relationships/page';
 import LmsPage from './lms/page';
 import ResidentialPage from './residential/page';
 import EventsPage from './events/page';
+import FinancePage from './finance/page';
+import HRPage from './hr/page';
 import PublicPortalPage from './public-portal/page';
 import StudentAssessmentPage from './dossiers/page';
 import AcademicMasterPage from './academic-master/page';
@@ -605,6 +607,8 @@ export default function Home() {
     { key: 'dossiers', name: 'Student Assessment', desc: 'Monthly appraisal forms, blueprints, sections, and staff assignments.' },
     { key: 'attendance', name: 'Attendance', desc: 'Track class sessions and student attendance.' },
     { key: 'residential', name: 'Residential & Hostel', desc: 'Hostels, rooms, beds, allocations, warden assignments, and student leave/outings.' },
+    { key: 'finance', name: 'Finance & Fees', desc: 'Fee structures, items, payments, and receipts.' },
+    { key: 'hr', name: 'Staff & HR', desc: 'Employee profiles, designations, and salary slips.' },
     { key: 'public-portal', name: 'Public Portal', desc: 'Every heading, label, image, and link on the public website.' }
   ];
 
@@ -6693,9 +6697,11 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'public-portal' && <PublicPortalPage />}
             {activeModule === 'dossiers' && <StudentAssessmentPage />}
             {activeModule === 'residential' && <ResidentialPage />}
+            {activeModule === 'finance' && <FinancePage />}
+            {activeModule === 'hr' && <HRPage />}
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential', 'finance', 'hr'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module
