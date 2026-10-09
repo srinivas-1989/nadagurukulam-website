@@ -391,7 +391,7 @@ const CategoryCard = ({ cat, roles, levelValues, holders, open, onToggle, onAddR
 const UserPersonalTab = ({ userId, dbData }) => {
   const u = dbData?.users?.find(user => user.id === userId);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
         <img src={u?.profile_pic_url || '/default-avatar.png'} alt="Profile" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg)', border: '1px solid var(--border)' }} />
         <div>
@@ -399,12 +399,16 @@ const UserPersonalTab = ({ userId, dbData }) => {
           <div style={{ fontSize: '13px', color: 'var(--text-soft)' }}>{Object.values(u?.level_values || {}).join(' · ') || 'N/A'} · {u?.role_key}</div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px', background: 'var(--surface)', padding: '16px', borderRadius: 'var(--radius)' }}>
+        <div><b>First Name:</b> {u?.first_name || 'N/A'}</div>
+        <div><b>Last Name:</b> {u?.last_name || 'N/A'}</div>
         <div><b>Email:</b> {u?.email}</div>
         <div><b>Alternate Email:</b> {u?.alternate_email || 'N/A'}</div>
         <div><b>Phone:</b> {u?.phone || 'N/A'}</div>
-        <div><b>Blood Group:</b> {u?.blood_group || 'N/A'}</div>
         <div><b>DOB:</b> {u?.date_of_birth || 'N/A'}</div>
+        <div><b>Blood Group:</b> {u?.blood_group || 'N/A'}</div>
+        <div style={{ gridColumn: 'span 2' }}><b>Permanent Address:</b> {u?.permanent_address || 'N/A'}</div>
+        <div style={{ gridColumn: 'span 2' }}><b>Correspondence Address:</b> {u?.correspondence_address || 'N/A'}</div>
       </div>
     </div>
   );
