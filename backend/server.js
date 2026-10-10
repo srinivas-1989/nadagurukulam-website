@@ -511,12 +511,8 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
     }
     return query.eq('student_id', profile.id);
   }
-  if (table === 'projects') {
+  if (table === 'payment_orders') {
     if (level === 'Manage' || level === 'Full') return query;
-    if (level === 'Own') {
-      if (!ownedBatchIds || ownedBatchIds.length === 0) return query.in('batch_id', ['00000000-0000-0000-0000-000000000000']);
-      return query.in('batch_id', ownedBatchIds);
-    }
     return query.eq('student_id', profile.id);
   }
   if (table === 'certificates') {
@@ -1702,6 +1698,31 @@ const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liv
 const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at', employees: 'created_at', fee_structures: 'name', fee_items: 'name', fee_payments: 'payment_date', salary_slips: 'created_at', document_folders: 'name', documents: 'title', media: 'title', notification_templates: 'name', notifications: 'sent_at', payment_orders: 'created_at', communication_logs: 'created_at' };
 
 const modules = ['users', 'curriculum', 'batches', 'timetable', 'timetable_periods', 'events', 'enquiries', 'jobs', 'liveclasses', 'lessonplans', 'assignments', 'feedback', 'student_performances', 'courses', 'course_modules', 'course_module_topics', 'examination_types', 'program_categories', 'course_syllabi', 'academic_years', 'terms', 'course_offerings', 'course_registrations', 'faculty_assignments', 'student_relationships', 'mentor_progress_notes', 'role_permissions', 'user_permissions', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'category_level_values', 'user_categories', 'attendance_states', 'class_sessions', 'attendance_records', 'grading_schemes', 'rubrics', 'rubric_criteria', 'assessment_plans', 'assessments', 'assessment_submissions', 'evaluations', 'results', 'result_corrections', 'evaluation_blueprints', 'evaluation_sections', 'evaluation_questions', 'dossier_section_assignments', 'hostels', 'hostel_blocks', 'hostel_floors', 'hostel_rooms', 'hostel_beds', 'hostel_allocations', 'warden_assignments', 'hostel_leave_requests', 'hostel_outings', 'hostel_room_transfers', 'hostel_incidents', 'productions', 'production_participants', 'production_sessions', 'production_travel', 'employees', 'salary_slips', 'fee_structures', 'fee_items', 'fee_payments', 'document_folders', 'documents', 'media', 'notification_templates', 'notifications', 'payment_orders', 'communication_logs'];
+
+// Payment Orders Custom Update Handler (Business rules enforcement)
+app.put('/api/payment_orders/:id', authMiddleware, async (req, res) => {
+  try {
+    const level = await getAccessLevel(req.auth.profile, 'integrations');
+    if (!canAccess(level, 'Manage')) {
+      return res.status(403).json({ error: 'You do not have Manage access for integrations.' });
+    }
+    const { data: order } = await supabase.from('payment_orders').select('*').eq('id', req.params.id).maybeSingle();
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const allowed = ['status', 'gateway_payment_id', 'gateway_signature', 'metadata'];
+    const updatePayload = { updated_at: new Date().toISOString() };
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) updatePayload[k] = req.body[k];
+    }
+
+    const { data, error } = await supabase.from('payment_orders').update(updatePayload).eq('id', req.params.id).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 modules.forEach(m => {
   const table = TABLE_FOR[m] || m;
   const handler = crud(table, ORDER_FOR[table]);
