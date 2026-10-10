@@ -1951,6 +1951,100 @@ app.post('/api/results/:id/publish', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Cross-module aggregates for the analytics dashboard: enrolment, fees,
+// attendance and results in one read. Computed server-side (rule 7) because it
+// is a whole-institution roll-up — pulling every row to the browser to count
+// there would not scale and would leak rows a caller cannot list.
+app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'analytics', 'list');
+    if (!level) return;
+    // Surface a read error rather than folding it into zeros — an empty
+    // dashboard must mean "no data", never "the query was wrong".
+    const rows = (t, c = '*') => supabase.from(t).select(c).then(r => {
+      if (r.error) throw r.error;
+      return r.data || [];
+    });
+
+    const [users, enrollments, batches, disciplines, courses, offerings, payments, sessions, attendance, states, results] = await Promise.all([
+      rows('users', 'id, name, role_key, status, program_id'),
+      rows('enrollments', 'student_id, batch_id, status'),
+      rows('batches', 'id, name, discipline_id, status'),
+      rows('disciplines', 'id, name'),
+      rows('courses', 'id, code, name, credits'),
+      rows('course_offerings', 'id, course_id, term_id, status'),
+      rows('fee_payments', 'amount_paid, status, payment_date'),
+      rows('class_sessions', 'id, status'),
+      rows('attendance_records', 'state_id'),
+      rows('attendance_states', 'id, label, counts_as_present, sort_order'),
+      rows('results', 'outcome, percentage, grade, is_published'),
+    ]);
+
+    const students = users.filter(u => u.role_key === 'student');
+    const presentStateIds = new Set(states.filter(s => s.counts_as_present).map(s => s.id));
+    const heldSessions = sessions.filter(s => s.status === 'held').length;
+    const present = attendance.filter(r => presentStateIds.has(r.state_id)).length;
+    const verified = payments.filter(p => p.status === 'verified');
+    const pendingPay = payments.filter(p => p.status === 'pending');
+    const sum = (list, f) => list.reduce((a, x) => a + (Number(f(x)) || 0), 0);
+
+    const byDiscipline = disciplines.map(d => ({
+      id: d.id, name: d.name,
+      batches: batches.filter(b => b.discipline_id === d.id).length,
+      students: students.filter(s => s.program_id === d.id).length,
+    })).filter(d => d.batches || d.students).sort((a, b) => b.students - a.students);
+
+    const distribution = {};
+    results.forEach(r => { const g = r.grade || '—'; distribution[g] = (distribution[g] || 0) + 1; });
+    const graded = results.filter(r => r.percentage != null);
+    const passCount = results.filter(r => r.outcome === 'pass').length;
+    const decided = results.filter(r => r.outcome === 'pass' || r.outcome === 'fail').length;
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      people: {
+        total: users.length,
+        students: students.length,
+        staff: users.length - students.length,
+        active: users.filter(u => u.status === 'active').length,
+      },
+      academics: {
+        disciplines: disciplines.length,
+        courses: courses.length,
+        offerings: offerings.length,
+        batches: batches.length,
+        active_batches: batches.filter(b => b.status === 'active').length,
+        total_credits: sum(courses, c => c.credits),
+      },
+      enrolment: {
+        active: enrollments.filter(e => e.status === 'enrolled').length,
+        completed: enrollments.filter(e => e.status === 'completed').length,
+        dropped: enrollments.filter(e => e.status === 'dropped').length,
+        by_discipline: byDiscipline,
+      },
+      fees: {
+        collected: Math.round(sum(verified, p => p.amount_paid) * 100) / 100,
+        pending: Math.round(sum(pendingPay, p => p.amount_paid) * 100) / 100,
+        payments: payments.length,
+        verified_count: verified.length,
+      },
+      attendance: {
+        sessions_held: heldSessions,
+        marked: attendance.length,
+        present,
+        percentage: attendance.length ? Math.round((present / attendance.length) * 1000) / 10 : null,
+      },
+      results: {
+        total: results.length,
+        published: results.filter(r => r.is_published).length,
+        pass_rate: decided ? Math.round((passCount / decided) * 1000) / 10 : null,
+        average_percentage: graded.length ? Math.round((sum(graded, r => r.percentage) / graded.length) * 10) / 10 : null,
+        distribution,
+      },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // The caller's own effective access per module, role baseline folded together
 // with their own grants. The portal renders its navigation from this, so a
 // person never needs read access to the whole grant tables.

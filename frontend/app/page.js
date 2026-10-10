@@ -19,6 +19,7 @@ import AcademicMasterPage from './academic-master/page';
 import AssessmentPage from './assessment/page';
 import AttendancePage from './attendance/page';
 import ResultsPage from './results/page';
+import AnalyticsPage from './analytics/page';
 import { CmsSections } from './public-sections';
 
 // The column holds a year, but a date picker is far easier to hit than a
@@ -611,6 +612,7 @@ export default function Home() {
     { key: 'assessment', name: 'Assessments & Exams', desc: 'Assessment plans, student submissions, due dates and evaluation.' },
     { key: 'attendance', name: 'Attendance', desc: 'Track class sessions and student attendance.' },
     { key: 'results', name: 'Results & Evaluation', desc: 'Derive results from evaluations, grade against schemes, publish, and correct.' },
+    { key: 'analytics', name: 'Analytics', desc: 'Institution-wide enrolment, fee, attendance and result roll-ups.' },
     { key: 'residential', name: 'Residential & Hostel', desc: 'Hostels, rooms, beds, allocations, warden assignments, and student leave/outings.' },
     { key: 'finance', name: 'Finance & Fees', desc: 'Fee structures, items, payments, and receipts.' },
     { key: 'hr', name: 'Staff & HR', desc: 'Employee profiles, designations, and salary slips.' },
@@ -645,6 +647,7 @@ export default function Home() {
     'dossiers': <><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M8 10h8M8 14h5" /></>,
     'attendance': <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M12 12.5l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></>,
     'results': <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
+    'analytics': <><path d="M3 3v18h18" /><path d="M7 15l4-5 3 3 5-7" /></>,
     'assessment': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 14.5l1.8 1.8 3.7-3.7" /></>,
     residential: <><path d="M3 21h18M5 21V7l8-4 8 4v14M8 11h2M14 11h2M8 15h2M14 15h2" /></>,
     mentorship: <><path d="M12 20.5s-7-4.4-7-9.2a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 4.8-7 9.2-7 9.2z" /></>,
@@ -6747,12 +6750,13 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'assessment' && <AssessmentPage />}
             {activeModule === 'attendance' && <AttendancePage />}
             {activeModule === 'results' && <ResultsPage />}
+            {activeModule === 'analytics' && <AnalyticsPage />}
             {activeModule === 'residential' && <ResidentialPage />}
             {activeModule === 'finance' && <FinancePage />}
             {activeModule === 'hr' && <HRPage />}
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential', 'finance', 'hr', 'assessment', 'attendance', 'results'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential', 'finance', 'hr', 'assessment', 'attendance', 'results', 'analytics'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module

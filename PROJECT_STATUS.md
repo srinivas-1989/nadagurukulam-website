@@ -78,14 +78,14 @@ Last updated: 2026-10-10
 - [x] **Module-visibility gap fixed** (2026-10-10): `attendance` had no `role_permissions` seed, so its sidebar entry was hidden for every role but Super Admin. Applied `specs/supabase-attendance-results-permissions.sql` (attendance + results, all roles) and seeded a default grading scheme `specs/supabase-grading-scheme-default.sql`; both added to `apply-schema.js` FILES.
 
 ### Phase 9 — The 8 (analytics / integrations / mobile / etc.)
-- [ ] Analytics & dashboards (enrolment/fee/attendance/result aggregates).
+- [x] Analytics & dashboards (enrolment/fee/attendance/result aggregates): `GET /api/analytics/summary` — one server-side roll-up (people/academics/enrolment/fees/attendance/results, per rule 7); standalone `/analytics` page + sidebar module; `specs/supabase-analytics-permissions.sql` seeds `analytics` module_key (staff roles only — students omitted deliberately). (2026-10-10)
 - [ ] Integrations (payment gateway, email/SMS providers).
 - [ ] Mobile app / PWA.
 - [ ] Accreditation-ready records & exports.
 - (4 more items to be enumerated with Srinivas as they arise — mirror of "8 of Phase 8".)
 
 ## Current task
-**Phase 8 — LMS manual features.** Assessment (§201-205), Attendance (§206-208), Results (§219-226) done. Next: enumerate the remaining Phase 8 items with Srinivas, or start Phase 9 (analytics/dashboards is the natural first: it aggregates the enrolment/fee/attendance/result data now all in place).
+**Phase 9.** Analytics & dashboards done (`/api/analytics/summary` + `/analytics` page). Next: integrations (payment gateway, email/SMS), mobile/PWA, or accreditation exports — pick with Srinivas.
 
 ## Verification checklist (every task)
 - [ ] `cd frontend && npm run build`
