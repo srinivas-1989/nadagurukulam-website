@@ -72,7 +72,7 @@ Last updated: 2026-10-10
 - [ ] Reconcile `category_level_values`: live has only `student` + a stray `test` category; seed added `staff` (16 nodes). Decide whether to re-run admin/teacher tree or edit in portal.
 
 ### Phase 8 — LMS manual Phase 1 (next feature work)
-- [ ] Assessment submission tracking (§201-205): `assessment_submissions` (tables already in server registry) — due dates, late/submitted states, video/file/text answers.
+- [x] Assessment submission tracking (§201-205): `assessment_submissions` — due dates, late/submitted/evaluated states, file/video-link/text answers. Server-side gates (self-create at View, ownership on update, Manage for evaluate, duplicate + draft-publish checks) + standalone `/assessment` page. (2026-10-10)
 - [ ] Attendance (§206-208): `class_sessions`, `attendance_records`, `attendance_states` — markdown + rollup.
 - [ ] Results / evaluation publication (§219-226): `evaluations`, `results`, `result_corrections`, grading schemes/rubrics.
 
@@ -84,7 +84,7 @@ Last updated: 2026-10-10
 - (4 more items to be enumerated with Srinivas as they arise — mirror of "8 of Phase 8".)
 
 ## Current task
-**Phase 8 — LMS manual features.** Sample data is done and verified. Start with assessment submission tracking (§201-205): `assessment_submissions` table exists (server registry ~line 415); build the due-date / late / submitted states and video-file-text answers on top of it, server-side per rule 7.
+**Phase 8 — LMS manual features.** Assessment submission tracking (§201-205) done. Next: Attendance (§206-208) — `class_sessions`, `attendance_records`, `attendance_states`; mark student attendance per session and roll up per-student/per-course state summaries. `backend/server.js` already maps these tables to module key `assessment`; build the due/rollup logic server-side per rule 7.
 
 ## Verification checklist (every task)
 - [ ] `cd frontend && npm run build`

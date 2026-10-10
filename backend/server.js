@@ -449,6 +449,15 @@ async function getOwnedBatchIds(profileId) {
 const OWN_BATCH_TABLES = new Set(['timetable_slots', 'live_sessions', 'lesson_plans', 'assignments', 'feedback', 'student_performances', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects']);
 
 function applyListScope(query, table, level, profile, ownedBatchIds) {
+  // Plans and assessments are a readable catalogue — a student must see what is
+  // due in order to submit. Only the submissions themselves are private.
+  if (table === 'assessments' || table === 'assessment_plans') {
+    return level ? query : null;
+  }
+  if (table === 'assessment_submissions') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return query.eq('student_id', profile.id);
+  }
   if (table === 'assignment_submissions') {
     if (level === 'Manage' || level === 'Full') return query;
     if (level === 'Own') {
@@ -509,6 +518,13 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
 
 async function checkRowOwnership(table, level, profile, rowId) {
   if (table === 'certificates') {
+    const { data: row } = await supabase.from(table).select('student_id').eq('id', rowId).single();
+    if (!row) return true;
+    if (String(row.student_id) === String(profile.id)) return true;
+    if ((LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage']) return true;
+    return false;
+  }
+  if (table === 'assessment_submissions') {
     const { data: row } = await supabase.from(table).select('student_id').eq('id', rowId).single();
     if (!row) return true;
     if (String(row.student_id) === String(profile.id)) return true;
@@ -647,9 +663,10 @@ const crud = (table, orderCol = 'created_at') => ({
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile, moduleKey);
       const isSelfSubmission = table === 'assignment_submissions' && String(req.body.student_id) === String(req.auth?.profile?.id);
+      const isSelfAssessmentSub = table === 'assessment_submissions' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
       const isSelfProject = table === 'projects' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
       const isSelfCert = table === 'certificates' && String(req.body.student_id || req.auth?.profile?.id) === String(req.auth?.profile?.id);
-      if ((table === 'assignment_submissions' && isSelfSubmission) || (table === 'projects' && isSelfProject) || (table === 'certificates' && isSelfCert)) {
+      if ((table === 'assignment_submissions' && isSelfSubmission) || isSelfAssessmentSub || (table === 'projects' && isSelfProject) || (table === 'certificates' && isSelfCert)) {
         if (!level) return res.status(403).json({ error: 'You do not have View access for this module.' });
       } else if (!level || !canAccess(level, 'create')) {
         return res.status(403).json({ error: 'You do not have Create access for this module.' });
@@ -732,6 +749,7 @@ const crud = (table, orderCol = 'created_at') => ({
         return res.status(201).json({ ...data[0], tempPassword: includeTemp ? tempPassword : undefined, otp: includeTemp && !emailed ? otp : undefined, emailSent: emailed });
       }
       if (table === 'assignments' && !req.body.created_by) req.body.created_by = req.auth.profile.id;
+      if (table === 'assessments' && !req.body.created_by) req.body.created_by = req.auth.profile.id;
       if (table === 'assignment_submissions') {
         if (!req.body.assignment_id || !req.body.batch_id || !req.body.student_id) return res.status(400).json({ error: 'assignment_id, batch_id, student_id required' });
         if (String(req.body.student_id) !== String(req.auth.profile.id) && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Cannot create submission for another student' });
@@ -763,18 +781,52 @@ const crud = (table, orderCol = 'created_at') => ({
       if (table === 'attendance_records') {
         if (!req.body.class_session_id || !req.body.student_id || !req.body.state_id) return res.status(400).json({ error: 'class_session_id, student_id, state_id required' });
       }
+      if (table === 'assessment_submissions') {
+        if (!req.body.assessment_id) return res.status(400).json({ error: 'assessment_id required' });
+        if (!req.body.student_id) req.body.student_id = req.auth.profile.id;
+        if (String(req.body.student_id) !== String(req.auth.profile.id) && (LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Cannot create submission for another student' });
+        if (req.body.status && !['pending','submitted','evaluated'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+        const manage = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        if (req.body.status === 'evaluated' && !manage) return res.status(403).json({ error: 'Only teachers can evaluate submissions.' });
+        const { data: a } = await supabase.from('assessments').select('id, status, plan_id').eq('id', req.body.assessment_id).maybeSingle();
+        if (!a) return res.status(404).json({ error: 'Assessment not found' });
+        // The offering belongs to the assessment's plan, so the client never has
+        // to send it — resolve it server-side when it is missing.
+        if (!req.body.course_offering_id && a.plan_id) {
+          const { data: plan } = await supabase.from('assessment_plans').select('course_offering_id').eq('id', a.plan_id).maybeSingle();
+          req.body.course_offering_id = plan?.course_offering_id || null;
+        }
+        if (!req.body.course_offering_id) return res.status(400).json({ error: 'Could not resolve the course offering from the assessment' });
+        const { data: dup } = await supabase.from('assessment_submissions').select('id').eq('assessment_id', req.body.assessment_id).eq('student_id', req.body.student_id).maybeSingle();
+        if (dup) return res.status(409).json({ error: 'You already have a submission for this assessment — update it instead.' });
+        if (req.body.status === 'submitted') {
+          if (a.status === 'draft') return res.status(409).json({ error: 'This assessment has not been published yet.' });
+          const evidence = String(req.body.evidence_url || '').trim() || String(req.body.notes || '').trim();
+          if (!evidence) return res.status(400).json({ error: 'Attach a file/video link or write an answer before submitting.' });
+          if (!req.body.submitted_at) req.body.submitted_at = new Date().toISOString();
+        }
+      }
+      if (table === 'assessments') {
+        if (!req.body.title) return res.status(400).json({ error: 'title required' });
+        if (req.body.status && !['draft','published','open','closed','evaluated'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (req.body.assessment_scope && !['internal','external','practical','skill'].includes(req.body.assessment_scope)) return res.status(400).json({ error: 'Invalid assessment_scope' });
+        // An assessment lives under a plan, which lives under an offering. The
+        // teacher forms pick the offering once; reuse that offering's plan (or
+        // create the first one) so the plan tier is not a separate chore.
+        if (!req.body.plan_id && req.body.course_offering_id) {
+          const { data: plan } = await supabase.from('assessment_plans').select('id').eq('course_offering_id', req.body.course_offering_id).order('created_at', { ascending: true }).limit(1).maybeSingle();
+          if (plan) req.body.plan_id = plan.id;
+          else {
+            const { data: made, error: planErr } = await supabase.from('assessment_plans').insert([{ course_offering_id: req.body.course_offering_id, name: req.body.plan_name || 'Assessments', created_by: req.auth.profile.id }]).select();
+            if (planErr) return res.status(500).json({ error: 'Could not create assessment plan: ' + planErr.message });
+            req.body.plan_id = made[0].id;
+          }
+        }
+        if (!req.body.plan_id) return res.status(400).json({ error: 'plan_id required (or supply course_offering_id)' });
+      }
       if (table === 'assessment_plans') {
         if (!req.body.course_offering_id || !req.body.name) return res.status(400).json({ error: 'course_offering_id and name required' });
         if (req.body.status && !['draft','published','locked'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
-      }
-      if (table === 'assessments') {
-        if (!req.body.plan_id || !req.body.title) return res.status(400).json({ error: 'plan_id and title required' });
-        if (req.body.status && !['draft','published','open','closed','evaluated'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
-        if (req.body.assessment_scope && !['internal','external','practical','skill'].includes(req.body.assessment_scope)) return res.status(400).json({ error: 'Invalid assessment_scope' });
-      }
-      if (table === 'assessment_submissions') {
-        if (!req.body.assessment_id || !req.body.student_id || !req.body.course_offering_id) return res.status(400).json({ error: 'assessment_id, student_id, course_offering_id required' });
-        if (req.body.status && !['pending','submitted','evaluated'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
       }
       if (table === 'evaluations') {
         if (!req.body.submission_id) return res.status(400).json({ error: 'submission_id required' });
@@ -989,6 +1041,30 @@ const crud = (table, orderCol = 'created_at') => ({
         if (!isRecipient && !isManage) return res.status(403).json({ error: 'You do not own this record.' });
         let ud = { ...req.body };
         if (!isManage) { delete ud.recipient_id; delete ud.sent_at; ud.status = 'read'; }
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        return res.json(data[0]);
+      }
+      if (table === 'assessment_submissions') {
+        const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
+        if (!owns) return res.status(403).json({ error: 'You do not own this record.' });
+        let ud = { ...req.body };
+        const { data: cur } = await supabase.from('assessment_submissions').select('student_id, status, evidence_url, notes').eq('id', req.params.id).single();
+        const isOwner = cur && String(cur.student_id) === String(req.auth.profile.id);
+        const manage = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        // students move their own row pending→submitted; only teachers evaluate
+        if (ud.status === 'evaluated' && !manage) return res.status(403).json({ error: 'Only teachers can evaluate submissions.' });
+        if (isOwner && !manage) {
+          if (ud.student_id !== undefined && String(ud.student_id) !== String(cur.student_id)) return res.status(403).json({ error: 'Cannot reassign a submission.' });
+          delete ud.student_id;
+          if (ud.status && !['pending','submitted'].includes(ud.status)) return res.status(403).json({ error: 'Invalid transition' });
+        }
+        if (ud.status === 'submitted') {
+          const evidence = String(ud.evidence_url || '').trim() || String(ud.notes || '').trim();
+          if (!evidence) return res.status(400).json({ error: 'Attach a file/video link or write an answer before submitting.' });
+          if (!ud.submitted_at) ud.submitted_at = new Date().toISOString();
+        }
+        if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
         const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
         if (error) throw error;
         return res.json(data[0]);
@@ -1442,7 +1518,7 @@ const rolesDelete = async (req, res) => {
 };
 
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
-const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments', 'documents']);
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'assessment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments', 'documents']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
 const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at', employees: 'created_at', fee_structures: 'name', fee_items: 'name', fee_payments: 'payment_date', salary_slips: 'created_at', document_folders: 'name', documents: 'title', media: 'title', notification_templates: 'name', notifications: 'sent_at' };
 
