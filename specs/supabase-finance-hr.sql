@@ -4,7 +4,7 @@
 -- HR: Employee profiles extending users
 create table if not exists public.employees (
   id uuid primary key references public.users(id) on delete cascade,
-  designation_id uuid references public.designations(id),
+  designation_id uuid references public.category_level_values(id),
   department_id uuid references public.organisational_units(id),
   employment_type text check (employment_type in ('full_time', 'part_time', 'contract', 'visiting')),
   joining_date date,
