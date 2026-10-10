@@ -659,6 +659,29 @@ export default function Home() {
   const [view, setView] = useState('public'); // public | login | portal
   const [role, setRole] = useState(null);
   const [myPerms, setMyPerms] = useState({}); // module_key -> effective access level
+  const [previewTarget, setPreviewTarget] = useState(null); // null | { type: 'role'|'user', role_key: string, user_id?: string, name: string }
+  const previewTargetRef = useRef(previewTarget);
+  useEffect(() => { previewTargetRef.current = previewTarget; }, [previewTarget]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const origFetch = window.fetch;
+    window.fetch = async (input, init = {}) => {
+      const target = previewTargetRef.current;
+      if (target && role === 'super_admin') {
+        let url = typeof input === 'string' ? input : input?.url;
+        if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/api/'))) {
+          init = init || {};
+          const headers = new Headers(init.headers || {});
+          if (target.role_key) headers.set('X-Preview-Role', target.role_key);
+          if (target.user_id) headers.set('X-Preview-User', target.user_id);
+          init.headers = headers;
+        }
+      }
+      return origFetch(input, init);
+    };
+    return () => { window.fetch = origFetch; };
+  }, [role]);
   const [activeModule, setActiveModule] = useState('overview');
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1069,6 +1092,10 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     const { data: { session: sess } } = await supabase.auth.getSession();
     const headers = { 'Content-Type': 'application/json', ...options.headers };
     if (sess?.access_token) headers.Authorization = `Bearer ${sess.access_token}`;
+    if (role === 'super_admin' && previewTarget) {
+      if (previewTarget.role_key) headers['X-Preview-Role'] = previewTarget.role_key;
+      if (previewTarget.user_id) headers['X-Preview-User'] = previewTarget.user_id;
+    }
     const res = await fetch(url, { ...options, headers });
     if (res.status === 401) { setSession(null); setRole(null); setView('login'); }
     else if (res.status === 403) {
@@ -1088,7 +1115,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
   // grant by /api/my-permissions. Level gates here only steer the UI; the
   // backend re-checks every write.
   const LEVELS = ['View', 'Self', 'Submits', 'Own', 'Manage', 'Full'];
-  const perm = (m) => (role === 'super_admin' ? 'Full' : myPerms[m]) || null;
+  const perm = (m) => ((role === 'super_admin' && !previewTarget) ? 'Full' : myPerms[m]) || null;
   // Role baseline only, for the Roles & Permissions matrix where the baseline
   // itself is what gets edited.
   const permsMap = {};
@@ -1361,6 +1388,9 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
       apiCall(`${apiUrl}/api/roles`).then(r => r.json()).then(d => Array.isArray(d) && setRoles(d)).catch(() => {});
       apiCall(`${apiUrl}/api/user_categories`).then(r => r.json()).then(d => Array.isArray(d) && setUserCategories(d)).catch(() => {});
       apiCall(`${apiUrl}/api/category_level_values`).then(r => r.json()).then(d => Array.isArray(d) && setLevelValues(d)).catch(() => {});
+      apiCall(`${apiUrl}/api/my-permissions`).then(r => r.json()).then(d => {
+        if (d?.perms) setMyPerms(d.perms);
+      }).catch(() => {});
     } catch (err) { console.error('Fetch error:', err); }
   };
 
@@ -1373,7 +1403,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
 
   useEffect(() => {
     if ((view === 'portal' || view === 'admin') && session) fetchData();
-  }, [view, activeModule, session]);
+  }, [view, activeModule, session, previewTarget]);
 
   useEffect(() => {
     if (dbData.batches.length && !timetableBatch) setTimetableBatch(dbData.batches[0].id);
@@ -3552,6 +3582,12 @@ const handleAddDiscipline = async (e) => {
 
           {/* Main Content Area */}
           <div className="portal-main">
+            {showPreviewBanner && (
+              <div className="ndg-preview-banner">
+                <span>👁️ Previewing as <b>{previewTarget.name}</b> ({previewTarget.type}) — read-only view</span>
+                <button onClick={exitPreview} className="ndg-view-as-select">Exit Preview</button>
+              </div>
+            )}
             {/* Light cream topbar — carries the page title */}
             <header className="portal-topbar">
               <div className="ndg-topbar-left">
@@ -3568,6 +3604,40 @@ const handleAddDiscipline = async (e) => {
                 </div>
               </div>
               <div className="ndg-topbar-right">
+                {role === 'super_admin' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <select
+                      className="ndg-view-as-select"
+                      value={previewTarget ? (previewTarget.user_id ? `user:${previewTarget.user_id}` : `role:${previewTarget.role_key}`) : ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) { setPreviewTarget(null); return; }
+                        if (val.startsWith('role:')) {
+                          const rKey = val.slice(5);
+                          const rObj = roles.find(r => r.key === rKey);
+                          setPreviewTarget({ type: 'role', role_key: rKey, name: rObj?.name || rKey });
+                        } else if (val.startsWith('user:')) {
+                          const uId = val.slice(5);
+                          const uObj = dbData.users.find(u => String(u.id) === String(uId));
+                          setPreviewTarget({ type: 'user', role_key: uObj?.role_key || 'student', user_id: uId, name: uObj?.name || uObj?.email || 'User' });
+                        }
+                      }}
+                      aria-label="View portal as role or user"
+                    >
+                      <option value="">👁️ View As...</option>
+                      <optgroup label="Roles">
+                        {roles.map(r => (
+                          <option key={`role:${r.key}`} value={`role:${r.key}`}>{r.name} ({r.key})</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Users">
+                        {dbData.users.map(u => (
+                          <option key={`user:${u.id}`} value={`user:${u.id}`}>{u.name || u.email} [{u.role_key}]</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                )}
                 <div className="ndg-topbar-search">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-deep)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />

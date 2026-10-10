@@ -79,13 +79,14 @@ Last updated: 2026-10-10
 
 ### Phase 9 — The 8 (analytics / integrations / mobile / etc.)
 - [x] Analytics & dashboards (enrolment/fee/attendance/result aggregates): `GET /api/analytics/summary` — one server-side roll-up (people/academics/enrolment/fees/attendance/results, per rule 7); standalone `/analytics` page + sidebar module; `specs/supabase-analytics-permissions.sql` seeds `analytics` module_key (staff roles only — students omitted deliberately). (2026-10-10)
+- [x] Super Admin "View As" Role/User Preview & User-Level Permissions (2026-10-10): backend `authMiddleware` honors `X-Preview-Role` & `X-Preview-User`, `getAccessLevel` & `/api/my-permissions` compute effective permissions with personal overrides (add-only), preview is read-only (`403` on writes), frontend dropdown selector + preview banner + global `fetch` header injection.
 - [ ] Integrations (payment gateway, email/SMS providers).
 - [ ] Mobile app / PWA.
 - [ ] Accreditation-ready records & exports.
 - (4 more items to be enumerated with Srinivas as they arise — mirror of "8 of Phase 8".)
 
 ## Current task
-**Phase 9.** Analytics & dashboards done (`/api/analytics/summary` + `/analytics` page). Next: integrations (payment gateway, email/SMS), mobile/PWA, or accreditation exports — pick with Srinivas.
+**Phase 9.** View As Role/User Preview completed. Next: integrations (payment gateway, email/SMS), mobile/PWA, or accreditation exports — pick with Srinivas.
 
 ## Verification checklist (every task)
 - [ ] `cd frontend && npm run build`

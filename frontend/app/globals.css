@@ -998,6 +998,30 @@ input, select, textarea {
   box-shadow: 0 0 0 3px rgba(221, 159, 60, 0.22);
 }
 
+.ndg-preview-banner {
+  background: var(--bg-saffron);
+  border: 1px solid var(--accent);
+  color: var(--primary);
+  padding: 8px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-xl-sm);
+  margin-bottom: 12px;
+}
+.ndg-view-as-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl-sm);
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--primary-deep);
+  outline: none;
+}
+
 .ndg-ov-metric.dragging,
 .ndg-ov-card.dragging { opacity: 0.45; }
 

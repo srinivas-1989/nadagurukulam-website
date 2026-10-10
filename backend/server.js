@@ -306,6 +306,23 @@ async function authMiddleware(req, res, next) {
       if (!allow) return res.status(403).json({ error: 'Password change required', code: 'PASSWORD_CHANGE_REQUIRED' });
     }
     req.auth = { user, profile };
+    if (profile.role_key === 'super_admin') {
+      const pRole = req.headers['x-preview-role'];
+      const pUser = req.headers['x-preview-user'];
+      if (pRole) {
+        profile.preview = {
+          role_key: String(pRole),
+          user_id: pUser ? String(pUser) : null,
+          original_id: profile.id,
+          original_role_key: profile.role_key,
+        };
+        profile.role_key = String(pRole);
+        if (pUser) profile.id = String(pUser);
+      }
+    }
+    if (profile.preview && req.method !== 'GET' && req.method !== 'HEAD') {
+      return res.status(403).json({ error: 'Preview mode is read-only.' });
+    }
     next();
   } catch (err) {
     console.error('Auth middleware error:', err);
@@ -322,12 +339,18 @@ const LEVEL_ORDER = { '—': 0, 'View': 1, 'Self': 2, 'Submits': 3, 'Own': 4, 'M
 // level, never lowers it, so a role can't be used to quietly cap a person. No
 // row anywhere = module hidden.
 async function getAccessLevel(profile, moduleKey) {
-  if (profile.role_key === 'super_admin') return 'Full';
+  const effectiveRole = profile.preview?.role_key || profile.role_key;
+  if (effectiveRole === 'super_admin') return 'Full';
+
+  const userQuery = profile.preview?.user_id
+    ? supabase.from('user_permissions').select('access_level').eq('user_id', profile.preview.user_id).eq('module_key', moduleKey).maybeSingle()
+    : profile.preview ? Promise.resolve({ data: null }) // Pure role preview: no user grants
+    : supabase.from('user_permissions').select('access_level').eq('user_id', profile.id).eq('module_key', moduleKey).maybeSingle();
+
   const [byRole, byUser] = await Promise.all([
     supabase.from('role_permissions').select('access_level')
-      .eq('role_key', profile.role_key).eq('module_key', moduleKey).maybeSingle(),
-    supabase.from('user_permissions').select('access_level')
-      .eq('user_id', profile.id).eq('module_key', moduleKey).maybeSingle(),
+      .eq('role_key', effectiveRole).eq('module_key', moduleKey).maybeSingle(),
+    userQuery,
   ]);
   const rank = (l) => LEVEL_ORDER[l] ?? 0;
   const role = byRole.data?.access_level;
@@ -2051,22 +2074,26 @@ app.get('/api/analytics/summary', authMiddleware, async (req, res) => {
 app.get('/api/my-permissions', authMiddleware, async (req, res) => {
   try {
     const me = req.auth.profile;
-    const isSuper = me.role_key === 'super_admin';
-    if (isSuper) {
-      res.json({ role_key: me.role_key, module_key: null, access_level: 'Full', perms: {} });
+    const isPreview = !!me.preview;
+    const roleKey = isPreview ? me.preview.role_key : me.role_key;
+    const userId = isPreview ? me.preview.user_id : me.id;
+
+    if (roleKey === 'super_admin') {
+      res.json({ role_key: roleKey, module_key: null, access_level: 'Full', perms: {}, is_preview: isPreview });
       return;
     }
-    const [{ data: byRole }, { data: byUser }] = await Promise.all([
-      supabase.from('role_permissions').select('module_key, access_level').eq('role_key', me.role_key),
-      supabase.from('user_permissions').select('module_key, access_level').eq('user_id', me.id),
+
+    const [byRole, byUser] = await Promise.all([
+      supabase.from('role_permissions').select('module_key, access_level').eq('role_key', roleKey),
+      userId ? supabase.from('user_permissions').select('module_key, access_level').eq('user_id', userId) : Promise.resolve({ data: [] }),
     ]);
     const perms = {};
     const rank = (l) => LEVEL_ORDER[l] ?? 0;
-    (byRole || []).forEach(p => { perms[p.module_key] = p.access_level; });
-    (byUser || []).forEach(p => {
+    (byRole.data || []).forEach(p => { perms[p.module_key] = p.access_level; });
+    (byUser.data || []).forEach(p => {
       if (rank(p.access_level) > rank(perms[p.module_key])) perms[p.module_key] = p.access_level;
     });
-    res.json({ role_key: me.role_key, perms });
+    res.json({ role_key: roleKey, perms, is_preview: isPreview, preview_user_id: userId });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
