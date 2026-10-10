@@ -3582,10 +3582,10 @@ const handleAddDiscipline = async (e) => {
 
           {/* Main Content Area */}
           <div className="portal-main">
-            {showPreviewBanner && (
+            {previewTarget && (
               <div className="ndg-preview-banner">
                 <span>👁️ Previewing as <b>{previewTarget.name}</b> ({previewTarget.type}) — read-only view</span>
-                <button onClick={exitPreview} className="ndg-view-as-select">Exit Preview</button>
+                <button onClick={() => setPreviewTarget(null)} className="ndg-view-as-select">Exit Preview</button>
               </div>
             )}
             {/* Light cream topbar — carries the page title */}
