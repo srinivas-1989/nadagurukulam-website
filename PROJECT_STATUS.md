@@ -74,7 +74,8 @@ Last updated: 2026-10-10
 ### Phase 8 — LMS manual Phase 1 (next feature work)
 - [x] Assessment submission tracking (§201-205): `assessment_submissions` — due dates, late/submitted/evaluated states, file/video-link/text answers. Server-side gates (self-create at View, ownership on update, Manage for evaluate, duplicate + draft-publish checks) + standalone `/assessment` page. (2026-10-10)
 - [x] Attendance (§206-208): `class_sessions`, `attendance_records`, `attendance_states` — session create (duplicate guard, created_by/taught_by), Manage-only markdown with state + registration checks, idempotent re-mark, and derived rollup endpoint `GET /api/attendance-summary` (present/total server-side). Standalone `/attendance` page: teacher session + roster marking, student own percentage. (2026-10-10)
-- [ ] Results / evaluation publication (§219-226): `evaluations`, `results`, `result_corrections`, grading schemes/rubrics.
+- [x] Results / evaluation publication (§219-226): `evaluations`, `results`, `result_corrections`, `grading_schemes`/`rubrics`. Evaluation records marks/feedback (Manage-only, marks ≤ assessment max, 409 on double-evaluate, flips submission to evaluated); `POST /api/results/generate` derives each student's result from their evaluations (weighted by `weight_percent`, raw-marks fallback when unweighted), grades against the scheme's data-driven `bands`, and never touches a published row; `POST /api/results/:id/publish` publishes deliberately; result edits require a reason and write a `result_corrections` audit row. Standalone `/results` page: generate → publish → correct; students see only their own published results. (2026-10-10)
+- [x] **Module-visibility gap fixed** (2026-10-10): `attendance` had no `role_permissions` seed, so its sidebar entry was hidden for every role but Super Admin. Applied `specs/supabase-attendance-results-permissions.sql` (attendance + results, all roles) and seeded a default grading scheme `specs/supabase-grading-scheme-default.sql`; both added to `apply-schema.js` FILES.
 
 ### Phase 9 — The 8 (analytics / integrations / mobile / etc.)
 - [ ] Analytics & dashboards (enrolment/fee/attendance/result aggregates).
@@ -84,7 +85,7 @@ Last updated: 2026-10-10
 - (4 more items to be enumerated with Srinivas as they arise — mirror of "8 of Phase 8".)
 
 ## Current task
-**Phase 8 — LMS manual features.** Assessment (§201-205) and Attendance (§206-208) done. Next: Results / evaluation publication (§219-226) — `evaluations`, `results`, `result_corrections`, grading schemes/rubrics. Manual §14/§15: Assessment → Submission/Performance → Evaluation → Grade/Score → Result; rubrics data-driven. Server-side per rule 7.
+**Phase 8 — LMS manual features.** Assessment (§201-205), Attendance (§206-208), Results (§219-226) done. Next: enumerate the remaining Phase 8 items with Srinivas, or start Phase 9 (analytics/dashboards is the natural first: it aggregates the enrolment/fee/attendance/result data now all in place).
 
 ## Verification checklist (every task)
 - [ ] `cd frontend && npm run build`

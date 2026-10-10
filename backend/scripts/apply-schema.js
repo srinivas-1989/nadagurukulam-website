@@ -48,6 +48,9 @@ const FILES = [
   path.join(__dirname, '../../specs/supabase-finance-hr.sql'),
   path.join(__dirname, '../../specs/supabase-documents-notifications.sql'),
   path.join(__dirname, '../../specs/phaseX-password-resets.sql'),
+  // Data seeds whose tables came from specs above (grading bands, module perms).
+  path.join(__dirname, '../../specs/supabase-grading-scheme-default.sql'),
+  path.join(__dirname, '../../specs/supabase-attendance-results-permissions.sql'),
   // Policies must run last: every table they reference has to exist first.
   path.join(__dirname, '../../specs/supabase-rls-policies.sql'),
 ];

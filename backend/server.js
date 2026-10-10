@@ -463,6 +463,21 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
     if (level === 'Manage' || level === 'Full') return query;
     return query.eq('student_id', profile.id);
   }
+  // Evaluations carry marks and rubric feedback, so only teachers read them.
+  if (table === 'evaluations') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return null;
+  }
+  // A student sees only their own results, and only once published.
+  if (table === 'results') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return query.eq('student_id', profile.id).eq('is_published', true);
+  }
+  // The correction trail is an academic record, so only teachers read it.
+  if (table === 'result_corrections') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return null;
+  }
   if (table === 'assignment_submissions') {
     if (level === 'Manage' || level === 'Full') return query;
     if (level === 'Own') {
@@ -867,10 +882,29 @@ const crud = (table, orderCol = 'created_at') => ({
       }
       if (table === 'evaluations') {
         if (!req.body.submission_id) return res.status(400).json({ error: 'submission_id required' });
+        if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Only teachers can evaluate submissions.' });
+        const { data: sub } = await supabase.from('assessment_submissions')
+          .select('id, assessment_id, assessment:assessments(max_marks)').eq('id', req.body.submission_id).maybeSingle();
+        if (!sub) return res.status(404).json({ error: 'Submission not found' });
+        const maxMarks = Number(sub.assessment?.max_marks);
+        if (req.body.marks_obtained !== undefined && req.body.marks_obtained !== null && req.body.marks_obtained !== '') {
+          const m = Number(req.body.marks_obtained);
+          if (!Number.isFinite(m) || m < 0) return res.status(400).json({ error: 'marks_obtained must be >= 0' });
+          if (Number.isFinite(maxMarks) && m > maxMarks) return res.status(400).json({ error: `marks_obtained cannot exceed the assessment maximum of ${maxMarks}` });
+          req.body.marks_obtained = m;
+        } else {
+          req.body.marks_obtained = null;
+        }
+        const { data: existing } = await supabase.from('evaluations').select('id').eq('submission_id', req.body.submission_id).maybeSingle();
+        if (existing) return res.status(409).json({ error: 'This submission is already evaluated — update the existing evaluation instead.' });
+        req.body.evaluator_id = req.auth.profile.id;
+        if (!req.body.evaluated_at) req.body.evaluated_at = new Date().toISOString();
       }
       if (table === 'results') {
-        if (!req.body.course_offering_id || !req.body.student_id) return res.status(400).json({ error: 'course_offering_id and student_id required' });
-        if (req.body.outcome && !['pass','fail','pending'].includes(req.body.outcome)) return res.status(400).json({ error: 'Invalid outcome' });
+        // Results are derived from evaluations (POST /api/results/generate), never
+        // typed in by hand. Later changes go through the correction flow so the
+        // audit trail stays complete.
+        return res.status(400).json({ error: 'Results are generated from evaluations. Use /api/results/generate, then correct through the results update endpoint.' });
       }
 
       // ── courses: hours input → auto periods via program mins (reverse of before); also normalize exam hrs/mins ──
@@ -1049,6 +1083,12 @@ const crud = (table, orderCol = 'created_at') => ({
       }
       const { data, error } = await supabase.from(table).insert([payload]).select();
       if (error) throw error;
+      // An evaluation marks the submission evaluated, so a student's row and the
+      // evaluations list cannot disagree about whether a submission is still open.
+      if (table === 'evaluations') {
+        await supabase.from('assessment_submissions').update({ status: 'evaluated', updated_at: new Date().toISOString() }).eq('id', payload.submission_id);
+        await recordAudit(req, { action: 'evaluate', entityType: 'evaluations', entityId: data[0]?.id, summary: `Evaluated submission ${payload.submission_id}${payload.marks_obtained == null ? '' : ` (${payload.marks_obtained} marks)`}`, newValue: data[0] });
+      }
       if (table === 'assignments' && payload.batch_id && payload.status !== 'draft') {
         const { data: enrolled } = await supabase.from('enrollments').select('student_id').eq('batch_id', payload.batch_id).eq('status', 'enrolled');
         if (enrolled?.length) {
@@ -1099,6 +1139,64 @@ const crud = (table, orderCol = 'created_at') => ({
         if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
         const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
         if (error) throw error;
+        return res.json(data[0]);
+      }
+      if (table === 'evaluations') {
+        if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Only teachers can evaluate submissions.' });
+        let ud = { ...req.body };
+        delete ud.submission_id; // one evaluation per submission; re-pointing it is not a correction
+        const { data: cur } = await supabase.from('evaluations').select('submission_id, marks_obtained, rubric_scores, feedback, submission:assessment_submissions(assessment:assessments(max_marks))').eq('id', req.params.id).maybeSingle();
+        if (!cur) return res.status(404).json({ error: 'Evaluation not found' });
+        if (ud.marks_obtained !== undefined) {
+          if (ud.marks_obtained === null || ud.marks_obtained === '') ud.marks_obtained = null;
+          else {
+            const m = Number(ud.marks_obtained);
+            const maxMarks = Number(cur.submission?.assessment?.max_marks);
+            if (!Number.isFinite(m) || m < 0) return res.status(400).json({ error: 'marks_obtained must be >= 0' });
+            if (Number.isFinite(maxMarks) && m > maxMarks) return res.status(400).json({ error: `marks_obtained cannot exceed the assessment maximum of ${maxMarks}` });
+            ud.marks_obtained = m;
+          }
+        }
+        ud.evaluator_id = req.auth.profile.id;
+        ud.evaluated_at = new Date().toISOString();
+        if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        await recordAudit(req, { action: 'update', entityType: 'evaluations', entityId: req.params.id, summary: 'Evaluation revised', previousValue: cur, newValue: data[0] });
+        return res.json(data[0]);
+      }
+      if (table === 'results') {
+        if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Only teachers can correct results.' });
+        const reason = String(req.body.reason || '').trim();
+        if (!reason) return res.status(400).json({ error: 'A reason is required to correct a result.' });
+        const { data: cur } = await supabase.from('results').select('obtained_marks, maximum_marks, percentage, grade, grade_point, outcome, grading_scheme_id, is_published, published_at, published_by').eq('id', req.params.id).maybeSingle();
+        if (!cur) return res.status(404).json({ error: 'Result not found' });
+        // Publishing has its own endpoint; a correction never silently (un)publishes.
+        const CORRECTABLE = ['obtained_marks', 'maximum_marks', 'percentage', 'grade', 'grade_point', 'outcome', 'grading_scheme_id'];
+        const changed = [];
+        const ud = {};
+        for (const f of CORRECTABLE) {
+          if (req.body[f] === undefined) continue;
+          let v = req.body[f];
+          if (['obtained_marks', 'maximum_marks', 'percentage', 'grade_point'].includes(f)) v = (v === null || v === '') ? null : Number(v);
+          if (JSON.stringify(v) !== JSON.stringify(cur[f] ?? null)) { ud[f] = v; changed.push(f); }
+        }
+        if (changed.length === 0) return res.status(400).json({ error: 'Nothing to correct — no correctable field changed.' });
+        if (ud.outcome !== undefined && ud.outcome !== null && !['pass', 'fail', 'pending'].includes(ud.outcome)) return res.status(400).json({ error: 'Invalid outcome' });
+        if (ud.percentage != null && (ud.percentage < 0 || ud.percentage > 100)) return res.status(400).json({ error: 'percentage must be between 0 and 100' });
+        ud.updated_at = new Date().toISOString();
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        // The auditable record lives in result_corrections, not just audit_log:
+        // it is the transcript-grade trail a correction is expected to leave.
+        await supabase.from('result_corrections').insert([{
+          result_id: req.params.id,
+          reason,
+          previous_value: Object.fromEntries(changed.map(f => [f, cur[f] ?? null])),
+          new_value: Object.fromEntries(changed.map(f => [f, ud[f] ?? null])),
+          corrected_by: req.auth.profile.id,
+        }]);
+        await recordAudit(req, { action: 'correct', entityType: 'results', entityId: req.params.id, summary: `Result corrected (${changed.join(', ')}): ${reason}`, previousValue: cur, newValue: data[0] });
         return res.json(data[0]);
       }
       if (table === 'assessment_submissions') {
@@ -1574,7 +1672,7 @@ const rolesDelete = async (req, res) => {
 };
 
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
-const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'class_sessions', 'attendance_records', 'assignment_submissions', 'assessment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments', 'documents']);
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'class_sessions', 'attendance_records', 'assignment_submissions', 'assessment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments', 'documents', 'evaluations', 'results', 'grading_schemes', 'rubrics', 'rubric_criteria']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
 const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at', employees: 'created_at', fee_structures: 'name', fee_items: 'name', fee_payments: 'payment_date', salary_slips: 'created_at', document_folders: 'name', documents: 'title', media: 'title', notification_templates: 'name', notifications: 'sent_at' };
 
@@ -1730,6 +1828,126 @@ app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
       percentage: b.held ? Math.round((b.present / b.held) * 1000) / 10 : null,
     }));
     res.json({ course_offering_id: offeringId, students });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Grades a percentage against a scheme's bands. Bands are data (§36), so the
+// grade and grade point are looked up rather than hardcoded; the highest band
+// whose threshold the percentage meets wins.
+function gradeFor(scheme, percentage) {
+  if (!scheme || percentage == null) return { grade: null, grade_point: null };
+  const bands = Array.isArray(scheme.bands) ? [...scheme.bands] : [];
+  bands.sort((a, b) => Number(b.min_percent ?? 0) - Number(a.min_percent ?? 0));
+  const band = bands.find(b => percentage >= Number(b.min_percent ?? 0));
+  return band ? { grade: band.grade ?? null, grade_point: band.grade_point ?? null } : { grade: null, grade_point: null };
+}
+
+// Rolls a student's evaluations up into a result per common rule: each
+// assessment contributes marks_obtained scaled by its weight_percent over the
+// same weighting of its max_marks. Results are written once and, once
+// published, are only ever changed through the correction flow — this endpoint
+// never edits a published row, so a transcript cannot shift silently.
+app.post('/api/results/generate', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'assessment', 'update');
+    if (!level) return;
+    if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Only teachers can generate results.' });
+    const offeringId = req.body.course_offering_id;
+    if (!offeringId) return res.status(400).json({ error: 'course_offering_id required' });
+
+    let scheme = null;
+    if (req.body.grading_scheme_id) {
+      const { data } = await supabase.from('grading_schemes').select('*').eq('id', req.body.grading_scheme_id).maybeSingle();
+      scheme = data;
+    } else {
+      const { data } = await supabase.from('grading_schemes').select('*').eq('is_default', true).maybeSingle();
+      scheme = data || null;
+    }
+
+    const { data: plans, error: pErr } = await supabase.from('assessment_plans').select('id').eq('course_offering_id', offeringId);
+    if (pErr) throw pErr;
+    const planIds = (plans || []).map(p => p.id);
+    if (planIds.length === 0) return res.status(400).json({ error: 'This offering has no assessment plan, so there is nothing to grade.' });
+
+    const { data: assessments, error: aErr } = await supabase.from('assessments').select('id, max_marks, weight_percent').in('plan_id', planIds);
+    if (aErr) throw aErr;
+    const assessmentById = Object.fromEntries((assessments || []).map(a => [a.id, a]));
+
+    const { data: subs, error: sErr } = await supabase.from('assessment_submissions').select('id, assessment_id, student_id').in('assessment_id', (assessments || []).map(a => a.id));
+    if (sErr) throw sErr;
+    const subById = Object.fromEntries((subs || []).map(s => [s.id, s]));
+
+    const { data: evals, error: eErr } = await supabase.from('evaluations').select('submission_id, marks_obtained').in('submission_id', (subs || []).map(s => s.id));
+    if (eErr) throw eErr;
+
+    // student -> weighted tallies across their evaluated work (plus raw marks as
+    // a fallback when the assessments carry no weights at all)
+    const tally = {};
+    for (const ev of evals || []) {
+      const sub = subById[ev.submission_id];
+      const a = sub && assessmentById[sub.assessment_id];
+      if (!a || ev.marks_obtained == null) continue;
+      const w = Number(a.weight_percent) || 0;
+      const t = tally[sub.student_id] || (tally[sub.student_id] = { weight: 0, weighted: 0, weightedMax: 0, raw: 0, rawMax: 0 });
+      t.weight += w;
+      t.weighted += Number(ev.marks_obtained) * w;
+      t.weightedMax += Number(a.max_marks) * w;
+      t.raw += Number(ev.marks_obtained);
+      t.rawMax += Number(a.max_marks);
+    }
+
+    const { data: existingRows } = await supabase.from('results').select('student_id, id, is_published').eq('course_offering_id', offeringId);
+    const existing = Object.fromEntries((existingRows || []).map(r => [r.student_id, r]));
+
+    let generated = 0; const skipped = [];
+    for (const [studentId, t] of Object.entries(tally)) {
+      const prev = existing[studentId];
+      if (prev?.is_published) { skipped.push(studentId); continue; }
+      // Weighted when the assessments set weights; raw marks as a fallback when
+      // every weight is zero, so an unweighted scheme still grades.
+      const weighted = t.weightedMax > 0;
+      const obtainedTotal = weighted ? t.weighted : t.raw;
+      const maxTotal = weighted ? t.weightedMax : t.rawMax;
+      const percentage = maxTotal > 0 ? Math.round((obtainedTotal / maxTotal) * 1000) / 10 : null;
+      const { grade, grade_point } = gradeFor(scheme, percentage);
+      const passAt = scheme ? Number(scheme.passing_percent) : null;
+      const outcome = percentage == null ? 'pending' : (passAt != null && percentage >= passAt ? 'pass' : 'fail');
+      const payload = {
+        course_offering_id: offeringId, student_id: studentId,
+        grading_scheme_id: scheme?.id || null,
+        obtained_marks: Math.round(obtainedTotal * 100) / 100,
+        maximum_marks: Math.round(maxTotal * 100) / 100,
+        percentage, grade, grade_point, outcome,
+        updated_at: new Date().toISOString(),
+      };
+      if (prev) await supabase.from('results').update(payload).eq('id', prev.id);
+      else await supabase.from('results').insert([payload]);
+      generated += 1;
+    }
+
+    await recordAudit(req, { action: 'generate', entityType: 'results', entityId: offeringId, summary: `Generated ${generated} result(s) for offering ${offeringId}`, newValue: { generated, skipped_published: skipped.length } });
+    res.json({ offering_id: offeringId, grading_scheme_id: scheme?.id || null, generated, skipped_published: skipped.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Publishing is deliberate and reversible, and always recorded. It never
+// recomputes the marks — those came from the evaluations.
+app.post('/api/results/:id/publish', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'assessment', 'update');
+    if (!level) return;
+    if ((LEVEL_ORDER[level] ?? 0) < LEVEL_ORDER['Manage']) return res.status(403).json({ error: 'Only teachers can publish results.' });
+    const publish = req.body.is_published === undefined ? true : !!req.body.is_published;
+    const { data: cur } = await supabase.from('results').select('*').eq('id', req.params.id).maybeSingle();
+    if (!cur) return res.status(404).json({ error: 'Result not found' });
+    if (publish && cur.percentage == null) return res.status(400).json({ error: 'This result has no marks yet — generate it from evaluations before publishing.' });
+    const ud = publish
+      ? { is_published: true, published_at: new Date().toISOString(), published_by: req.auth.profile.id, updated_at: new Date().toISOString() }
+      : { is_published: false, published_at: null, published_by: null, updated_at: new Date().toISOString() };
+    const { data, error } = await supabase.from('results').update(ud).eq('id', req.params.id).select();
+    if (error) throw error;
+    await recordAudit(req, { action: publish ? 'publish' : 'unpublish', entityType: 'results', entityId: req.params.id, summary: publish ? 'Result published' : 'Result unpublished', previousValue: cur, newValue: data[0] });
+    res.json(data[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

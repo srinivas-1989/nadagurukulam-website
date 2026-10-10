@@ -284,6 +284,7 @@ insert into public.role_permissions (role_key, module_key, access_level) values
   ('admin','notifications','Manage'), ('admin','finance','Manage'),
   ('admin','hr','Manage'),            ('admin','teachinglogs','Manage'),
   ('admin','assessment','Manage'),
+  ('admin','attendance','Manage'),    ('admin','results','Manage'),
   -- Teaching faculty — runs classes, marks attendance/grades, uploads resources.
   ('teaching_faculty','overview','View'), ('teaching_faculty','curriculum','View'),
   ('teaching_faculty','batches','View'),  ('teaching_faculty','timetable','View'),
@@ -291,6 +292,7 @@ insert into public.role_permissions (role_key, module_key, access_level) values
   ('teaching_faculty','assignments','Manage'), ('teaching_faculty','feedback','Manage'),
   ('teaching_faculty','performances','Manage'), ('teaching_faculty','lms','Manage'),
   ('teaching_faculty','teachinglogs','Manage'), ('teaching_faculty','assessment','Manage'),
+  ('teaching_faculty','attendance','Manage'),  ('teaching_faculty','results','Manage'),
   ('teaching_faculty','events','View'), ('teaching_faculty','documents','View'),
   ('teaching_faculty','notifications','View'),
   -- Non-teaching faculty — front-office + documents + enquiries.
@@ -309,6 +311,7 @@ insert into public.role_permissions (role_key, module_key, access_level) values
   ('student','overview','View'), ('student','lms','View'), ('student','assignments','View'),
   ('student','feedback','View'), ('student','performances','View'),
   ('student','assessment','Self'), ('student','events','View'),
+  ('student','attendance','View'), ('student','results','Self'),
   ('student','documents','View'), ('student','notifications','View')
 on conflict (role_key, module_key) do nothing;
 

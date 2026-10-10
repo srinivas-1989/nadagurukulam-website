@@ -139,9 +139,20 @@ export default function AssessmentPage() {
     } catch (err) { alert(err.message); }
   }
 
-  async function handleEvaluate(sub) {
-    try { await apiCall(`/api/assessment_submissions/${sub.id}`, { method: 'PUT', body: JSON.stringify({ status: 'evaluated' }) }); reload(); }
-    catch (err) { alert(err.message); }
+  // An evaluation carries the marks and rubric feedback the result is later
+  // derived from; recording it also flips the submission to evaluated server-side.
+  async function handleEvaluate(a, sub) {
+    const marks = window.prompt(`Marks for ${userName(sub.student_id)} (out of ${a.max_marks}) — leave blank for none:`, '');
+    if (marks === null) return;
+    const feedback = window.prompt('Feedback (optional):', '') || null;
+    try {
+      await apiCall('/api/evaluations', { method: 'POST', body: JSON.stringify({
+        submission_id: sub.id,
+        marks_obtained: marks.trim() === '' ? null : Number(marks),
+        feedback,
+      }) });
+      reload();
+    } catch (err) { alert(err.message); }
   }
 
   if (loading) return <div style={{ padding: '24px' }}>Loading…</div>;
@@ -238,7 +249,7 @@ export default function AssessmentPage() {
                             <td style={{ padding: '6px 8px' }}><span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', background: s.status === 'evaluated' ? 'var(--primary)' : s.status === 'submitted' ? '#15803d' : '#b45309', color: '#fff' }}>{s.status}{sLate ? ' · late' : ''}</span></td>
                             <td style={{ padding: '6px 8px', fontSize: '11.5px', color: 'var(--text-soft)' }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '—'}</td>
                             <td style={{ padding: '6px 8px' }}>{s.evidence_url ? <a href={s.evidence_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>📎 link</a> : <span style={{ color: 'var(--text-faint)' }}>—</span>}{s.notes ? <span title={s.notes} style={{ color: 'var(--text-soft)', fontSize: '11px', marginLeft: '6px' }}>· {s.notes.slice(0, 32)}{s.notes.length > 32 ? '…' : ''}</span> : null}</td>
-                            <td style={{ padding: '6px 8px' }}>{s.status !== 'evaluated' && s.status === 'submitted' ? <button onClick={() => handleEvaluate(s)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Mark evaluated</button> : null}</td>
+                            <td style={{ padding: '6px 8px' }}>{s.status === 'submitted' ? <button onClick={() => handleEvaluate(a, s)} style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Evaluate</button> : null}</td>
                           </tr>
                         );
                       })}
