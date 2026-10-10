@@ -59,15 +59,16 @@ Last updated: 2026-10-10
 - [x] Documents & media modules (`document_folders`, `documents`, `media`).
 - [x] Notifications engine (LMS §20/§187-200): auto-notify enrolled students on assignment publish, recipient-scoped listing, mark-as-read, topbar bell. (commit e2bcf6a).
 - [x] Permission grants `specs/supabase-notifications-permissions.sql` applied 2026-10-10 (all roles View).
-- [ ] **Table gap**: `notifications`/`notification_templates` tables do not exist in live DB — `supabase-documents-notifications.sql` was never applied, so the auto-notify insert silently fails. Fix with the blocker above.
+- [x] `notifications` / `notification_templates` tables now exist (documents-notifications spec applied 2026-10-10); auto-notify insert no longer fails silently.
 - [ ] Optional: notification templates (`notification_templates`) + domain-event triggers.
 
 ### Phase 7B — Sample data (in progress)
 - [x] `specs/supabase-seed-sample-data.sql` — roles (admin/teaching_faculty/non_teaching_faculty/guest_faculty/student), staff + students, UG/PG/Diploma/Certificate programmes, courses/offerings, batches, enrollments, faculty team, bootstrap permissions. Pure data, editable/deletable, similarity to how admin creates via UI. CLEANUP block included.
 - [x] **Applied to live Supabase 2026-10-10.** 5 roles, 16 staff-tree nodes, 11 programmes, 4 batches, 9 sample users, 3 courses + 3 offerings, 2 faculty assignments, 94 permission rows. Re-run verified idempotent.
 - [x] Applied `specs/supabase-notifications-permissions.sql` (all roles get notification View).
-- [ ] Create matching `auth.users` accounts for the 9 sample users (profile rows exist; portal "Add User" or `supabase.auth.admin.createUser` adds the auth row + temp password so they can log in).
-- [ ] **BLOCKER — 3 specs never applied** (`apply-schema.js` FILES omits them, shipped features therefore have no tables): `supabase-finance-hr.sql`, `supabase-documents-notifications.sql`, `phaseX-password-resets.sql`. First two are blocked: finance-hr FKs `public.designations` which `supabase-tree-categories.sql` superseded — needs FK rewritten to a `category_level_values` node. Then add all three to the FILES array.
+- [x] **Auth rows created + linked 2026-10-10** via `backend/scripts/create-sample-auth-users.js` (idempotent). All 9 sample users can log in; first login forces a password change (`must_change_password`), then modules unlock. Login verified end-to-end (auth → `public.users` link → `/api/my-permissions`).
+- [x] **Table gap fixed 2026-10-10** — `apply-schema.js` FILES now lists finance-hr, documents-notifications, password-resets; applied (94→104 tables). finance-hr's stale `designation_id` FK repointed from dropped `public.designations` to `category_level_values`.
+- [x] **Drift guard added** — `backend/scripts/check-schema-drift.js` (`npm run check-schema`) diffs every `create table ... public.X` in `specs/` against the live DB and exits non-zero on any miss, so a written-but-unapplied spec can never fail silently again (the exact class of the notifications bug). Currently: 95/95 present.
 - [ ] Reconcile `category_level_values`: live has only `student` + a stray `test` category; seed added `staff` (16 nodes). Decide whether to re-run admin/teacher tree or edit in portal.
 
 ### Phase 8 — LMS manual Phase 1 (next feature work)
@@ -83,12 +84,13 @@ Last updated: 2026-10-10
 - (4 more items to be enumerated with Srinivas as they arise — mirror of "8 of Phase 8".)
 
 ## Current task
-**Fix the schema gap.** Three specs (`supabase-finance-hr.sql`, `supabase-documents-notifications.sql`, `phaseX-password-resets.sql`) were never added to `backend/scripts/apply-schema.js`, so Finance/HR, Documents/Media, Notifications and password-reset tables are absent from the live DB. Rewrite the finance-hr `designation_id` FK (dropped `public.designations` → `category_level_values`), add all three to FILES, apply. Then create the 9 sample users' auth rows.
+**Phase 8 — LMS manual features.** Sample data is done and verified. Start with assessment submission tracking (§201-205): `assessment_submissions` table exists (server registry ~line 415); build the due-date / late / submitted states and video-file-text answers on top of it, server-side per rule 7.
 
 ## Verification checklist (every task)
 - [ ] `cd frontend && npm run build`
 - [ ] Backend boots (`node backend/server.js`) — check for route/module errors
 - [ ] SQL migrations/seeds idempotent (grep specs/ for table first, per rule 8)
+- [ ] `cd backend && npm run check-schema` — no table in specs/ missing from the live DB
 - [ ] New module? registered in server routes loop + super_admin seed
 - [ ] Commit + push (no attribution lines)
 - [ ] Update THIS file (dates, checkboxes, current task)
