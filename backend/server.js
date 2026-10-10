@@ -473,6 +473,10 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
     if (level === 'Manage' || level === 'Full') return query;
     return query.eq('student_id', profile.id);
   }
+  if (table === 'notifications') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return query.eq('recipient_id', profile.id);
+  }
   // course_offerings stays a readable catalogue: students need to see open
   // offerings in order to register for one. Registrations are the private part.
   if (level === 'View' || level === 'Submits' || level === 'Manage' || level === 'Full') return query;
@@ -956,6 +960,20 @@ const crud = (table, orderCol = 'created_at') => ({
       }
       const { data, error } = await supabase.from(table).insert([payload]).select();
       if (error) throw error;
+      if (table === 'assignments' && payload.batch_id && payload.status !== 'draft') {
+        const { data: enrolled } = await supabase.from('enrollments').select('student_id').eq('batch_id', payload.batch_id).eq('status', 'enrolled');
+        if (enrolled?.length) {
+          const due = payload.due_date ? new Date(payload.due_date).toLocaleDateString('en-IN') : 'No due date';
+          const rows = enrolled.map(s => ({
+            recipient_id: s.student_id,
+            title: `New assignment: ${payload.title || 'Assignment'}`,
+            body: `${payload.title || 'Assignment'} — due ${due}`,
+            channel: 'in_app',
+            status: 'unread'
+          }));
+          await supabase.from('notifications').insert(rows);
+        }
+      }
       res.status(201).json(data[0]);
     } catch (err) { console.error('create', table, err.message); res.status(500).json({ error: err.message }); }
   },
@@ -963,6 +981,18 @@ const crud = (table, orderCol = 'created_at') => ({
     try {
       const moduleKey = TABLE_TO_MODULE[table] || API_TO_MODULE[table] || table;
       const level = await getAccessLevel(req.auth.profile, moduleKey);
+      if (table === 'notifications') {
+        const { data: cur } = await supabase.from('notifications').select('recipient_id').eq('id', req.params.id).maybeSingle();
+        if (!cur) return res.status(404).json({ error: 'Not found' });
+        const isRecipient = String(cur.recipient_id) === String(req.auth.profile.id);
+        const isManage = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        if (!isRecipient && !isManage) return res.status(403).json({ error: 'You do not own this record.' });
+        let ud = { ...req.body };
+        if (!isManage) { delete ud.recipient_id; delete ud.sent_at; ud.status = 'read'; }
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        return res.json(data[0]);
+      }
       if (table === 'assignment_submissions') {
         const owns = await checkRowOwnership(table, level, req.auth.profile, req.params.id);
         if (!owns) return res.status(403).json({ error: 'You do not own this record.' });

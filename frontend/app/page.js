@@ -657,6 +657,7 @@ export default function Home() {
   const [addBlockOpen, setAddBlockOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 // Add width/custom_title to widgets state
 const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, sort_order, width, custom_title}
 
@@ -671,7 +672,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
     users: [], curriculum: [], batches: [], timetable: [], timetable_periods: [],
     events: [], enquiries: [], jobs: [], courses: [], course_modules: [], course_module_topics: [], examination_types: [],
     live_sessions: [], lesson_plans: [], assignments: [], feedback: [], performances: [], projects: [], certificates: [], role_permissions: [], assignment_submissions: [],
-    class_entries: [], class_confirmations: [], academic_years: [], terms: [], course_offerings: [], course_registrations: [], enrollments: []
+    class_entries: [], class_confirmations: [], academic_years: [], terms: [], course_offerings: [], course_registrations: [], enrollments: [], notifications: []
   });
   const [roles, setRoles] = useState([]);
   const [userCategories, setUserCategories] = useState([]);
@@ -1339,7 +1340,7 @@ const [widgets, setWidgets] = useState([]); // Array of {module_key, visible, so
         ['lessonplans', 'lesson_plans'], ['assignments', 'assignments'], ['feedback', 'feedback'], ['performances', 'student_performances'], ['projects', 'projects'], ['certificates', 'certificates'],
         ['role_permissions', 'role_permissions'], ['user_permissions', 'user_permissions'], ['class_entries', 'class_entries'], ['class_confirmations', 'class_confirmations'], ['assignment_submissions', 'assignment_submissions'],
         ['academic_years', 'academic_years'], ['terms', 'terms'],
-        ['course_offerings', 'course_offerings'], ['course_registrations', 'course_registrations'], ['enrollments', 'enrollments']
+        ['course_offerings', 'course_offerings'], ['course_registrations', 'course_registrations'], ['enrollments', 'enrollments'], ['notifications', 'notifications']
       ];
       const results = await Promise.all(endpoints.map(([ep]) =>
         apiCall(`${apiUrl}/api/${ep}`).then(r => r.json()).catch(() => [])
@@ -3563,13 +3564,53 @@ const handleAddDiscipline = async (e) => {
                   </svg>
                   <input placeholder="Search..." aria-label="Search portal" />
                 </div>
-                <button className="ndg-icon-btn" aria-label="Notifications">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-                  </svg>
-                  <span className="ndg-notif-dot" />
-                </button>
+                {(() => {
+                  const notifs = Array.isArray(dbData?.notifications) ? dbData.notifications : [];
+                  const unread = notifs.filter(n => n.status !== 'read').length;
+                  return (
+                    <>
+                      <button className="ndg-icon-btn" aria-label="Notifications" onClick={() => setNotifOpen(!notifOpen)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                        </svg>
+                        {unread > 0 && <span className="ndg-notif-dot" />}
+                      </button>
+                      {notifOpen && (
+                        <div className="ndg-notif-panel" role="dialog" aria-label="Notifications">
+                          <div className="ndg-notif-head">
+                            <strong>Notifications</strong>
+                            <button className="ndg-notif-close" onClick={() => setNotifOpen(false)} aria-label="Close notifications">&times;</button>
+                          </div>
+                          <div className="ndg-notif-list">
+                            {notifs.length === 0 && <p className="ndg-notif-empty">No notifications yet.</p>}
+                            {notifs.map(n => (
+                              <button
+                                key={n.id}
+                                className={`ndg-notif-row${n.status === 'read' ? '' : ' is-unread'}`}
+                                onClick={async () => {
+                                  if (n.status !== 'read') {
+                                    await fetch(`${apiUrl}/api/notifications/${n.id}`, {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+                                      body: JSON.stringify({ status: 'read' })
+                                    });
+                                    const upd = (Array.isArray(dbData?.notifications) ? dbData.notifications : []).map(x => x.id === n.id ? { ...x, status: 'read' } : x);
+                                    setDbData({ ...dbData, notifications: upd });
+                                  }
+                                  setNotifOpen(false);
+                                }}
+                              >
+                                <strong>{n.title}</strong>
+                                <span className="ndg-notif-meta">{n.body}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </header>
 

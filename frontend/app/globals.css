@@ -635,6 +635,78 @@ input, select, textarea {
   border: 1.5px solid var(--surface);
 }
 
+.ndg-notif-panel {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  z-index: 60;
+  overflow: hidden;
+}
+
+.ndg-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--primary-deep);
+}
+
+.ndg-notif-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-faint);
+}
+
+.ndg-notif-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.ndg-notif-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+
+.ndg-notif-row:hover {
+  background: var(--bg-saffron);
+}
+
+.ndg-notif-row.is-unread {
+  border-left: 3px solid var(--accent-deep);
+}
+
+.ndg-notif-meta {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.ndg-notif-empty {
+  margin: 0;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
 /* Content column */
 .portal-main {
   grid-column: 2;
