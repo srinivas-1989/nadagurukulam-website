@@ -73,7 +73,7 @@ Last updated: 2026-10-10
 
 ### Phase 8 — LMS manual Phase 1 (next feature work)
 - [x] Assessment submission tracking (§201-205): `assessment_submissions` — due dates, late/submitted/evaluated states, file/video-link/text answers. Server-side gates (self-create at View, ownership on update, Manage for evaluate, duplicate + draft-publish checks) + standalone `/assessment` page. (2026-10-10)
-- [ ] Attendance (§206-208): `class_sessions`, `attendance_records`, `attendance_states` — markdown + rollup.
+- [x] Attendance (§206-208): `class_sessions`, `attendance_records`, `attendance_states` — session create (duplicate guard, created_by/taught_by), Manage-only markdown with state + registration checks, idempotent re-mark, and derived rollup endpoint `GET /api/attendance-summary` (present/total server-side). Standalone `/attendance` page: teacher session + roster marking, student own percentage. (2026-10-10)
 - [ ] Results / evaluation publication (§219-226): `evaluations`, `results`, `result_corrections`, grading schemes/rubrics.
 
 ### Phase 9 — The 8 (analytics / integrations / mobile / etc.)
@@ -84,7 +84,7 @@ Last updated: 2026-10-10
 - (4 more items to be enumerated with Srinivas as they arise — mirror of "8 of Phase 8".)
 
 ## Current task
-**Phase 8 — LMS manual features.** Assessment submission tracking (§201-205) done. Next: Attendance (§206-208) — `class_sessions`, `attendance_records`, `attendance_states`; mark student attendance per session and roll up per-student/per-course state summaries. `backend/server.js` already maps these tables to module key `assessment`; build the due/rollup logic server-side per rule 7.
+**Phase 8 — LMS manual features.** Assessment (§201-205) and Attendance (§206-208) done. Next: Results / evaluation publication (§219-226) — `evaluations`, `results`, `result_corrections`, grading schemes/rubrics. Manual §14/§15: Assessment → Submission/Performance → Evaluation → Grade/Score → Result; rubrics data-driven. Server-side per rule 7.
 
 ## Verification checklist (every task)
 - [ ] `cd frontend && npm run build`

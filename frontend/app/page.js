@@ -17,6 +17,7 @@ import PublicPortalPage from './public-portal/page';
 import StudentAssessmentPage from './dossiers/page';
 import AcademicMasterPage from './academic-master/page';
 import AssessmentPage from './assessment/page';
+import AttendancePage from './attendance/page';
 import { CmsSections } from './public-sections';
 
 // The column holds a year, but a date picker is far easier to hit than a
@@ -6741,12 +6742,13 @@ const handleAddDiscipline = async (e) => {
             {activeModule === 'public-portal' && <PublicPortalPage />}
             {activeModule === 'dossiers' && <StudentAssessmentPage />}
             {activeModule === 'assessment' && <AssessmentPage />}
+            {activeModule === 'attendance' && <AttendancePage />}
             {activeModule === 'residential' && <ResidentialPage />}
             {activeModule === 'finance' && <FinancePage />}
             {activeModule === 'hr' && <HRPage />}
 
             {/* DEFAULT FALLBACK FOR OTHER MODULES */}
-            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential', 'finance', 'hr', 'assessment'].includes(activeModule) && (
+            {![ 'overview', 'users', 'curriculum', 'timetable', 'batches', 'lessonplans', 'liveclasses', 'assignments', 'feedback', 'events', 'jobs', 'enquiries', 'performances', 'roles', 'organisation', 'admissions', 'academic-calendar', 'academic-master', 'course-offerings', 'course-registration', 'lms', 'public-portal', 'dossiers', 'mentorship', 'residential', 'finance', 'hr', 'assessment', 'attendance'].includes(activeModule) && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: '24px' }}>
                 <h4 style={{ fontSize: '16px', color: 'var(--primary)', marginBottom: '8px' }}>
                   {MODULES.find(m => m.key === activeModule)?.name} — Portal Module

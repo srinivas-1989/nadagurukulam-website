@@ -458,6 +458,11 @@ function applyListScope(query, table, level, profile, ownedBatchIds) {
     if (level === 'Manage' || level === 'Full') return query;
     return query.eq('student_id', profile.id);
   }
+  // A student sees only their own attendance; teachers and admins see the roster.
+  if (table === 'attendance_records') {
+    if (level === 'Manage' || level === 'Full') return query;
+    return query.eq('student_id', profile.id);
+  }
   if (table === 'assignment_submissions') {
     if (level === 'Manage' || level === 'Full') return query;
     if (level === 'Own') {
@@ -525,6 +530,13 @@ async function checkRowOwnership(table, level, profile, rowId) {
     return false;
   }
   if (table === 'assessment_submissions') {
+    const { data: row } = await supabase.from(table).select('student_id').eq('id', rowId).single();
+    if (!row) return true;
+    if (String(row.student_id) === String(profile.id)) return true;
+    if ((LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage']) return true;
+    return false;
+  }
+  if (table === 'attendance_records') {
     const { data: row } = await supabase.from(table).select('student_id').eq('id', rowId).single();
     if (!row) return true;
     if (String(row.student_id) === String(profile.id)) return true;
@@ -776,10 +788,35 @@ const crud = (table, orderCol = 'created_at') => ({
         if (!req.body.course_offering_id) return res.status(400).json({ error: 'course_offering_id is required' });
         if (!req.body.session_date) return res.status(400).json({ error: 'session_date is required' });
         if (req.body.status && !['planned','held','cancelled'].includes(req.body.status)) return res.status(400).json({ error: 'Invalid status' });
+        if (req.body.delivery_mode && !['room','online','hybrid'].includes(req.body.delivery_mode)) return res.status(400).json({ error: 'Invalid delivery_mode' });
         if (req.body.start_time && req.body.end_time && req.body.end_time < req.body.start_time) return res.status(400).json({ error: 'end_time cannot be before start_time' });
+        if (!req.body.created_by) req.body.created_by = req.auth.profile.id;
+        // The teacher running the session defaults to whoever scheduled it.
+        if (!req.body.taught_by) req.body.taught_by = req.auth.profile.id;
+        // The DB has a unique index on (offering, date, start_time); surface the
+        // clash as 409 instead of a raw 23505 so the UI can say what happened.
+        if (req.body.session_date) {
+          let dupQuery = supabase.from('class_sessions').select('id')
+            .eq('course_offering_id', req.body.course_offering_id).eq('session_date', req.body.session_date);
+          dupQuery = req.body.start_time ? dupQuery.eq('start_time', req.body.start_time) : dupQuery.is('start_time', null);
+          const { data: dup } = await dupQuery.maybeSingle();
+          if (dup) return res.status(409).json({ error: 'A session already exists for this offering at that date and time.' });
+        }
       }
       if (table === 'attendance_records') {
         if (!req.body.class_session_id || !req.body.student_id || !req.body.state_id) return res.status(400).json({ error: 'class_session_id, student_id, state_id required' });
+        const marking = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        if (!marking) return res.status(403).json({ error: 'Only teachers can mark attendance.' });
+        const { data: sess } = await supabase.from('class_sessions').select('id, course_offering_id').eq('id', req.body.class_session_id).maybeSingle();
+        if (!sess) return res.status(404).json({ error: 'Class session not found' });
+        const { data: st } = await supabase.from('attendance_states').select('id').eq('id', req.body.state_id).maybeSingle();
+        if (!st) return res.status(400).json({ error: 'Unknown attendance state' });
+        // Only a student registered for the session's offering can be marked.
+        const { data: reg } = await supabase.from('course_registrations').select('id')
+          .eq('course_offering_id', sess.course_offering_id).eq('student_id', req.body.student_id).maybeSingle();
+        if (!reg) return res.status(400).json({ error: 'Student is not registered for this course offering.' });
+        req.body.marked_by = req.auth.profile.id;
+        if (!req.body.marked_at) req.body.marked_at = new Date().toISOString();
       }
       if (table === 'assessment_submissions') {
         if (!req.body.assessment_id) return res.status(400).json({ error: 'assessment_id required' });
@@ -1041,6 +1078,25 @@ const crud = (table, orderCol = 'created_at') => ({
         if (!isRecipient && !isManage) return res.status(403).json({ error: 'You do not own this record.' });
         let ud = { ...req.body };
         if (!isManage) { delete ud.recipient_id; delete ud.sent_at; ud.status = 'read'; }
+        const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
+        if (error) throw error;
+        return res.json(data[0]);
+      }
+      if (table === 'attendance_records') {
+        const { data: cur } = await supabase.from('attendance_records').select('student_id, class_session_id').eq('id', req.params.id).maybeSingle();
+        if (!cur) return res.status(404).json({ error: 'Attendance record not found' });
+        const marking = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+        if (!marking) return res.status(403).json({ error: 'Only teachers can change attendance.' });
+        let ud = { ...req.body };
+        // A correction re-points the state or notes; the student and session are fixed.
+        delete ud.student_id; delete ud.class_session_id;
+        if (ud.state_id) {
+          const { data: st } = await supabase.from('attendance_states').select('id').eq('id', ud.state_id).maybeSingle();
+          if (!st) return res.status(400).json({ error: 'Unknown attendance state' });
+        }
+        ud.marked_by = req.auth.profile.id;
+        ud.marked_at = new Date().toISOString();
+        if (TABLES_WITH_UPDATED_AT.has(table)) ud.updated_at = new Date().toISOString();
         const { data, error } = await supabase.from(table).update(ud).eq('id', req.params.id).select();
         if (error) throw error;
         return res.json(data[0]);
@@ -1518,7 +1574,7 @@ const rolesDelete = async (req, res) => {
 };
 
 // Routing Registry — one generic CRUD per API key, mapped to its (sometimes differently-named) table.
-const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'assignment_submissions', 'assessment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments', 'documents']);
+const TABLES_WITH_UPDATED_AT = new Set(['users', 'events', 'enquiries', 'class_entries', 'class_confirmations', 'class_sessions', 'attendance_records', 'assignment_submissions', 'assessment_submissions', 'projects', 'certificates', 'employees', 'fee_structures', 'fee_payments', 'documents']);
 const TABLE_FOR = { curriculum: 'disciplines', timetable: 'timetable_slots', liveclasses: 'live_sessions', lessonplans: 'lesson_plans' };
 const ORDER_FOR = { courses: 'code', course_modules: 'module_number', course_module_topics: 'sort_order', disciplines: 'name', examination_types: 'name', roles: 'name', role_permissions: 'module_key', user_permissions: 'module_key', category_level_values: 'sort_order', user_categories: 'sort_order', class_entries: 'class_date', class_confirmations: 'created_at', assignment_submissions: 'created_at', projects: 'created_at', certificates: 'created_at', timetable_periods: 'sort_order', program_categories: 'sort_order', course_syllabi: 'created_at', academic_years: 'start_date', terms: 'sequence', course_offerings: 'created_at', course_registrations: 'registered_at', faculty_assignments: 'created_at', student_relationships: 'created_at', mentor_progress_notes: 'created_at', attendance_states: 'sort_order', class_sessions: 'session_date', attendance_records: 'created_at', grading_schemes: 'name', rubrics: 'name', rubric_criteria: 'sort_order', assessment_plans: 'created_at', assessments: 'due_date', assessment_submissions: 'submitted_at', evaluations: 'evaluated_at', results: 'created_at', result_corrections: 'created_at', employees: 'created_at', fee_structures: 'name', fee_items: 'name', fee_payments: 'payment_date', salary_slips: 'created_at', document_folders: 'name', documents: 'title', media: 'title', notification_templates: 'name', notifications: 'sent_at' };
 
@@ -1635,6 +1691,45 @@ app.delete('/api/enrollments/:id', authMiddleware, async (req, res) => {
     if (error) throw error;
     await recordAudit(req, { action: 'delete', entityType: 'enrollments', entityId: req.params.id, summary: `Deleted enrolment of student ${cur.student_id} from batch ${cur.batch_id}`, previousValue: cur });
     res.status(204).send();
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Attendance rollup (§206-208). Present/total is computed server-side only, so
+// every client shows the same figure for the same person. A student may ask for
+// their own percentages; teachers and admins may ask for a whole offering.
+app.get('/api/attendance-summary', authMiddleware, async (req, res) => {
+  try {
+    const level = await requireLevel(req, res, 'assessment', 'list');
+    if (!level) return;
+    const me = req.auth.profile;
+    const canSeeAll = (LEVEL_ORDER[level] ?? 0) >= LEVEL_ORDER['Manage'];
+    let studentId = req.query.student_id || null;
+    if (!canSeeAll) studentId = me.id;
+    const offeringId = req.query.course_offering_id || null;
+
+    let q = supabase.from('attendance_records')
+      .select('student_id, state:attendance_states(counts_as_present), session:class_sessions!inner(course_offering_id, status)');
+    if (studentId) q = q.eq('student_id', studentId);
+    const { data: rows, error } = await q;
+    if (error) throw error;
+
+    const byStudent = {};
+    (rows || []).forEach(r => {
+      const sess = r.session || {};
+      if (sess.status && sess.status !== 'held') return; // planned/cancelled never count
+      if (offeringId && sess.course_offering_id !== offeringId) return;
+      const sid = r.student_id;
+      const b = byStudent[sid] || (byStudent[sid] = { student_id: sid, held: 0, present: 0, by_state: {} });
+      b.held += 1;
+      if (r.state && r.state.counts_as_present) b.present += 1;
+    });
+    const students = Object.values(byStudent).map(b => ({
+      student_id: b.student_id,
+      held: b.held,
+      present: b.present,
+      percentage: b.held ? Math.round((b.present / b.held) * 1000) / 10 : null,
+    }));
+    res.json({ course_offering_id: offeringId, students });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
